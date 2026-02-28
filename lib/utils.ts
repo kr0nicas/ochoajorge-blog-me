@@ -29,8 +29,8 @@ export const siteConfig = {
     title: "Jorge Ochoa — Software Architect & Developer",
     description:
         "Software architect, Python & Next.js developer. Writing about Clean Architecture, AI systems, and building production-grade software.",
-    url: "https://jorgeochoa.dev",
-    ogImage: "https://jorgeochoa.dev/og.png",
+    url: "https://ochoajorge.me",
+    ogImage: "https://ochoajorge.me/og.png",
     author: {
         name: "Jorge Ochoa",
         twitter: "@jorgeochoa",

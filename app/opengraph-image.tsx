@@ -101,7 +101,7 @@ export default function Image() {
                             letterSpacing: "-0.01em",
                         }}
                     >
-                        jorgeochoa.dev
+                        ochoajorge.me
                     </span>
                 </div>
 

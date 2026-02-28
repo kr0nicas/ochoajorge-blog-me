@@ -7,7 +7,7 @@ export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 interface Props {
-    params: Promise<{ slug: string }>;
+    params: Promise<{ slug: string; lang: string }>;
 }
 
 /**
@@ -15,8 +15,8 @@ interface Props {
  * Generates a branded card with the post title, description, and tags.
  */
 export default async function Image({ params }: Props) {
-    const { slug } = await params;
-    const post = getPostBySlug(slug);
+    const { slug, lang } = await params;
+    const post = getPostBySlug(slug, lang);
 
     const title = post?.title ?? "Blog Post";
     const description = post?.description ?? "";
@@ -104,7 +104,7 @@ export default async function Image({ params }: Props) {
                         {"</>"}
                     </div>
                     <span style={{ fontSize: "16px", color: "#64748b", fontWeight: 500 }}>
-                        jorgeochoa.dev
+                        ochoajorge.me
                     </span>
                 </div>
 
