@@ -68,7 +68,7 @@ export default async function TagPage({ params }: TagPageProps) {
                     </div>
 
                     {/* Posts */}
-                    <ul className="space-y-4" role="list">
+                    <ul className="grid gap-5 sm:grid-cols-2" role="list">
                         {posts.map((post) => (
                             <li key={post.slug}>
                                 <PostCard post={post} lang={lang} />

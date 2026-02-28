@@ -106,7 +106,7 @@ export default async function SeriesPage({ params }: SeriesPageProps) {
 
                         {/* Post content */}
                         <div className="flex-1 pb-12">
-                            <PostCard post={post} featured={index === 0} lang={lang} />
+                            <PostCard post={post} lang={lang} />
                         </div>
                     </div>
                 ))}

@@ -32,9 +32,9 @@ const config: Config = {
                 },
             },
             fontFamily: {
-                sans: ["var(--font-inter)", "system-ui", "sans-serif"],
-                display: ["var(--font-outfit)", "system-ui", "sans-serif"],
-                mono: ["var(--font-jetbrains-mono)", "Menlo", "monospace"],
+                sans: ["var(--font-jetbrains-mono)", "ui-monospace", "monospace"],
+                display: ["var(--font-jetbrains-mono)", "ui-monospace", "monospace"],
+                mono: ["var(--font-jetbrains-mono)", "ui-monospace", "monospace"],
             },
             typography: {
                 DEFAULT: {

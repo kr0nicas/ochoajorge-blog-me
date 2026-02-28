@@ -61,9 +61,9 @@ export default async function BlogPage({
                 </div>
             ) : (
                 <ul className="grid gap-5 sm:grid-cols-2" role="list">
-                    {posts.map((post, idx) => (
-                        <li key={post.slug} className={idx === 0 ? "sm:col-span-2" : ""}>
-                            <PostCard post={post} featured={idx === 0} lang={lang} />
+                    {posts.map((post) => (
+                        <li key={post.slug}>
+                            <PostCard post={post} lang={lang} />
                         </li>
                     ))}
                 </ul>

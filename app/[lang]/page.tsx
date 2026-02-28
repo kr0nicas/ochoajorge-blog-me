@@ -69,9 +69,8 @@ export default async function HomePage({
               <AnimatedSection
                 key={post.slug}
                 delay={i * 0.08}
-                className={i === 0 ? "sm:col-span-2" : ""}
               >
-                <PostCard post={post} featured={i === 0} lang={lang} />
+                <PostCard post={post} lang={lang} />
               </AnimatedSection>
             ))}
           </div>
