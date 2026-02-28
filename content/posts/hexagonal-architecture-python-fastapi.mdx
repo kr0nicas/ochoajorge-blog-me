@@ -1,0 +1,195 @@
+---
+title: "Hexagonal Architecture in Python: When to Use It and When It's Overkill"
+description: "A practical breakdown of Ports & Adapters architecture in Python FastAPI services — real patterns, trade-offs, and the honest answer to 'do I actually need this'."
+date: "2026-02-20"
+tags: ["python", "architecture", "fastapi", "clean-architecture", "backend"]
+draft: false
+---
+
+## The Question Nobody Asks Honestly
+
+Every architecture talk starts with the happy path. Clean diagrams, perfect separation, no legacy code.
+
+Here's the real question: **should you use Hexagonal Architecture for your next FastAPI service?**
+
+My honest answer: *probably not for your first version, definitely for your second*.
+
+## What Is Hexagonal Architecture?
+
+Alistair Cockburn named it in 2005. The idea is simple:
+
+> Your application has a core — the business logic. Everything else (HTTP, databases, queues, file systems) connects to that core through well-defined *ports* (interfaces). *Adapters* implement those ports.
+
+The hexagon is just a visual metaphor. What matters is the **dependency rule**: adapters depend on ports, never the other way around.
+
+```
+           ┌─────────────────────────┐
+HTTP ──────►  Port (Input)           │
+           │                         │
+           │    Application Core     │
+           │    (Pure Python)        │
+           │                         │
+           │  Port (Output) ◄── DB   │
+           └─────────────────────────┘
+```
+
+## A Real FastAPI Example
+
+Let's say you're building an invoice service. Here's how it looks in practice.
+
+### The Port (interface)
+
+```python
+# app/domain/ports/invoice_repository.py
+from abc import ABC, abstractmethod
+from typing import Optional
+from app.domain.entities import Invoice
+
+class InvoiceRepository(ABC):
+    """Output port — the core defines what it needs, not how it's done."""
+
+    @abstractmethod
+    async def save(self, invoice: Invoice) -> Invoice:
+        ...
+
+    @abstractmethod
+    async def find_by_id(self, invoice_id: str) -> Optional[Invoice]:
+        ...
+```
+
+### The Adapter (implementation)
+
+```python
+# app/infrastructure/persistence/postgres_invoice_repository.py
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.domain.ports.invoice_repository import InvoiceRepository
+from app.domain.entities import Invoice
+from app.infrastructure.models import InvoiceModel
+
+class PostgresInvoiceRepository(InvoiceRepository):
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def save(self, invoice: Invoice) -> Invoice:
+        model = InvoiceModel.from_domain(invoice)
+        self._session.add(model)
+        await self._session.flush()
+        return model.to_domain()
+
+    async def find_by_id(self, invoice_id: str) -> Invoice | None:
+        result = await self._session.get(InvoiceModel, invoice_id)
+        return result.to_domain() if result else None
+```
+
+### The Use Case (application core)
+
+```python
+# app/application/use_cases/create_invoice.py
+from dataclasses import dataclass
+from app.domain.ports.invoice_repository import InvoiceRepository
+from app.domain.entities import Invoice
+from decimal import Decimal
+
+@dataclass
+class CreateInvoiceCommand:
+    customer_id: str
+    total: Decimal
+
+class CreateInvoiceUseCase:
+    def __init__(self, repository: InvoiceRepository) -> None:
+        self._repo = repository
+
+    async def execute(self, cmd: CreateInvoiceCommand) -> Invoice:
+        invoice = Invoice.create(
+            customer_id=cmd.customer_id,
+            total=cmd.total,
+        )
+        return await self._repo.save(invoice)
+```
+
+### The FastAPI Handler (input adapter)
+
+```python
+# app/infrastructure/web/routers/invoices.py
+from fastapi import APIRouter, Depends
+from app.application.use_cases.create_invoice import (
+    CreateInvoiceUseCase,
+    CreateInvoiceCommand,
+)
+from app.infrastructure.dependencies import get_invoice_use_case
+
+router = APIRouter(prefix="/invoices")
+
+@router.post("/", status_code=201)
+async def create_invoice(
+    body: CreateInvoiceRequest,
+    use_case: CreateInvoiceUseCase = Depends(get_invoice_use_case),
+):
+    invoice = await use_case.execute(
+        CreateInvoiceCommand(
+            customer_id=body.customer_id,
+            total=body.total,
+        )
+    )
+    return InvoiceResponse.from_domain(invoice)
+```
+
+## The Real Trade-offs
+
+### What you gain
+
+**Testability without a database.** You can swap `PostgresInvoiceRepository` for an in-memory implementation in tests:
+
+```python
+class InMemoryInvoiceRepository(InvoiceRepository):
+    def __init__(self) -> None:
+        self._store: dict[str, Invoice] = {}
+
+    async def save(self, invoice: Invoice) -> Invoice:
+        self._store[invoice.id] = invoice
+        return invoice
+
+    async def find_by_id(self, invoice_id: str) -> Invoice | None:
+        return self._store.get(invoice_id)
+```
+
+Your use case tests run in milliseconds with no database dependency.
+
+**Swappable infrastructure.** When we moved from a monolith to microservices on Orbis 8, we swapped HTTP adapters for event-driven ones. The core business logic didn't change at all.
+
+### What you lose
+
+**Speed of initial development.** You're writing 3–5x more files than a simple CRUD FastAPI route. `models.py`, `entities.py`, `repository.py`, `use_case.py`, `router.py`, `schemas.py`, `dependencies.py`. That's a lot of ceremony.
+
+**Discoverability.** Junior devs struggle to trace the flow from HTTP request → database. "Where is the actual logic?" is a real question you'll answer many times.
+
+## When to Actually Use It
+
+| Scenario | Use Hexagonal? |
+|---|---|
+| MVP / prototype | ❌ No — go fast, prove the idea |
+| Internal CRUD tool | ❌ No — simplicity wins |
+| Core business domain (billing, inventory, invoicing) | ✅ Yes |
+| Service that will have multiple adapters (HTTP + CLI + queue) | ✅ Yes |
+| Team of 3+ working on the same domain | ✅ Yes |
+| You need to swap the database later | ✅ Yes |
+
+## The Pattern I Actually Use
+
+In production, I don't go full hexagonal everywhere. I use a **pragmatic hybrid**:
+
+1. **Strict hexagonal** for the core business domain (invoices, inventory, pricing rules)
+2. **Simple FastAPI + SQLAlchemy** for CRUD endpoints with no business logic
+3. **Shared domain entities** — the `Invoice`, `Order`, `Customer` dataclasses are always pure Python
+
+This means the parts that *change* are protected, and the parts that are *stable* stay simple.
+
+## Conclusion
+
+Hexagonal Architecture is a tool, not a religion. The real discipline is knowing when your code has crossed the threshold where the extra structure pays for itself.
+
+For me, the signal is: **"Can I test this use case without a running database?"** If the answer is no, and the logic is non-trivial, it's time to add the boundaries.
+
+---
+
+*Previously in this series: [Building a Multi-Tenant ERP with Clean Architecture and Next.js](/blog/building-multitenant-erp-clean-architecture)*
