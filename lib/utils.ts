@@ -36,6 +36,7 @@ export const siteConfig = {
         twitter: "@jorgeochoa",
         github: "https://github.com/jorgeochoa",
         linkedin: "https://linkedin.com/in/jorgeochoa",
+        bluesky: "https://bsky.app/profile/kr0nicas.bsky.social",
     },
     keywords: [
         "software architecture",

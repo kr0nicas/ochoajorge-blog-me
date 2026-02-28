@@ -2,12 +2,13 @@
 
 import { useRef } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
-import Link from "next/link";
-import { ArrowRight, Github, Linkedin, Sparkles } from "lucide-react";
+import { Github, Linkedin, Sparkles } from "lucide-react";
 
 interface HeroProps {
     githubUrl: string;
     linkedinUrl: string;
+    blueskyUrl: string;
+    lang: string;
     dict: {
         title: string;
         subtitle: string;
@@ -28,7 +29,19 @@ const itemVariants = {
     },
 } as const;
 
-export function Hero({ githubUrl, linkedinUrl, dict }: HeroProps) {
+// Bluesky SVG Icon
+const BlueskyIcon = ({ className }: { className?: string }) => (
+    <svg
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        className={className}
+        xmlns="http://www.w3.org/2000/svg"
+    >
+        <path d="M12 10.8c-1.32-2.31-3.6-5.8-6.12-6.84C3.36 2.94 2 3.6 2 6c0 1.2.6 4.8 1.2 6 .6 1.2 2.4 2.4 3.6 2.4-1.2 0-3 .6-3 1.8 0 1.8 1.8 4.2 4.2 4.2 3 0 4.8-2.4 4.8-4.2 0 1.8 1.8 4.2 4.8 4.2 2.4 0 4.2-2.4 4.2-4.2 0-1.2-1.8-1.8-3-1.8 1.2 0 3-1.2 3.6-2.4.6-1.2 1.2-4.8 1.2-6 0-2.4-1.36-3.06-3.88-2.04-2.52 1.04-4.8 4.53-6.12 6.84Z" />
+    </svg>
+);
+
+export function Hero({ githubUrl, linkedinUrl, blueskyUrl, lang, dict }: HeroProps) {
     const ref = useRef<HTMLElement>(null);
     const { scrollYProgress } = useScroll({
         target: ref,
@@ -41,112 +54,107 @@ export function Hero({ githubUrl, linkedinUrl, dict }: HeroProps) {
     return (
         <section ref={ref} className="relative overflow-hidden">
             {/* ── Layered background ──────────────────────────────── */}
-            <div className="absolute inset-0 bg-grid opacity-40" />
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_90%_70%_at_50%_-10%,rgba(99,102,241,0.25),transparent)]" />
-            <div className="absolute bottom-0 left-1/4 h-[500px] w-[500px] -translate-x-1/2 translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(34,211,238,0.08),transparent_70%)]" />
-
-            {/* Floating orbs */}
-            <motion.div
-                className="absolute right-[10%] top-[15%] h-48 w-48 rounded-full bg-[radial-gradient(circle,rgba(99,102,241,0.15),transparent_70%)]"
-                animate={{
-                    scale: [1, 1.15, 1],
-                    opacity: [0.5, 0.8, 0.5],
-                }}
-                transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-            />
+            <div className="absolute inset-0 bg-grid opacity-20" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_90%_70%_at_50%_-10%,rgba(99,102,241,0.15),transparent)]" />
 
             {/* ── Content ─────────────────────────────────────────── */}
             <motion.div
                 style={{ y, opacity }}
-                className="relative mx-auto max-w-4xl px-4 py-28 sm:px-6 sm:py-36 lg:px-8"
+                className="relative mx-auto max-w-5xl px-4 py-24 sm:px-6 sm:py-32 lg:px-8"
             >
                 <motion.div
                     variants={containerVariants}
                     initial="hidden"
                     animate="visible"
-                    className="flex flex-col items-start gap-6"
+                    className="flex flex-col gap-10"
                 >
-                    {/* Eyebrow badge */}
-                    <motion.div variants={itemVariants}>
-                        <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(99,102,241,0.35)] bg-[rgba(99,102,241,0.08)] py-1.5 pl-3 pr-4 text-sm text-[var(--brand-light)] backdrop-blur-sm">
-                            <motion.span
-                                className="flex h-2 w-2 rounded-full bg-[var(--accent)]"
-                                animate={{ scale: [1, 1.4, 1], opacity: [0.7, 1, 0.7] }}
-                                transition={{ duration: 2, repeat: Infinity }}
-                            />
-                            <Sparkles className="h-3.5 w-3.5" />
-                            Software Architect · Builder · Writer
+                    {/* Header Row: Photo + Name */}
+                    <div className="flex flex-col sm:flex-row items-center sm:items-end gap-6 sm:gap-10">
+                        {/* Profile Photo Placeholder */}
+                        <motion.div
+                            variants={itemVariants}
+                            className="relative group shrink-0"
+                        >
+                            <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-[var(--brand)] to-[var(--accent)] opacity-40 blur-md group-hover:opacity-75 transition-opacity duration-500" />
+                            <div className="relative h-32 w-32 sm:h-40 sm:w-40 overflow-hidden rounded-full border-2 border-[var(--border)] bg-[var(--bg-elevated)] shadow-2xl">
+                                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400&auto=format&fit=crop')] bg-cover bg-center grayscale group-hover:grayscale-0 transition-all duration-700 scale-110 group-hover:scale-100" />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-60" />
+                            </div>
+                        </motion.div>
+
+                        {/* Name & Badge */}
+                        <div className="flex flex-col items-center sm:items-start text-center sm:text-left">
+                            <motion.div variants={itemVariants} className="mb-4">
+                                <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(99,102,241,0.3)] bg-[rgba(99,102,241,0.06)] py-1.5 px-3.5 text-xs font-medium text-[var(--brand-light)] backdrop-blur-sm">
+                                    <Sparkles className="h-3 w-3" />
+                                    Software Architect · Builder
+                                </div>
+                            </motion.div>
+
+                            <motion.h1
+                                variants={itemVariants}
+                                className="font-display text-4xl font-extrabold leading-tight tracking-tight text-[var(--text-primary)] sm:text-6xl lg:text-7xl"
+                            >
+                                {lang === 'es' ? 'Soy ' : "I'm "}
+                                <span className="gradient-text">Jorge Ochoa</span>
+                            </motion.h1>
                         </div>
-                    </motion.div>
+                    </div>
 
-                    {/* Main heading */}
-                    <motion.h1
-                        variants={itemVariants}
-                        className="font-display text-5xl font-bold leading-[1.1] tracking-tight sm:text-6xl lg:text-7xl"
-                    >
-                        <span className="text-[var(--text-primary)]">
-                            {dict.title.split("Jorge Ochoa")[0]}
-                        </span>
-                        <span
-                            className="gradient-text"
-                            style={{
-                                filter: "drop-shadow(0 0 40px rgba(99,102,241,0.4))",
-                            }}
+                    {/* Bio & Socials Row */}
+                    <div className="max-w-3xl space-y-8">
+                        {/* Subheading */}
+                        <motion.p
+                            variants={itemVariants}
+                            className="text-lg leading-relaxed text-[var(--text-secondary)] sm:text-xl lg:text-2xl font-medium"
                         >
-                            Jorge Ochoa
-                        </span>
-                        <span className="text-[var(--text-primary)]">
-                            {dict.title.split("Jorge Ochoa")[1]}
-                        </span>
-                    </motion.h1>
+                            {dict.subtitle}
+                        </motion.p>
 
-                    {/* Subheading */}
-                    <motion.p
-                        variants={itemVariants}
-                        className="max-w-2xl text-lg leading-relaxed text-[var(--text-secondary)] sm:text-xl"
-                    >
-                        {dict.subtitle}
-                    </motion.p>
-
-                    {/* CTAs */}
-                    <motion.div
-                        variants={itemVariants}
-                        className="flex flex-wrap items-center gap-3"
-                    >
-                        <Link
-                            href="/blog"
-                            id="hero-cta-blog"
-                            className="group inline-flex items-center gap-2 rounded-xl bg-[var(--brand)] px-6 py-3 text-sm font-semibold text-white shadow-[0_0_28px_rgba(99,102,241,0.4)] transition-all duration-300 hover:bg-[var(--brand-dark)] hover:shadow-[0_0_40px_rgba(99,102,241,0.6)] active:scale-[0.98]"
+                        {/* Social Links */}
+                        <motion.div
+                            variants={itemVariants}
+                            className="flex flex-wrap items-center justify-center sm:justify-start gap-4"
                         >
-                            {dict.subtitle.includes("Construyendo") ? "Leer el blog" : "Read the blog"}
-                            <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
-                        </Link>
+                            <a
+                                href={githubUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="GitHub"
+                                className="group flex items-center gap-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-5 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition-all duration-300 hover:border-[var(--brand-light)] hover:text-[var(--text-primary)] hover:bg-[var(--brand)]/5"
+                            >
+                                <Github className="h-4 w-4" />
+                                GitHub
+                            </a>
 
-                        <a
-                            href={githubUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-6 py-3 text-sm font-semibold text-[var(--text-secondary)] backdrop-blur-sm transition-all duration-200 hover:border-[var(--border-strong)] hover:text-[var(--text-primary)] active:scale-[0.98]"
-                        >
-                            <Github className="h-4 w-4" />
-                            GitHub
-                        </a>
+                            <a
+                                href={linkedinUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="LinkedIn"
+                                className="group flex items-center gap-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-5 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition-all duration-300 hover:border-[var(--brand-light)] hover:text-[var(--text-primary)] hover:bg-[var(--brand)]/5"
+                            >
+                                <Linkedin className="h-4 w-4" />
+                                LinkedIn
+                            </a>
 
-                        <a
-                            href={linkedinUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-6 py-3 text-sm font-semibold text-[var(--text-secondary)] backdrop-blur-sm transition-all duration-200 hover:border-[var(--border-strong)] hover:text-[var(--text-primary)] active:scale-[0.98]"
-                        >
-                            <Linkedin className="h-4 w-4" />
-                            LinkedIn
-                        </a>
-                    </motion.div>
+                            <a
+                                href={blueskyUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="Bluesky"
+                                className="group flex items-center gap-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-5 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition-all duration-300 hover:border-[#0285FF] hover:text-[var(--text-primary)] hover:bg-[#0285FF]/5"
+                            >
+                                <BlueskyIcon className="h-4 w-4" />
+                                Bluesky
+                            </a>
+                        </motion.div>
+                    </div>
                 </motion.div>
             </motion.div>
 
             {/* Bottom fade to body */}
-            <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[var(--bg-base)] to-transparent" />
+            <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-[var(--bg-base)] to-transparent" />
         </section>
     );
 }

@@ -34,6 +34,8 @@ export default async function HomePage({
       <Hero
         githubUrl={siteConfig.author.github}
         linkedinUrl={siteConfig.author.linkedin}
+        blueskyUrl={siteConfig.author.bluesky}
+        lang={lang}
         dict={dict.hero}
       />
 

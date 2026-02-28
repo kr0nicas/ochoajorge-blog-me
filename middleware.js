@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
 
 const locales = ["es", "en"];
 const defaultLocale = "es";
 
-export function middleware(request: NextRequest) {
+export function middleware(request) {
     const pathname = request.nextUrl.pathname;
 
     // Check if pathname already has a locale
@@ -16,15 +15,15 @@ export function middleware(request: NextRequest) {
 
     // Redirect if there is no locale
     const locale = defaultLocale;
-    request.nextUrl.pathname = `/${locale}${pathname}`;
+    const url = request.nextUrl.clone();
+    url.pathname = `/${locale}${pathname}`;
 
     // URL transformation for localized routes
-    return NextResponse.redirect(request.nextUrl);
+    return NextResponse.redirect(url);
 }
 
 export const config = {
     matcher: [
-        // Skip all internal paths (_next)
-        "/((?!api|_next/static|_next/image|favicon.ico|feed.xml|icon.png|og.png).*)",
+        "/((?!api|_next|favicon.ico|feed.xml|icon.png|og.png).*)",
     ],
 };
