@@ -1,0 +1,45 @@
+---
+title: "IA + Next.js: Cómo construí este blog con Arquitectura de Agentes"
+description: "Una inmersión profunda en el stack tecnológico de ochoajorge.me y cómo utilicé agentes de IA para diseñar una plataforma de contenidos 'zero backend' y escalable."
+date: "2024-02-28"
+lang: "es"
+tags: ["Next.js", "AI Agents", "Vercel", "Web Architecture"]
+---
+
+Construir un blog personal suele ser un rito de iniciación para cualquier desarrollador. Pero como arquitecto de software, no quería simplemente "otro blog". Quería una plataforma que reflejara mi filosofía de ingeniería: **máximo rendimiento, mínima complejidad de infraestructura y orquestación liderada por IA.**
+
+En este primer post, quiero desglosar el stack que hace funcionar este sitio y, lo más importante, cómo puedes usar este mismo repositorio para configurar tu propio "Manager de Blog" basado en agentes.
+
+## El Stack: "The Zero Backend Philosophy"
+
+La arquitectura de este sitio se basa en eliminar el estado innecesario. No hay base de datos, no hay CMS externo, no hay servidores de imágenes configurados manualmente. Todo vive en el repositorio y en la infraestructura *edge* de Vercel.
+
+- **Next.js 15 (App Router + Turbopack)**: El corazón del sitio. Utilizamos SSG (Static Site Generation) para que cada post sea un archivo HTML estático cargado instantáneamente.
+- **Tailwind v4**: Implementamos un sistema de diseño basado en tokens. Olvídate de clases mágicas; todo el "vibe" del sitio (incluyendo la estética monoespaciada inspirada en referentes como Peter Steinberger) se gestiona desde variables CSS centralizadas.
+- **MDX (Markdown + JSX)**: Los posts no son solo texto. MDX nos permite inyectar componentes interactivos de React directamente en el contenido.
+- **Vercel Blob Storage**: Las imágenes de los artículos se gestionan mediante una herramienta de subida personalizada integrada en el blog que interactúa con el almacenamiento de Vercel. Nada de binarios pesados en Git.
+- **Giscus**: Comentarios basados en GitHub Discussions. Comunidad real sin necesidad de un backend de comentarios.
+
+## El Agente: El Ingeniero detrás del Código
+
+Lo que hace que este blog sea diferente no es solo el código, sino **cómo se escribió**. Este sitio ha sido orquestado por **Agentes de IA** (como Antigravity/Gemini) siguiendo un conjunto de reglas estratégicas definidas en un archivo `SKILL.md`.
+
+### ¿Por qué usar agentes?
+A diferencia de copiar y pegar código de un chat, el agente entiende la **estrategia**. Sabe que si quiero añadir un idioma nuevo, debe actualizar el middleware, los diccionarios y la estructura de archivos. Sabe que no debe subir imágenes a Git porque violaría nuestro principio de eficiencia.
+
+He dejado un archivo de "Skill" en el repositorio local (`.agent/skills/blog-manager/SKILL.md`) que actúa como la base de conocimientos para que cualquier IA pueda entrar al proyecto y agregar contenido respetando las decisiones arquitectónicas originales.
+
+## Cómo empezar tu propio blog automatizado
+
+He decidido dejar este repositorio como código abierto (`kr0nicas/ochoajorge-blog-me`) para que cualquiera pueda replicar este flujo:
+
+1. **Fork del Repositorio**: Clona la estructura y limpia los posts de ejemplo.
+2. **Configura Vercel Blob**: Conecta un Blob Store en tu panel de Vercel para habilitar la subida de imágenes.
+3. **Activa Giscus**: Habilita Discussions en tu repo y pon tus IDs en el componente `Comments`.
+4. **Define tu Skill**: Ajusta el archivo `.agent/skills/blog-manager/SKILL.md` con tus preferencias de diseño y tono de voz.
+
+## Lo que viene: OpenClaw
+
+Este es solo el comienzo. Mi meta es que la gestión de este blog no sea solo a través de una terminal o una herramienta web, sino una conversación fluida y automatizada. El próximo paso lógico es integrar este flujo en **OpenClaw**, permitiendo que la gestión de contenidos sea aún más autónoma y contextual.
+
+¿Tienes dudas sobre la arquitectura o quieres sugerir una feature? Nos vemos abajo en la sección de discusión (¡Powered by Giscus! 😉).

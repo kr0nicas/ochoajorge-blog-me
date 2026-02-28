@@ -1,0 +1,45 @@
+---
+title: "AI + Next.js: How I Built This Blog with Agentic Architecture"
+description: "A deep dive into ochoajorge.me's tech stack and how I used AI agents to design a 'zero backend', scalable content platform."
+date: "2024-02-28"
+lang: "en"
+tags: ["Next.js", "AI Agents", "Vercel", "Web Architecture"]
+---
+
+Building a personal blog is a rite of passage for any developer. But as a software architect, I didn’t just want "another blog." I wanted a platform that reflects my engineering philosophy: **maximum performance, minimal infrastructure complexity, and AI-led orchestration.**
+
+In this first post, I want to break down the stack that powers this site and, most importantly, how you can use this same repository to set up your own agent-based "Blog Manager."
+
+## The Stack: "The Zero Backend Philosophy"
+
+The architecture of this site is based on eliminating unnecessary state. No database, no external CMS, no manually configured image servers. Everything lives in the repository and on Vercel's edge infrastructure.
+
+- **Next.js 15 (App Router + Turbopack)**: The heart of the site. We use SSG (Static Site Generation) so every post is an instantly loaded static HTML file.
+- **Tailwind v4**: We implemented a design system based on tokens. Forget about magic classes; the entire "vibe" of the site (including the monospace aesthetic inspired by references like Peter Steinberger) is managed from centralized CSS variables.
+- **MDX (Markdown + JSX)**: Posts are not just text. MDX allows us to inject interactive React components directly into the content.
+- **Vercel Blob Storage**: Article images are managed through a custom upload tool integrated into the blog that interacts with Vercel's storage. No heavy binaries in Git.
+- **Giscus**: Comments based on GitHub Discussions. Real community without needing a comments backend.
+
+## The Agent: The Engineer Behind the Code
+
+What makes this blog different is not just the code, but **how it was written**. This site was orchestrated by **AI Agents** (like Antigravity/Gemini) following a set of strategic rules defined in a `SKILL.md` file.
+
+### Why use agents?
+Unlike copying and pasting code from a chat, the agent understands the **strategy**. It knows that if I want to add a new language, it must update the middleware, dictionaries, and file structure. It knows not to upload images to Git because it would violate our efficiency principle.
+
+I have left a "Skill" file in the local repository (`.agent/skills/blog-manager/SKILL.md`) that acts as the knowledge base for any AI to enter the project and add content respecting the original architectural decisions.
+
+## How to Start Your Own Automated Blog
+
+I have decided to leave this repository as open source (`kr0nicas/ochoajorge-blog-me`) so anyone can replicate this flow:
+
+1. **Fork the Repository**: Clone the structure and clean up the example posts.
+2. **Configure Vercel Blob**: Connect a Blob Store in your Vercel panel to enable image uploading.
+3. **Activate Giscus**: Enable Discussions in your repo and put your IDs in the `Comments` component.
+4. **Define Your Skill**: Adjust the `.agent/skills/blog-manager/SKILL.md` file with your design preferences and voice tone.
+
+## What's Next: OpenClaw
+
+This is just the beginning. My goal is for the management of this blog to be not just through a terminal or a web tool, but a fluid and automated conversation. The logical next step is to integrate this flow into **OpenClaw**, allowing content management to be even more autonomous and contextual.
+
+Have questions about the architecture or want to suggest a feature? See you below in the discussion section (Powered by Giscus! 😉).
