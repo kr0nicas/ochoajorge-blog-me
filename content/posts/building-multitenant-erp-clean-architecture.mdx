@@ -1,0 +1,95 @@
+---
+title: "Building a Multi-Tenant ERP with Clean Architecture and Next.js"
+description: "Lessons learned from architecting Orbis 8, a production SaaS ERP for SMBs in El Salvador. Clean Architecture, hexagonal patterns, and AI agents — what worked and what didn't."
+date: "2026-02-27"
+tags: ["architecture", "nextjs", "python", "saas", "clean-architecture"]
+draft: false
+---
+
+## The Problem
+
+Building an ERP from scratch in 2025 is a bold choice. Most teams reach for existing platforms — and for good reason. But when your market has very specific fiscal compliance requirements (like El Salvador's DTE electronic invoicing system), and you want AI-first workflows from day one, building gives you precision that buying can't.
+
+This is the story of Orbis 8, and what I learned from 6 months of designing its architecture.
+
+## Why Clean Architecture?
+
+I've worked with codebases that started "pragmatic" — direct database calls in controllers, business logic in React components, no clear separation. They work. Until they don't.
+
+The moment you need to:
+- Swap your ORM
+- Add a message queue
+- Write a unit test that doesn't require a running database
+
+...you realize you've painted yourself into a corner.
+
+Clean Architecture solves this by making **dependencies point inward**. Your business logic knows nothing about FastAPI, SQLAlchemy, or PostgreSQL. It just defines what needs to happen.
+
+```python
+# ✅ Domain entity — pure Python, zero dependencies
+from dataclasses import dataclass
+from decimal import Decimal
+
+@dataclass
+class Invoice:
+    id: str
+    total: Decimal
+    tax_rate: Decimal = Decimal("0.13")  # IVA 13% for El Salvador
+
+    @property
+    def tax_amount(self) -> Decimal:
+        return (self.total * self.tax_rate).quantize(Decimal("0.0001"))
+
+    @property
+    def subtotal(self) -> Decimal:
+        return self.total - self.tax_amount
+```
+
+## The Repository Pattern in Practice
+
+The interface in the domain, the implementation in the infrastructure layer:
+
+```python
+# domain/interfaces/invoice_repository.py
+from abc import ABC, abstractmethod
+from typing import Optional
+from domain.entities.invoice import Invoice
+
+class IInvoiceRepository(ABC):
+    @abstractmethod
+    async def find_by_id(self, invoice_id: str) -> Optional[Invoice]:
+        pass
+
+    @abstractmethod
+    async def save(self, invoice: Invoice) -> Invoice:
+        pass
+```
+
+This means my service layer can be tested **without a database**. I swap the real repository for a mock in tests. This is not theoretical — it saved us multiple times when the database schema was changing rapidly.
+
+## What I'd Do Differently
+
+### 1. Start with the event model
+
+We added Pub/Sub later. Adding async communication to a synchronous system is much harder than designing for it from the start. Define your domain events on day 1, even if you implement them later.
+
+### 2. MDX for documentation
+
+We use Confluence. We shouldn't. Every architectural decision that lived in Confluence died when the person who wrote it left. Keep decisions close to code, in `.md` files in the repo.
+
+### 3. Postgres schemas for multi-tenancy, not separate databases
+
+We use schema-level isolation (`access`, `billing`, `inventory` schemas). It's simpler to manage than database-per-tenant and still provides strong logical isolation.
+
+## Conclusion
+
+Clean Architecture adds upfront investment. The payoff is a codebase where:
+- Senior devs can onboard in hours, not days
+- AI agents (like Claude) can reason about the codebase structure reliably
+- Features can be added without touching unrelated modules
+
+The architecture serves the team. When the team grows, the architecture should bend gracefully — not break.
+
+---
+
+*Next post: Hexagonal Architecture in Python — when to use it and when it's overkill.*
