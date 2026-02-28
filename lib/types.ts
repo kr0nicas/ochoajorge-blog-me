@@ -11,6 +11,7 @@ export interface Post {
         name: string;
         part: number;
     };
+    featured?: boolean;
     lang?: "es" | "en";
 }
 

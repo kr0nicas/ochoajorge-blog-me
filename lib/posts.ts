@@ -47,6 +47,7 @@ export function getPostBySlug(slug: string, locale: string = "es"): PostWithCont
         readingTime: Math.ceil(stats.minutes),
         content,
         lang: locale as "es" | "en",
+        featured: data.featured ?? false,
         series: data.series ? {
             name: data.series.name,
             part: data.series.part
@@ -61,7 +62,11 @@ export function getAllPosts(locale: string = "es"): Post[] {
     return getPostSlugs(locale)
         .map((slug) => getPostBySlug(slug, locale))
         .filter((post): post is PostWithContent => post !== null)
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        .sort((a, b) => {
+            if (a.featured && !b.featured) return -1;
+            if (!a.featured && b.featured) return 1;
+            return new Date(b.date).getTime() - new Date(a.date).getTime();
+        });
 }
 
 /**
