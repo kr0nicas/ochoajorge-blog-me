@@ -8,7 +8,7 @@ import { siteConfig } from "@/lib/utils";
  * Comments component using Giscus (GitHub Discussions-based).
  * Requires the repo to have Discussions enabled and configured.
  */
-export function Comments() {
+export function Comments({ lang }: { lang: string }) {
     const { theme } = useTheme();
 
     return (
@@ -19,17 +19,17 @@ export function Comments() {
             <div className="rounded-2xl bg-[var(--bg-elevated)]/30 p-4 sm:p-8 backdrop-blur-md border border-[var(--border)] shadow-xl">
                 <Giscus
                     id="comments"
-                    repo="jorgeochoa/personal-blog" // USER: Make sure this is your correct repo!
-                    repoId="R_kgDON-H2mQ"        // Placeholder — normally obtained from giscus.app
-                    category="General"
-                    categoryId="DIC_kwDON-H2mc4Cn8C6" // Placeholder
+                    repo="kr0nicas/ochoajorge-blog-me"
+                    repoId="R_kgDORa5J1g"
+                    category="Show and tell"
+                    categoryId="DIC_kwDORa5J1s4C3Yzk"
                     mapping="pathname"
                     term="Welcome to my blog!"
                     reactionsEnabled="1"
                     emitMetadata="0"
-                    inputPosition="top"
+                    inputPosition="bottom"
                     theme={theme === "dark" ? "transparent_dark" : "light"}
-                    lang="en"
+                    lang={lang === "es" ? "es" : "en"}
                     loading="lazy"
                 />
             </div>

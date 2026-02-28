@@ -111,7 +111,7 @@ export default async function PostPage({ params }: PostPageProps) {
                             </div>
 
                             {/* Discussion */}
-                            <Comments />
+                            <Comments lang={lang} />
 
                             {/* Footer */}
                             <footer className="mt-16 border-t border-[var(--border)] pt-8">
