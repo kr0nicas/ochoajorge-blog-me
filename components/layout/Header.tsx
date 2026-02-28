@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { Menu, X, Code2, Globe } from "lucide-react";
+import { Menu, X, Code2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Search } from "@/components/blog/Search";
@@ -24,10 +24,6 @@ export function Header({ lang }: HeaderProps) {
         { href: `/${lang}/projects`, label: dict.nav.projects },
         { href: `/${lang}/about`, label: dict.nav.about },
     ];
-
-    // Language switcher logic
-    const toggleLang = lang === "es" ? "en" : "es";
-    const newPathname = pathname.replace(`/${lang}`, `/${toggleLang}`);
 
     useEffect(() => {
         const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -91,25 +87,57 @@ export function Header({ lang }: HeaderProps) {
                             })}
                         </nav>
 
-                        {/* Lang Switcher */}
-                        <Link
-                            href={newPathname}
-                            className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] transition-all hover:border-[var(--brand)] hover:text-[var(--text-primary)]"
-                        >
-                            <Globe className="h-3.5 w-3.5" />
-                            {toggleLang}
-                        </Link>
+                        {/* Lang Switcher (Simplified & Explicit) */}
+                        <div className="flex items-center gap-1 rounded-lg border border-[var(--border)] p-1 bg-[var(--bg-elevated)]/30 backdrop-blur-sm">
+                            <Link
+                                href={pathname.replace(`/${lang}`, "/es")}
+                                className={cn(
+                                    "px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all",
+                                    lang === "es"
+                                        ? "bg-[var(--brand)] text-white shadow-lg shadow-[var(--brand)]/20"
+                                        : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                                )}
+                            >
+                                ES
+                            </Link>
+                            <span className="h-3 w-px bg-[var(--border-strong)]" />
+                            <Link
+                                href={pathname.replace(`/${lang}`, "/en")}
+                                className={cn(
+                                    "px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all",
+                                    lang === "en"
+                                        ? "bg-[var(--brand)] text-white shadow-lg shadow-[var(--brand)]/20"
+                                        : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                                )}
+                            >
+                                EN
+                            </Link>
+                        </div>
                     </div>
 
                     {/* Mobile: Search + Menu Button */}
                     <div className="flex items-center gap-2 md:hidden">
                         <Search dict={dict.nav} />
-                        <Link
-                            href={newPathname}
-                            className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border)] text-xs font-bold uppercase text-[var(--text-secondary)]"
-                        >
-                            {toggleLang}
-                        </Link>
+                        <div className="flex items-center gap-1 rounded-lg border border-[var(--border)] p-0.5 bg-[var(--bg-elevated)]/30">
+                            <Link
+                                href={pathname.replace(`/${lang}`, "/es")}
+                                className={cn(
+                                    "px-1.5 py-1 text-[10px] font-bold uppercase rounded-md",
+                                    lang === "es" ? "bg-[var(--brand)] text-white" : "text-[var(--text-muted)]"
+                                )}
+                            >
+                                ES
+                            </Link>
+                            <Link
+                                href={pathname.replace(`/${lang}`, "/en")}
+                                className={cn(
+                                    "px-1.5 py-1 text-[10px] font-bold uppercase rounded-md",
+                                    lang === "en" ? "bg-[var(--brand)] text-white" : "text-[var(--text-muted)]"
+                                )}
+                            >
+                                EN
+                            </Link>
+                        </div>
                         <button
                             onClick={() => setMobileOpen(!mobileOpen)}
                             className="flex items-center justify-center rounded-lg p-2 text-[var(--text-secondary)] transition-colors hover:bg-[var(--border)] hover:text-[var(--text-primary)]"
