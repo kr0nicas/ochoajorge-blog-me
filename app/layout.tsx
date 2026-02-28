@@ -74,6 +74,12 @@ export const metadata: Metadata = {
     shortcut: "/favicon-16x16.png",
     apple: "/apple-touch-icon.png",
   },
+  alternates: {
+    canonical: "/",
+    types: {
+      "application/rss+xml": [{ url: "feed.xml", title: "Jorge Ochoa — RSS Feed" }],
+    },
+  },
 };
 
 export default function RootLayout({

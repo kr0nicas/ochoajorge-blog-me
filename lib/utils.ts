@@ -8,6 +8,18 @@ import { twMerge } from "tailwind-merge";
 export function cn(...inputs: ClassValue[]): string {
     return twMerge(clsx(inputs));
 }
+/**
+ * Slugify a string — converts to lowercase, handles spaces and special chars.
+ */
+export function slugify(text: string): string {
+    return text
+        .toString()
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, "-")
+        .replace(/[^\w-]+/g, "")
+        .replace(/--+/g, "-");
+}
 
 /**
  * Site configuration — single source of truth for metadata.
@@ -39,3 +51,14 @@ export const siteConfig = {
 };
 
 export type SiteConfig = typeof siteConfig;
+
+/**
+ * Format a date string for display.
+ */
+export function formatDate(dateString: string): string {
+    return new Date(dateString).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+    });
+}

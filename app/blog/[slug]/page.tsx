@@ -6,6 +6,7 @@ import { siteConfig } from "@/lib/utils";
 import { PostHeader } from "@/components/blog/PostHeader";
 import { ReadingProgress } from "@/components/blog/ReadingProgress";
 import { TableOfContents } from "@/components/blog/TableOfContents";
+import { SeriesBanner } from "@/components/blog/SeriesBanner";
 import Link from "next/link";
 import { Github } from "lucide-react";
 
@@ -100,6 +101,13 @@ export default async function PostPage({ params }: PostPageProps) {
                                 id="article-content"
                                 className="prose-blog prose prose-invert max-w-none"
                             >
+                                {post.series && (
+                                    <SeriesBanner
+                                        series={post.series}
+                                        currentSlug={post.slug}
+                                    />
+                                )}
+
                                 {content}
                             </div>
 

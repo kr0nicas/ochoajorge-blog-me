@@ -7,6 +7,10 @@ export interface Post {
     draft: boolean;
     coverImage?: string;
     readingTime?: number; // minutes
+    series?: {
+        name: string;
+        part: number;
+    };
 }
 
 export interface PostWithContent extends Post {

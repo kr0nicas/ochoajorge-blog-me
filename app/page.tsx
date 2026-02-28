@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { ArrowRight, Github, Linkedin } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import type { Metadata } from "next";
 import { getFeaturedPosts } from "@/lib/posts";
 import { PostCard } from "@/components/blog/PostCard";
+import { Hero } from "@/components/layout/Hero";
+import { AnimatedSection } from "@/components/shared/AnimatedSection";
 import { siteConfig } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -10,169 +12,128 @@ export const metadata: Metadata = {
   description: siteConfig.description,
 };
 
-const pillars = [
-  { label: "Architecture", emoji: "🏗️" },
-  { label: "Python", emoji: "🐍" },
-  { label: "Next.js", emoji: "▲" },
-  { label: "AI / LLMs", emoji: "🤖" },
-  { label: "SaaS / ERP", emoji: "🚀" },
+const stats = [
+  { value: "5+", label: "Years building" },
+  { value: "20+", label: "Projects shipped" },
+  { value: "∞", label: "Cups of coffee" },
 ];
 
 export default function HomePage() {
-  const featuredPosts = getFeaturedPosts(3);
+  const featuredPosts = getFeaturedPosts(4);
 
   return (
     <>
-      {/* ── Hero ─────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden">
-        {/* Subtle grid + radial gradient background */}
-        <div className="absolute inset-0 bg-grid opacity-50" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-20%,rgba(99,102,241,0.2),transparent)]" />
+      {/* ── Hero (Client — Framer Motion) ─────────────────────── */}
+      <Hero
+        githubUrl={siteConfig.author.github}
+        linkedinUrl={siteConfig.author.linkedin}
+      />
 
-        <div className="relative mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-24 sm:py-32">
-          {/* Eyebrow */}
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[rgba(99,102,241,0.3)] bg-[rgba(99,102,241,0.08)] px-4 py-1.5 text-sm text-[var(--brand-light)]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-pulse" />
-            Software Architect · Builder · Writer
-          </div>
-
-          {/* Main Heading */}
-          <h1 className="font-display text-4xl font-bold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
-            <span className="text-[var(--text-primary)]">Hi, I&apos;m </span>
-            <span className="gradient-text">Jorge Ochoa</span>
-          </h1>
-
-          {/* Subheading */}
-          <p className="mt-6 max-w-2xl text-lg text-[var(--text-secondary)] leading-relaxed">
-            I build production-grade software —{" "}
-            <span className="text-[var(--text-primary)] font-medium">
-              ERPs, AI agents, and developer platforms
-            </span>
-            . I write about the patterns, mistakes, and lessons learned along the way.
-          </p>
-
-          {/* Content Pillars */}
-          <div className="mt-6 flex flex-wrap gap-2">
-            {pillars.map(({ label, emoji }) => (
-              <span
-                key={label}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-secondary)]"
+      {/* ── Featured Posts ─────────────────────────────────────── */}
+      {featuredPosts.length > 0 && (
+        <section className="mx-auto max-w-5xl px-4 py-20 sm:px-6 lg:px-8">
+          <AnimatedSection>
+            <div className="mb-10 flex items-end justify-between">
+              <div>
+                <p className="mb-1 text-sm font-semibold uppercase tracking-widest text-[var(--brand-light)]">
+                  Writing
+                </p>
+                <h2 className="font-display text-3xl font-bold text-[var(--text-primary)] sm:text-4xl">
+                  Latest Articles
+                </h2>
+              </div>
+              <Link
+                href="/blog"
+                id="homepage-view-all-posts"
+                className="group hidden items-center gap-1.5 text-sm font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--brand-light)] sm:flex"
               >
-                <span>{emoji}</span>
-                {label}
-              </span>
+                View all
+                <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
+              </Link>
+            </div>
+          </AnimatedSection>
+
+          {/* Posts grid: first post spans full width, rest 2-col */}
+          <div className="grid gap-5 sm:grid-cols-2">
+            {featuredPosts.map((post, i) => (
+              <AnimatedSection
+                key={post.slug}
+                delay={i * 0.08}
+                className={i === 0 ? "sm:col-span-2" : ""}
+              >
+                <PostCard post={post} featured={i === 0} />
+              </AnimatedSection>
             ))}
           </div>
 
-          {/* CTAs */}
-          <div className="mt-8 flex flex-wrap gap-3">
+          <AnimatedSection delay={0.3} className="mt-6 sm:hidden">
             <Link
               href="/blog"
-              id="hero-cta-blog"
-              className="inline-flex items-center gap-2 rounded-xl bg-[var(--brand)] px-6 py-3 text-sm font-semibold text-white shadow-[0_0_24px_rgba(99,102,241,0.35)] transition-all duration-200 hover:bg-[var(--brand-dark)] hover:shadow-[0_0_32px_rgba(99,102,241,0.5)]"
+              className="flex items-center gap-1.5 text-sm font-medium text-[var(--brand-light)]"
             >
-              Read the blog
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-            <a
-              href={siteConfig.author.github}
-              target="_blank"
-              rel="noopener noreferrer"
-              id="hero-cta-github"
-              className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-6 py-3 text-sm font-semibold text-[var(--text-secondary)] transition-all duration-200 hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
-            >
-              <Github className="h-4 w-4" />
-              GitHub
-            </a>
-            <a
-              href={siteConfig.author.linkedin}
-              target="_blank"
-              rel="noopener noreferrer"
-              id="hero-cta-linkedin"
-              className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-6 py-3 text-sm font-semibold text-[var(--text-secondary)] transition-all duration-200 hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
-            >
-              <Linkedin className="h-4 w-4" />
-              LinkedIn
-            </a>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Featured Posts ────────────────────────────────────────── */}
-      {featuredPosts.length > 0 && (
-        <section className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-16">
-          <div className="mb-8 flex items-center justify-between">
-            <h2 className="font-display text-2xl font-bold text-[var(--text-primary)]">
-              Latest Writing
-            </h2>
-            <Link
-              href="/blog"
-              id="homepage-view-all-posts"
-              className="flex items-center gap-1.5 text-sm text-[var(--brand-light)] transition-opacity hover:opacity-80"
-            >
-              View all
+              View all articles
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {featuredPosts.map((post, i) => (
-              <PostCard
-                key={post.slug}
-                post={post}
-                featured={i === 0}
-                className={i === 0 ? "sm:col-span-2 lg:col-span-1" : ""}
-              />
-            ))}
-          </div>
+          </AnimatedSection>
         </section>
       )}
 
-      {/* ── About Teaser ─────────────────────────────────────────── */}
-      <section className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 pb-20">
-        <div className="card-glass p-8 lg:p-10">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:gap-10">
-            <div className="flex-1">
-              <h2 className="font-display text-2xl font-bold text-[var(--text-primary)]">
-                About me
-              </h2>
-              <p className="mt-3 text-[var(--text-secondary)] leading-relaxed">
-                I&apos;m a software architect and full-stack developer based in El Salvador.
-                Currently building{" "}
-                <span className="text-[var(--text-primary)] font-medium">Orbis 8</span>, a
-                multi-tenant ERP SaaS for SMBs, using Python, Go, and Next.js. I&apos;m
-                passionate about clean architecture, AI engineering, and developer experience.
-              </p>
-              <Link
-                href="/about"
-                id="homepage-about-link"
-                className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--brand-light)] transition-opacity hover:opacity-80"
-              >
-                More about me
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
+      {/* ── About Teaser ───────────────────────────────────────── */}
+      <section className="mx-auto max-w-5xl px-4 pb-24 sm:px-6 lg:px-8">
+        <AnimatedSection>
+          {/* Glass card with subtle border glow on hover */}
+          <div className="group relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[rgba(19,19,26,0.7)] p-8 backdrop-blur-xl transition-all duration-500 hover:border-[rgba(99,102,241,0.25)] hover:shadow-[0_0_60px_rgba(99,102,241,0.08)] lg:p-10">
+            {/* Decorative top-right glow orb */}
+            <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[radial-gradient(circle,rgba(99,102,241,0.12),transparent_70%)] transition-opacity duration-500 group-hover:opacity-150" />
 
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-4 lg:flex-shrink-0">
-              {[
-                { value: "5+", label: "Years" },
-                { value: "20+", label: "Projects" },
-                { value: "∞", label: "Coffee" },
-              ].map(({ value, label }) => (
-                <div
-                  key={label}
-                  className="flex flex-col items-center rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] p-4"
-                >
-                  <span className="font-display text-2xl font-bold gradient-text">
-                    {value}
+            <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:gap-12">
+              {/* Bio */}
+              <div className="flex-1">
+                <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-[var(--brand-light)]">
+                  About
+                </p>
+                <h2 className="font-display text-2xl font-bold text-[var(--text-primary)] sm:text-3xl">
+                  Jorge Ochoa
+                </h2>
+                <p className="mt-4 leading-relaxed text-[var(--text-secondary)]">
+                  Software architect and full-stack developer based in El
+                  Salvador. Currently building{" "}
+                  <span className="font-medium text-[var(--text-primary)]">
+                    Orbis 8
                   </span>
-                  <span className="mt-1 text-xs text-[var(--text-muted)]">{label}</span>
-                </div>
-              ))}
+                  , a multi-tenant ERP SaaS for SMBs, using Python, Go,
+                  and Next.js. Passionate about clean architecture, AI
+                  engineering, and developer tooling.
+                </p>
+                <Link
+                  href="/about"
+                  id="homepage-about-link"
+                  className="group/link mt-5 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--brand-light)] transition-opacity hover:opacity-80"
+                >
+                  More about me
+                  <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover/link:translate-x-0.5" />
+                </Link>
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-3 gap-3 lg:w-60 lg:grid-cols-1 lg:gap-3">
+                {stats.map(({ value, label }) => (
+                  <div
+                    key={label}
+                    className="flex flex-col items-center rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-4 text-center transition-all duration-200 hover:border-[rgba(99,102,241,0.25)] lg:items-start lg:text-left"
+                  >
+                    <span className="font-display text-2xl font-bold gradient-text">
+                      {value}
+                    </span>
+                    <span className="mt-0.5 text-xs text-[var(--text-muted)]">
+                      {label}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        </AnimatedSection>
       </section>
     </>
   );

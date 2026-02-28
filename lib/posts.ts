@@ -47,6 +47,10 @@ export function getPostBySlug(slug: string): PostWithContent | null {
         coverImage: data.coverImage,
         readingTime: Math.ceil(stats.minutes),
         content,
+        series: data.series ? {
+            name: data.series.name,
+            part: data.series.part
+        } : undefined
     };
 }
 
@@ -88,12 +92,21 @@ export function getFeaturedPosts(count = 3): Post[] {
 }
 
 /**
- * Format a date string for display.
+ * Get all posts belonging to a specific series, sorted by part number.
  */
-export function formatDate(dateString: string): string {
-    return new Date(dateString).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-    });
+export function getPostsBySeries(seriesName: string): Post[] {
+    return getAllPosts()
+        .filter((post) => post.series?.name === seriesName)
+        .sort((a, b) => (a.series?.part ?? 0) - (b.series?.part ?? 0));
 }
+
+/**
+ * Get all unique series names across all posts.
+ */
+export function getAllSeries(): string[] {
+    const allSeries = getAllPosts()
+        .map((post) => post.series?.name)
+        .filter((name): name is string => !!name);
+    return [...new Set(allSeries)].sort();
+}
+

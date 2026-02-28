@@ -6,33 +6,33 @@
 /* ─── Design Tokens ──────────────────────────────────────────────── */
 :root {
   /* Background scale */
-  --bg-base:        #0a0a0f;
-  --bg-surface:     #13131a;
-  --bg-elevated:    #1a1a24;
+  --bg-base: #0a0a0f;
+  --bg-surface: #13131a;
+  --bg-elevated: #1a1a24;
 
   /* Brand: Indigo */
-  --brand:          #6366f1;
-  --brand-light:    #818cf8;
-  --brand-dark:     #4f46e5;
+  --brand: #6366f1;
+  --brand-light: #818cf8;
+  --brand-dark: #4f46e5;
 
   /* Accent: Cyan */
-  --accent:         #22d3ee;
-  --accent-light:   #67e8f9;
-  --accent-dark:    #0891b2;
+  --accent: #22d3ee;
+  --accent-light: #67e8f9;
+  --accent-dark: #0891b2;
 
   /* Text */
-  --text-primary:   #f1f5f9;
+  --text-primary: #f1f5f9;
   --text-secondary: #94a3b8;
-  --text-muted:     #475569;
+  --text-muted: #475569;
 
   /* Borders */
-  --border:         rgba(255, 255, 255, 0.06);
-  --border-strong:  rgba(255, 255, 255, 0.12);
+  --border: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.12);
 
   /* Shadows */
-  --shadow-brand:   0 0 30px rgba(99, 102, 241, 0.25);
-  --shadow-card:    0 4px 24px rgba(0, 0, 0, 0.4);
-  --shadow-glass:   0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-brand: 0 0 30px rgba(99, 102, 241, 0.25);
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4);
+  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.5);
 
   /* Semantic (used by Tailwind) */
   --background: var(--bg-base);
@@ -254,4 +254,114 @@ body {
 .tag:hover {
   background: rgba(99, 102, 241, 0.2);
   border-color: rgba(99, 102, 241, 0.4);
+}
+
+/* ─── Prose: decorated headings ─────────────────────────────── */
+.prose-blog h2 {
+  position: relative;
+  padding-left: 1rem;
+  margin-top: 2.5rem;
+}
+
+.prose-blog h2::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.1em;
+  bottom: 0.1em;
+  width: 3px;
+  border-radius: 2px;
+  background: linear-gradient(to bottom, var(--brand), var(--accent));
+}
+
+.prose-blog h3 {
+  position: relative;
+  padding-left: 0.75rem;
+  margin-top: 2rem;
+}
+
+.prose-blog h3::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.15em;
+  bottom: 0.15em;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--brand-light);
+  opacity: 0.6;
+}
+
+/* ─── Prose: table styling ───────────────────────────────────── */
+.prose-blog table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.875rem;
+}
+
+.prose-blog th {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-weight: 600;
+  padding: 0.6rem 1rem;
+  text-align: left;
+  border: 1px solid var(--border-strong);
+}
+
+.prose-blog td {
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.prose-blog tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+/* ─── In-view fade-slide utility ─────────────────────────────── */
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-slide-up {
+  animation: fadeSlideUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ─── Glow border animation (for premium cards) ─────────────── */
+@keyframes glowPulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.1);
+  }
+
+  50% {
+    box-shadow: 0 0 40px rgba(99, 102, 241, 0.25);
+  }
+}
+
+.glow-pulse {
+  animation: glowPulse 3s ease-in-out infinite;
+}
+
+/* ─── Noise texture overlay (premium dark mood) ──────────────── */
+.noise-overlay::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 128px 128px;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 0.5;
+  mix-blend-mode: overlay;
 }

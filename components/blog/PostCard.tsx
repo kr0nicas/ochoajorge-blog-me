@@ -1,9 +1,8 @@
 import Link from "next/link";
-import { Calendar, Clock, ArrowRight } from "lucide-react";
+import { Calendar, Clock, ArrowRight, Layers } from "lucide-react";
 import type { Post } from "@/lib/types";
-import { formatDate } from "@/lib/posts";
+import { cn, formatDate, slugify } from "@/lib/utils";
 import { Tag } from "@/components/shared/Tag";
-import { cn } from "@/lib/utils";
 
 interface PostCardProps {
     post: Post;
@@ -20,6 +19,17 @@ export function PostCard({ post, featured = false, className }: PostCardProps) {
                 className
             )}
         >
+            {/* Series Indicator */}
+            {post.series && (
+                <Link
+                    href={`/series/${slugify(post.series.name)}`}
+                    className="mb-2 inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--brand-light)] transition-opacity hover:opacity-80 no-underline"
+                >
+                    <Layers className="h-3 w-3" />
+                    {post.series.name} · Part {post.series.part}
+                </Link>
+            )}
+
             {/* Tags row */}
             {post.tags.length > 0 && (
                 <div className="mb-3 flex flex-wrap gap-2">
