@@ -7,6 +7,7 @@ import { PostHeader } from "@/components/blog/PostHeader";
 import { ReadingProgress } from "@/components/blog/ReadingProgress";
 import { TableOfContents } from "@/components/blog/TableOfContents";
 import { SeriesBanner } from "@/components/blog/SeriesBanner";
+import { Comments } from "@/components/blog/Comments";
 import Link from "next/link";
 import { Github } from "lucide-react";
 
@@ -110,6 +111,9 @@ export default async function PostPage({ params }: PostPageProps) {
 
                                 {content}
                             </div>
+
+                            {/* Discussion */}
+                            <Comments />
 
                             {/* Footer */}
                             <footer className="mt-16 border-t border-[var(--border)] pt-8">

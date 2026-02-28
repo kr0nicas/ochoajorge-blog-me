@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Github, Linkedin, Twitter } from "lucide-react";
+import { Github, Linkedin, Twitter, Rss } from "lucide-react";
 import { siteConfig } from "@/lib/utils";
 
 const socialLinks = [
@@ -17,6 +17,11 @@ const socialLinks = [
         href: `https://twitter.com/${siteConfig.author.twitter.replace("@", "")}`,
         label: "Twitter",
         icon: Twitter,
+    },
+    {
+        href: "/feed.xml",
+        label: "RSS Feed",
+        icon: Rss,
     },
 ];
 
