@@ -55,10 +55,15 @@ export type SiteConfig = typeof siteConfig;
 /**
  * Format a date string for display.
  */
-export function formatDate(dateString: string): string {
-    return new Date(dateString).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-    });
+export function formatDate(dateString: string, locale: string = "es"): string {
+    try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString(locale === "es" ? "es-ES" : "en-US", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+        });
+    } catch (e) {
+        return dateString;
+    }
 }

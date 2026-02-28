@@ -9,12 +9,12 @@ interface Heading {
     level: number; // 2 | 3 | 4
 }
 
-/**
- * TableOfContents — auto-built from h2/h3/h4 headings inside
- * #article-content. Uses IntersectionObserver to highlight the
- * current section as the user scrolls. Client component.
- */
-export function TableOfContents() {
+interface TableOfContentsProps {
+    lang?: string;
+}
+
+export function TableOfContents({ lang = "es" }: TableOfContentsProps) {
+    const isSpanish = lang === "es";
     const [headings, setHeadings] = useState<Heading[]>([]);
     const [activeId, setActiveId] = useState<string>("");
 
@@ -65,11 +65,11 @@ export function TableOfContents() {
 
     return (
         <nav
-            aria-label="Table of contents"
+            aria-label={isSpanish ? "Tabla de contenidos" : "Table of contents"}
             className="card-glass hidden p-5 xl:block"
         >
             <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-[var(--text-muted)]">
-                On this page
+                {isSpanish ? "En esta página" : "On this page"}
             </p>
             <ol className="space-y-1.5 text-sm">
                 {headings.map(({ id, text, level }) => (

@@ -8,22 +8,22 @@ import { ReadingProgress } from "@/components/blog/ReadingProgress";
 import { TableOfContents } from "@/components/blog/TableOfContents";
 import { SeriesBanner } from "@/components/blog/SeriesBanner";
 import { Comments } from "@/components/blog/Comments";
-import Link from "next/link";
 import { Github } from "lucide-react";
 
 interface PostPageProps {
-    params: Promise<{ slug: string }>;
+    params: Promise<{ slug: string; lang: string }>;
 }
 
-export async function generateStaticParams() {
-    return getPostSlugs().map((slug) => ({ slug }));
+export async function generateStaticParams({ params }: { params: { lang: string } }) {
+    const { lang } = params;
+    return getPostSlugs(lang).map((slug) => ({ slug }));
 }
 
 export async function generateMetadata({
     params,
 }: PostPageProps): Promise<Metadata> {
-    const { slug } = await params;
-    const post = getPostBySlug(slug);
+    const { slug, lang } = await params;
+    const post = getPostBySlug(slug, lang);
     if (!post) return {};
 
     return {
@@ -36,7 +36,7 @@ export async function generateMetadata({
             publishedTime: post.date,
             authors: [siteConfig.author.name],
             tags: post.tags,
-            url: `${siteConfig.url}/blog/${post.slug}`,
+            url: `${siteConfig.url}/${lang}/blog/${post.slug}`,
         },
         twitter: {
             card: "summary_large_image",
@@ -47,8 +47,8 @@ export async function generateMetadata({
 }
 
 export default async function PostPage({ params }: PostPageProps) {
-    const { slug } = await params;
-    const post = getPostBySlug(slug);
+    const { slug, lang } = await params;
+    const post = getPostBySlug(slug, lang);
 
     if (!post) notFound();
 
@@ -71,8 +71,10 @@ export default async function PostPage({ params }: PostPageProps) {
             name: siteConfig.author.name,
         },
         keywords: post.tags.join(", "),
-        url: `${siteConfig.url}/blog/${post.slug}`,
+        url: `${siteConfig.url}/${lang}/blog/${post.slug}`,
     };
+
+    const isSpanish = lang === "es";
 
     return (
         <>
@@ -82,20 +84,15 @@ export default async function PostPage({ params }: PostPageProps) {
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
             />
 
-            {/* Gradient reading progress bar */}
+            {/* Reading progress bar */}
             <ReadingProgress />
 
-            {/*
-             * Two-column layout on XL screens:
-             *   Left (main) — article content
-             *   Right (sticky) — table of contents
-             */}
             <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
                 <div className="xl:grid xl:grid-cols-[1fr_280px] xl:gap-12">
                     {/* ── Article ─────────────────────────────────── */}
                     <article className="min-w-0">
                         <div className="mx-auto max-w-3xl">
-                            <PostHeader post={post} />
+                            <PostHeader post={post} lang={lang} />
 
                             {/* MDX Content */}
                             <div
@@ -106,6 +103,7 @@ export default async function PostPage({ params }: PostPageProps) {
                                     <SeriesBanner
                                         series={post.series}
                                         currentSlug={post.slug}
+                                        lang={lang}
                                     />
                                 )}
 
@@ -119,11 +117,11 @@ export default async function PostPage({ params }: PostPageProps) {
                             <footer className="mt-16 border-t border-[var(--border)] pt-8">
                                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                     <p className="text-sm text-[var(--text-muted)]">
-                                        Written by{" "}
+                                        {isSpanish ? "Escrito por" : "Written by"}{" "}
                                         <span className="font-medium text-[var(--text-primary)]">
                                             {siteConfig.author.name}
                                         </span>
-                                        . Found a typo or an error?
+                                        . {isSpanish ? "¿Encontraste un error?" : "Found a typo or an error?"}
                                     </p>
                                     <a
                                         href={siteConfig.author.github}
@@ -132,7 +130,7 @@ export default async function PostPage({ params }: PostPageProps) {
                                         className="inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-2 text-sm text-[var(--text-secondary)] transition-all duration-200 hover:border-[var(--brand)] hover:text-[var(--brand-light)] no-underline"
                                     >
                                         <Github className="h-4 w-4" />
-                                        Open on GitHub
+                                        {isSpanish ? "Abrir en GitHub" : "Open on GitHub"}
                                     </a>
                                 </div>
                             </footer>
@@ -142,7 +140,7 @@ export default async function PostPage({ params }: PostPageProps) {
                     {/* ── Table of Contents (sticky, xl only) ─────── */}
                     <aside className="hidden xl:block">
                         <div className="sticky top-24">
-                            <TableOfContents />
+                            <TableOfContents lang={lang} />
                         </div>
                     </aside>
                 </div>

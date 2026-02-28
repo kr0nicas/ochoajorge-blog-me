@@ -11,6 +11,7 @@ export interface Post {
         name: string;
         part: number;
     };
+    lang?: "es" | "en";
 }
 
 export interface PostWithContent extends Post {

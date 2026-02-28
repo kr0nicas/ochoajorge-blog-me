@@ -8,9 +8,12 @@ interface PostCardProps {
     post: Post;
     featured?: boolean;
     className?: string;
+    lang?: string;
 }
 
-export function PostCard({ post, featured = false, className }: PostCardProps) {
+export function PostCard({ post, featured = false, className, lang = "es" }: PostCardProps) {
+    const isSpanish = lang === "es";
+
     return (
         <div
             className={cn(
@@ -22,11 +25,11 @@ export function PostCard({ post, featured = false, className }: PostCardProps) {
             {/* Series Indicator */}
             {post.series && (
                 <Link
-                    href={`/series/${slugify(post.series.name)}`}
+                    href={`/${lang}/series/${slugify(post.series.name)}`}
                     className="mb-2 inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--brand-light)] transition-opacity hover:opacity-80 no-underline"
                 >
                     <Layers className="h-3 w-3" />
-                    {post.series.name} · Part {post.series.part}
+                    {post.series.name} · {isSpanish ? `Parte ${post.series.part}` : `Part ${post.series.part}`}
                 </Link>
             )}
 
@@ -34,14 +37,14 @@ export function PostCard({ post, featured = false, className }: PostCardProps) {
             {post.tags.length > 0 && (
                 <div className="mb-3 flex flex-wrap gap-2">
                     {post.tags.slice(0, 3).map((tag) => (
-                        <Tag key={tag} name={tag} />
+                        <Tag key={tag} name={tag} lang={lang} />
                     ))}
                 </div>
             )}
 
             {/* Title — the clickable part */}
             <Link
-                href={`/blog/${post.slug}`}
+                href={`/${lang}/blog/${post.slug}`}
                 className="no-underline"
                 aria-label={`Read: ${post.title}`}
             >
@@ -65,23 +68,23 @@ export function PostCard({ post, featured = false, className }: PostCardProps) {
                 <div className="flex items-center gap-4 text-xs text-[var(--text-muted)]">
                     <span className="flex items-center gap-1.5">
                         <Calendar className="h-3.5 w-3.5" />
-                        {formatDate(post.date)}
+                        {formatDate(post.date, lang)}
                     </span>
                     {post.readingTime && (
                         <span className="flex items-center gap-1.5">
                             <Clock className="h-3.5 w-3.5" />
-                            {post.readingTime} min read
+                            {post.readingTime} {isSpanish ? "min de lectura" : "min read"}
                         </span>
                     )}
                 </div>
 
                 <Link
-                    href={`/blog/${post.slug}`}
+                    href={`/${lang}/blog/${post.slug}`}
                     className="flex items-center gap-1 text-xs font-medium text-[var(--brand-light)] opacity-0 transition-all duration-200 group-hover:translate-x-0.5 group-hover:opacity-100 no-underline"
                     tabIndex={-1}
                     aria-hidden="true"
                 >
-                    Read
+                    {isSpanish ? "Leer" : "Read"}
                     <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
             </div>

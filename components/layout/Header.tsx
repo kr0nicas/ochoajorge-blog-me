@@ -3,30 +3,38 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { Menu, X, Code2 } from "lucide-react";
+import { Menu, X, Code2, Globe } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Search } from "@/components/blog/Search";
+import { getDictionary, Locale } from "@/lib/dictionary";
 
-const navLinks = [
-    { href: "/blog", label: "Blog" },
-    { href: "/projects", label: "Projects" },
-    { href: "/about", label: "About" },
-];
+interface HeaderProps {
+    lang: string;
+}
 
-export function Header() {
+export function Header({ lang }: HeaderProps) {
     const pathname = usePathname();
     const [mobileOpen, setMobileOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
+    const dict = getDictionary(lang as Locale);
 
-    // Add shadow + stronger glass after scrolling 20px
+    const navLinks = [
+        { href: `/${lang}/blog`, label: dict.nav.blog },
+        { href: `/${lang}/projects`, label: dict.nav.projects },
+        { href: `/${lang}/about`, label: dict.nav.about },
+    ];
+
+    // Language switcher logic
+    const toggleLang = lang === "es" ? "en" : "es";
+    const newPathname = pathname.replace(`/${lang}`, `/${toggleLang}`);
+
     useEffect(() => {
         const handleScroll = () => setScrolled(window.scrollY > 20);
         window.addEventListener("scroll", handleScroll, { passive: true });
         return () => window.removeEventListener("scroll", handleScroll);
     }, []);
 
-    // Close mobile menu on route change
     useEffect(() => {
         setMobileOpen(false);
     }, [pathname]);
@@ -44,7 +52,7 @@ export function Header() {
                 <div className="flex h-16 items-center justify-between">
                     {/* Logo */}
                     <Link
-                        href="/"
+                        href={`/${lang}`}
                         className="group flex items-center gap-2.5 font-display font-semibold text-[var(--text-primary)] transition-opacity hover:opacity-90"
                     >
                         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--brand)] shadow-[0_0_20px_rgba(99,102,241,0.45)] transition-shadow duration-300 group-hover:shadow-[0_0_28px_rgba(99,102,241,0.65)]">
@@ -55,11 +63,10 @@ export function Header() {
 
                     {/* Desktop Search & Nav */}
                     <div className="hidden items-center gap-6 md:flex">
-                        <Search />
+                        <Search dict={dict.nav} />
                         <nav className="flex items-center gap-1" aria-label="Main navigation">
                             {navLinks.map(({ href, label }) => {
-                                const isActive =
-                                    pathname === href || pathname.startsWith(href + "/");
+                                const isActive = pathname === href || (href !== `/${lang}` && pathname.startsWith(href));
                                 return (
                                     <Link
                                         key={href}
@@ -83,11 +90,26 @@ export function Header() {
                                 );
                             })}
                         </nav>
+
+                        {/* Lang Switcher */}
+                        <Link
+                            href={newPathname}
+                            className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] transition-all hover:border-[var(--brand)] hover:text-[var(--text-primary)]"
+                        >
+                            <Globe className="h-3.5 w-3.5" />
+                            {toggleLang}
+                        </Link>
                     </div>
 
                     {/* Mobile: Search + Menu Button */}
                     <div className="flex items-center gap-2 md:hidden">
-                        <Search />
+                        <Search dict={dict.nav} />
+                        <Link
+                            href={newPathname}
+                            className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border)] text-xs font-bold uppercase text-[var(--text-secondary)]"
+                        >
+                            {toggleLang}
+                        </Link>
                         <button
                             onClick={() => setMobileOpen(!mobileOpen)}
                             className="flex items-center justify-center rounded-lg p-2 text-[var(--text-secondary)] transition-colors hover:bg-[var(--border)] hover:text-[var(--text-primary)]"
@@ -135,7 +157,7 @@ export function Header() {
                                         href={href}
                                         className={cn(
                                             "block rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
-                                            pathname === href || pathname.startsWith(href + "/")
+                                            pathname === href || (href !== `/${lang}` && pathname.startsWith(href))
                                                 ? "bg-[rgba(99,102,241,0.15)] text-[var(--brand-light)]"
                                                 : "text-[var(--text-secondary)] hover:bg-[var(--border)] hover:text-[var(--text-primary)]"
                                         )}

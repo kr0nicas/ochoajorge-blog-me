@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { FolderCode, Github, ExternalLink, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
     title: "Projects | Jorge Ochoa",
@@ -10,7 +9,7 @@ export const metadata: Metadata = {
 
 interface Project {
     title: string;
-    description: string;
+    description: Record<string, string>;
     tech: string[];
     github?: string;
     link?: string;
@@ -21,7 +20,10 @@ interface Project {
 const projects: Project[] = [
     {
         title: "Orbis 8",
-        description: "A multi-tenant ERP SaaS designed for small and medium businesses. Features fiscal compliance for Central America, automated inventory, and AI-driven reporting.",
+        description: {
+            es: "Un ERP SaaS multi-tenant diseñado para pequeñas y medianas empresas. Incluye cumplimiento fiscal para Centroamérica, inventario automatizado y reportes impulsados por IA.",
+            en: "A multi-tenant ERP SaaS designed for small and medium businesses. Features fiscal compliance for Central America, automated inventory, and AI-driven reporting."
+        },
         tech: ["FastAPI", "Next.js", "PostgreSQL", "Tailwind CSS"],
         link: "https://orbis8.com",
         featured: true,
@@ -29,7 +31,10 @@ const projects: Project[] = [
     },
     {
         title: "FastAPI Clean Template",
-        description: "A professional boilerplate for FastAPI following Hexagonal Architecture. Includes ready-to-use Auth, PostgreSQL (SQLAlchemy), and test examples.",
+        description: {
+            es: "Un boilerplate profesional para FastAPI siguiendo la Arquitectura Hexagonal. Incluye Auth listo para usar, PostgreSQL (SQLAlchemy) y ejemplos de tests.",
+            en: "A professional boilerplate for FastAPI following Hexagonal Architecture. Includes ready-to-use Auth, PostgreSQL (SQLAlchemy), and test examples."
+        },
         tech: ["Python", "SQLAlchemy", "Pytest", "Docker"],
         github: "https://github.com/jorgeochoa/fastapi-clean-arch",
         featured: true,
@@ -37,21 +42,30 @@ const projects: Project[] = [
     },
     {
         title: "Agentic Tools CLI",
-        description: "A CLI tool built with Go to help developers scaffold and manage AI agent tools for LangGraph and other LLM frameworks.",
+        description: {
+            es: "Una herramienta de CLI construida con Go para ayudar a los desarrolladores a estructurar y gestionar herramientas de agentes de IA para LangGraph y otros frameworks de LLM.",
+            en: "A CLI tool built with Go to help developers scaffold and manage AI agent tools for LangGraph and other LLM frameworks."
+        },
         tech: ["Go", "Cobra", "LangGraph"],
         github: "https://github.com/jorgeochoa/agentic-cli",
         image: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=800&auto=format&fit=crop",
     },
     {
         title: "Hexagonal SVG Visualizer",
-        description: "React component to visualize complex dependency trees in hexagonal software systems.",
+        description: {
+            es: "Componente React para visualizar árboles de dependencias complejos en sistemas de software hexagonales.",
+            en: "React component to visualize complex dependency trees in hexagonal software systems."
+        },
         tech: ["React", "D3.js", "SVG"],
         github: "https://github.com/jorgeochoa/hex-svg",
         image: "https://images.unsplash.com/photo-1504868584819-f8e90526354a?q=80&w=800&auto=format&fit=crop",
     }
 ];
 
-export default function ProjectsPage() {
+export default async function ProjectsPage({ params }: { params: Promise<{ lang: string }> }) {
+    const { lang } = await params;
+    const isSpanish = lang === "es";
+
     return (
         <div className="mx-auto max-w-5xl px-4 py-20 sm:px-6 lg:px-8">
             <header className="mb-20">
@@ -59,11 +73,12 @@ export default function ProjectsPage() {
                     <FolderCode className="h-6 w-6" />
                 </div>
                 <h1 className="font-display text-4xl font-extrabold text-[var(--text-primary)] sm:text-5xl lg:text-6xl tracking-tight">
-                    Projects & <span className="gradient-text">Creations</span>
+                    {isSpanish ? "Proyectos &" : "Projects &"} <span className="gradient-text">{isSpanish ? "Creaciones" : "Creations"}</span>
                 </h1>
                 <p className="mt-8 text-lg leading-relaxed text-[var(--text-secondary)] max-w-2xl">
-                    A selection of the systems I&apos;ve built and the experiments I&apos;ve run.
-                    From production-ready SaaS to open-source developer tooling.
+                    {isSpanish
+                        ? "Una selección de los sistemas que he construido y los experimentos que he realizado. Desde SaaS listos para producción hasta herramientas de desarrollo open-source."
+                        : "A selection of the systems I've built and the experiments I've run. From production-ready SaaS to open-source developer tooling."}
                 </p>
             </header>
 
@@ -72,23 +87,20 @@ export default function ProjectsPage() {
                     <div key={i} className="group relative flex flex-col">
                         {/* Image / Thumbnail */}
                         <div className="relative aspect-[16/9] mb-6 overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--bg-elevated)] transition-all duration-500 group-hover:-translate-y-1 group-hover:border-[var(--brand)]/30 group-hover:shadow-[0_20px_50px_rgba(99,102,241,0.15)]">
-                            {/* Background image placeholder */}
                             <div
                                 className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110"
                                 style={{ backgroundImage: `url(${project.image})` }}
                             />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
-                            {/* Badge */}
                             <div className="absolute top-4 left-4">
                                 {project.featured && (
                                     <span className="inline-flex rounded-full bg-[var(--brand)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-white shadow-lg">
-                                        Featured
+                                        {isSpanish ? "Destacado" : "Featured"}
                                     </span>
                                 )}
                             </div>
 
-                            {/* Project title inside image for premium look */}
                             <div className="absolute bottom-6 left-6 right-6">
                                 <h2 className="font-display text-2xl font-bold text-white group-hover:text-[var(--brand-light)] transition-colors">
                                     {project.title}
@@ -98,7 +110,7 @@ export default function ProjectsPage() {
 
                         {/* Info */}
                         <p className="text-sm leading-relaxed text-[var(--text-secondary)] mb-6 flex-1">
-                            {project.description}
+                            {isSpanish ? project.description.es : project.description.en}
                         </p>
 
                         {/* Tech & Links */}
@@ -130,15 +142,18 @@ export default function ProjectsPage() {
 
             {/* CTA Section */}
             <div className="mt-32 rounded-3xl border border-[var(--border-strong)] bg-gradient-to-br from-[var(--bg-elevated)] to-black p-12 text-center shadow-2xl overflow-hidden relative">
-                {/* Decorative glow */}
                 <div className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-[var(--brand)]/10 blur-[100px]" />
                 <div className="absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-[var(--accent)]/10 blur-[100px]" />
 
-                <h3 className="relative z-10 font-display text-3xl font-bold text-[var(--text-primary)]">Interested in working together?</h3>
-                <p className="relative z-10 mt-4 text-[var(--text-secondary)]">I&apos;m currently available for architecture consulting and high-impact development.</p>
+                <h3 className="relative z-10 font-display text-3xl font-bold text-[var(--text-primary)]">
+                    {isSpanish ? "¿Interesado en trabajar juntos?" : "Interested in working together?"}
+                </h3>
+                <p className="relative z-10 mt-4 text-[var(--text-secondary)]">
+                    {isSpanish ? "Actualmente estoy disponible para consultoría de arquitectura y desarrollo de alto impacto." : "I'm currently available for architecture consulting and high-impact development."}
+                </p>
                 <div className="relative z-10 mt-10">
-                    <Link href="/about" className="inline-flex items-center gap-2 rounded-xl bg-white px-8 py-3.5 text-sm font-bold text-black transition-transform hover:scale-105 active:scale-95 shadow-xl shadow-white/10">
-                        Get in touch
+                    <Link href={`/${lang}/about`} className="inline-flex items-center gap-2 rounded-xl bg-white px-8 py-3.5 text-sm font-bold text-black transition-transform hover:scale-105 active:scale-95 shadow-xl shadow-white/10">
+                        {isSpanish ? "Contáctame" : "Get in touch"}
                         <ArrowUpRight className="h-4 w-4" />
                     </Link>
                 </div>

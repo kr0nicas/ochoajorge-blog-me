@@ -4,27 +4,27 @@ import matter from "gray-matter";
 import readingTime from "reading-time";
 import type { Post, PostWithContent } from "./types";
 
-const POSTS_DIR = path.join(process.cwd(), "content/posts");
+const BASE_POSTS_DIR = path.join(process.cwd(), "content/posts");
 
 /**
- * Get all post slugs from the filesystem.
- * Used by generateStaticParams.
+ * Get all post slugs for a specific locale.
  */
-export function getPostSlugs(): string[] {
-    if (!fs.existsSync(POSTS_DIR)) return [];
+export function getPostSlugs(locale: string = "es"): string[] {
+    const localeDir = path.join(BASE_POSTS_DIR, locale);
+    if (!fs.existsSync(localeDir)) return [];
+
     return fs
-        .readdirSync(POSTS_DIR)
+        .readdirSync(localeDir)
         .filter((file) => file.endsWith(".mdx") || file.endsWith(".md"))
         .map((file) => file.replace(/\.(mdx|md)$/, ""));
 }
 
 /**
- * Parse a single post by slug.
- * Returns null if the post doesn't exist or is a draft in production.
+ * Parse a single post by slug and locale.
  */
-export function getPostBySlug(slug: string): PostWithContent | null {
-    const mdxPath = path.join(POSTS_DIR, `${slug}.mdx`);
-    const mdPath = path.join(POSTS_DIR, `${slug}.md`);
+export function getPostBySlug(slug: string, locale: string = "es"): PostWithContent | null {
+    const mdxPath = path.join(BASE_POSTS_DIR, locale, `${slug}.mdx`);
+    const mdPath = path.join(BASE_POSTS_DIR, locale, `${slug}.md`);
     const filePath = fs.existsSync(mdxPath) ? mdxPath : mdPath;
 
     if (!fs.existsSync(filePath)) return null;
@@ -32,7 +32,6 @@ export function getPostBySlug(slug: string): PostWithContent | null {
     const raw = fs.readFileSync(filePath, "utf-8");
     const { data, content } = matter(raw);
 
-    // Skip drafts in production
     if (data.draft && process.env.NODE_ENV === "production") return null;
 
     const stats = readingTime(content);
@@ -47,6 +46,7 @@ export function getPostBySlug(slug: string): PostWithContent | null {
         coverImage: data.coverImage,
         readingTime: Math.ceil(stats.minutes),
         content,
+        lang: locale as "es" | "en",
         series: data.series ? {
             name: data.series.name,
             part: data.series.part
@@ -55,58 +55,56 @@ export function getPostBySlug(slug: string): PostWithContent | null {
 }
 
 /**
- * Get all posts, sorted by date (newest first).
- * Excludes drafts in production.
+ * Get all posts for a locale, sorted by date.
  */
-export function getAllPosts(): Post[] {
-    return getPostSlugs()
-        .map((slug) => getPostBySlug(slug))
+export function getAllPosts(locale: string = "es"): Post[] {
+    return getPostSlugs(locale)
+        .map((slug) => getPostBySlug(slug, locale))
         .filter((post): post is PostWithContent => post !== null)
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
 /**
- * Get posts filtered by a specific tag.
+ * Get posts filtered by tag and locale.
  */
-export function getPostsByTag(tag: string): Post[] {
-    return getAllPosts().filter((post) =>
+export function getPostsByTag(tag: string, locale: string = "es"): Post[] {
+    return getAllPosts(locale).filter((post) =>
         post.tags.map((t) => t.toLowerCase()).includes(tag.toLowerCase())
     );
 }
 
 /**
- * Get all unique tags across all posts, sorted alphabetically.
+ * Get all unique tags for a locale.
  */
-export function getAllTags(): string[] {
-    const allTags = getAllPosts().flatMap((post) => post.tags);
+export function getAllTags(locale: string = "es"): string[] {
+    const allTags = getAllPosts(locale).flatMap((post) => post.tags);
     return [...new Set(allTags)].sort();
 }
 
 /**
- * Get featured posts (first 3 published posts).
+ * Get featured posts for a locale.
  */
-export function getFeaturedPosts(count = 3): Post[] {
-    return getAllPosts()
+export function getFeaturedPosts(count = 3, locale: string = "es"): Post[] {
+    return getAllPosts(locale)
         .filter((post) => !post.draft)
         .slice(0, count);
 }
 
 /**
- * Get all posts belonging to a specific series, sorted by part number.
+ * Get series posts for a locale.
  */
-export function getPostsBySeries(seriesName: string): Post[] {
-    return getAllPosts()
+export function getPostsBySeries(seriesName: string, locale: string = "es"): Post[] {
+    return getAllPosts(locale)
         .filter((post) => post.series?.name === seriesName)
         .sort((a, b) => (a.series?.part ?? 0) - (b.series?.part ?? 0));
 }
 
 /**
- * Get all unique series names across all posts.
+ * Get all unique series names for a locale.
  */
-export function getAllSeries(): string[] {
-    const allSeries = getAllPosts()
+export function getAllSeries(locale: string = "es"): string[] {
+    const allSeries = getAllPosts(locale)
         .map((post) => post.series?.name)
         .filter((name): name is string => !!name);
     return [...new Set(allSeries)].sort();
 }
-

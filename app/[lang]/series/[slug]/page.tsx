@@ -7,12 +7,13 @@ import Link from "next/link";
 import { slugify } from "@/lib/utils";
 
 interface SeriesPageProps {
-    params: Promise<{ slug: string }>;
+    params: Promise<{ slug: string; lang: string }>;
 }
 
 /** Pre-generate a page for every series. */
-export async function generateStaticParams() {
-    return getAllSeries().map((name) => ({
+export async function generateStaticParams({ params }: { params: { lang: string } }) {
+    const { lang } = params;
+    return getAllSeries(lang).map((name) => ({
         slug: slugify(name),
     }));
 }
@@ -20,38 +21,42 @@ export async function generateStaticParams() {
 export async function generateMetadata({
     params,
 }: SeriesPageProps): Promise<Metadata> {
-    const { slug } = await params;
-    const seriesName = getAllSeries().find(
+    const { slug, lang } = await params;
+    const seriesName = getAllSeries(lang).find(
         (s) => slugify(s) === slug
     );
+    const isSpanish = lang === "es";
 
-    if (!seriesName) return { title: "Series Not Found" };
+    if (!seriesName) return { title: isSpanish ? "Serie No Encontrada" : "Series Not Found" };
 
     return {
-        title: `Series: ${seriesName}`,
-        description: `Explore all parts of the "${seriesName}" series. Deep dives into software architecture and engineering.`,
+        title: `${isSpanish ? "Serie" : "Series"}: ${seriesName}`,
+        description: isSpanish
+            ? `Explora todas las partes de la serie "${seriesName}". Inmersiones profundas en arquitectura de software e ingeniería.`
+            : `Explore all parts of the "${seriesName}" series. Deep dives into software architecture and engineering.`,
     };
 }
 
 export default async function SeriesPage({ params }: SeriesPageProps) {
-    const { slug } = await params;
-    const seriesName = getAllSeries().find(
+    const { slug, lang } = await params;
+    const seriesName = getAllSeries(lang).find(
         (s) => slugify(s) === slug
     );
 
     if (!seriesName) notFound();
 
-    const posts = getPostsBySeries(seriesName);
+    const posts = getPostsBySeries(seriesName, lang);
+    const isSpanish = lang === "es";
 
     return (
         <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6 lg:px-8">
             {/* Breadcrumb / Back */}
             <Link
-                href="/blog"
+                href={`/${lang}/blog`}
                 className="group mb-8 inline-flex items-center gap-2 text-sm font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--brand-light)]"
             >
                 <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
-                Back to all posts
+                {isSpanish ? "Volver a todos los artículos" : "Back to all posts"}
             </Link>
 
             {/* Header */}
@@ -61,7 +66,7 @@ export default async function SeriesPage({ params }: SeriesPageProps) {
                         <Layers className="h-6 w-6" />
                     </div>
                     <span className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--brand-light)]">
-                        Special Series
+                        {isSpanish ? "Serie Especial" : "Special Series"}
                     </span>
                 </div>
 
@@ -70,17 +75,18 @@ export default async function SeriesPage({ params }: SeriesPageProps) {
                 </h1>
 
                 <p className="mt-6 max-w-2xl text-lg text-[var(--text-secondary)] leading-relaxed">
-                    A multi-part deep dive into {seriesName.toLowerCase()}.
-                    Follow the sequence to build a comprehensive understanding of the topic.
+                    {isSpanish
+                        ? `Una inmersión profunda de varias partes en ${seriesName.toLowerCase()}. Sigue la secuencia para construir una comprensión completa del tema.`
+                        : `A multi-part deep dive into ${seriesName.toLowerCase()}. Follow the sequence to build a comprehensive understanding of the topic.`}
                 </p>
 
                 <div className="mt-8 flex items-center gap-4 text-sm text-[var(--text-muted)]">
                     <span className="flex items-center gap-2">
                         <span className="h-1 w-1 rounded-full bg-[var(--brand-light)]" />
-                        {posts.length} installments
+                        {posts.length} {isSpanish ? "entregas" : "installments"}
                     </span>
                     <span className="h-4 w-px bg-[var(--border)]" />
-                    <span>Sequence complete</span>
+                    <span>{isSpanish ? "Secuencia completa" : "Sequence complete"}</span>
                 </div>
             </header>
 
@@ -100,7 +106,7 @@ export default async function SeriesPage({ params }: SeriesPageProps) {
 
                         {/* Post content */}
                         <div className="flex-1 pb-12">
-                            <PostCard post={post} featured={index === 0} />
+                            <PostCard post={post} featured={index === 0} lang={lang} />
                         </div>
                     </div>
                 ))}

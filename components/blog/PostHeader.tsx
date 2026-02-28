@@ -5,23 +5,21 @@ import { formatDate } from "@/lib/utils";
 
 interface PostHeaderProps {
     post: Post;
+    lang: string;
 }
 
-/**
- * PostHeader — the full article header with back link, tags,
- * title, description, and meta (date + reading time).
- * Rendered server-side inside the [slug] page.
- */
-export function PostHeader({ post }: PostHeaderProps) {
+export function PostHeader({ post, lang }: PostHeaderProps) {
+    const isSpanish = lang === "es";
+
     return (
         <header className="mb-12">
             {/* Back navigation */}
             <Link
-                href="/blog"
+                href={`/${lang}/blog`}
                 className="group mb-8 inline-flex items-center gap-2 text-sm text-[var(--text-muted)] transition-colors duration-200 hover:text-[var(--brand-light)] no-underline"
             >
                 <ArrowLeft className="h-4 w-4 transition-transform duration-200 group-hover:-translate-x-1" />
-                All articles
+                {isSpanish ? "Todos los artículos" : "All articles"}
             </Link>
 
             {/* Tags */}
@@ -30,7 +28,7 @@ export function PostHeader({ post }: PostHeaderProps) {
                     {post.tags.map((tag) => (
                         <Link
                             key={tag}
-                            href={`/tags/${encodeURIComponent(tag.toLowerCase())}`}
+                            href={`/${lang}/tags/${encodeURIComponent(tag.toLowerCase())}`}
                             className="tag"
                             aria-label={`Posts tagged ${tag}`}
                         >
@@ -56,12 +54,12 @@ export function PostHeader({ post }: PostHeaderProps) {
             <div className="mt-7 flex flex-wrap items-center gap-5 border-t border-[var(--border)] pt-6 text-sm text-[var(--text-muted)]">
                 <span className="flex items-center gap-1.5">
                     <Calendar className="h-4 w-4" />
-                    {formatDate(post.date)}
+                    {formatDate(post.date, lang)}
                 </span>
                 {post.readingTime && (
                     <span className="flex items-center gap-1.5">
                         <Clock className="h-4 w-4" />
-                        {post.readingTime} min read
+                        {post.readingTime} {isSpanish ? "min de lectura" : "min read"}
                     </span>
                 )}
             </div>

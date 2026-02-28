@@ -1,37 +1,44 @@
 import Link from "next/link";
 import { Github, Linkedin, Twitter, Rss } from "lucide-react";
 import { siteConfig } from "@/lib/utils";
+import { getDictionary, Locale } from "@/lib/dictionary";
 
-const socialLinks = [
-    {
-        href: siteConfig.author.github,
-        label: "GitHub",
-        icon: Github,
-    },
-    {
-        href: siteConfig.author.linkedin,
-        label: "LinkedIn",
-        icon: Linkedin,
-    },
-    {
-        href: `https://twitter.com/${siteConfig.author.twitter.replace("@", "")}`,
-        label: "Twitter",
-        icon: Twitter,
-    },
-    {
-        href: "/feed.xml",
-        label: "RSS Feed",
-        icon: Rss,
-    },
-];
+interface FooterProps {
+    lang: string;
+}
 
-const footerLinks = [
-    { href: "/blog", label: "Blog" },
-    { href: "/projects", label: "Projects" },
-    { href: "/about", label: "About" },
-];
+export function Footer({ lang }: FooterProps) {
+    const dict = getDictionary(lang as Locale);
 
-export function Footer() {
+    const socialLinks = [
+        {
+            href: siteConfig.author.github,
+            label: "GitHub",
+            icon: Github,
+        },
+        {
+            href: siteConfig.author.linkedin,
+            label: "LinkedIn",
+            icon: Linkedin,
+        },
+        {
+            href: `https://twitter.com/${siteConfig.author.twitter.replace("@", "")}`,
+            label: "Twitter",
+            icon: Twitter,
+        },
+        {
+            href: "feed.xml",
+            label: "RSS Feed",
+            icon: Rss,
+        },
+    ];
+
+    const footerLinks = [
+        { href: `/${lang}/blog`, label: dict.nav.blog },
+        { href: `/${lang}/projects`, label: dict.nav.projects },
+        { href: `/${lang}/about`, label: dict.nav.about },
+    ];
+
     return (
         <footer className="border-t border-[var(--border)] bg-[var(--bg-base)]">
             <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-10">
@@ -42,7 +49,7 @@ export function Footer() {
                             Jorge Ochoa
                         </p>
                         <p className="mt-1 text-xs text-[var(--text-muted)]">
-                            Software Architect · Python · Next.js · AI
+                            {lang === "es" ? "Arquitecto de Software · Python · Next.js · IA" : "Software Architect · Python · Next.js · AI"}
                         </p>
                     </div>
 
@@ -78,7 +85,7 @@ export function Footer() {
 
                 <div className="mt-8 border-t border-[var(--border)] pt-6 text-center">
                     <p className="text-xs text-[var(--text-muted)]">
-                        © {new Date().getFullYear()} Jorge Ochoa. Built with{" "}
+                        © {new Date().getFullYear()} Jorge Ochoa. {dict.footer.built_with}{" "}
                         <a
                             href="https://nextjs.org"
                             target="_blank"

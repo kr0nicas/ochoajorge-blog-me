@@ -3,19 +3,14 @@ import { cn } from "@/lib/utils";
 
 interface TagProps {
     name: string;
-    /** When true, renders as a <Link> to /tags/[name]. Default: true */
     linkable?: boolean;
     className?: string;
-    /** Show the count of posts for this tag */
     count?: number;
+    lang?: string;
 }
 
-/**
- * Tag — reusable pill component.
- * When `linkable` is true (default), wraps the pill in a Next.js Link
- * pointing to /tags/[tag]. When false, renders a plain <span>.
- */
-export function Tag({ name, linkable = true, className, count }: TagProps) {
+export function Tag({ name, linkable = true, className, count, lang = "es" }: TagProps) {
+    const isSpanish = lang === "es";
     const pill = (
         <span className={cn("tag", "gap-1.5", className)}>
             {name}
@@ -31,8 +26,8 @@ export function Tag({ name, linkable = true, className, count }: TagProps) {
 
     return (
         <Link
-            href={`/tags/${encodeURIComponent(name.toLowerCase())}`}
-            aria-label={`Browse posts tagged "${name}"`}
+            href={`/${lang}/tags/${encodeURIComponent(name.toLowerCase())}`}
+            aria-label={isSpanish ? `Ver posts con la etiqueta "${name}"` : `Browse posts tagged "${name}"`}
         >
             {pill}
         </Link>

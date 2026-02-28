@@ -5,12 +5,13 @@ import { PostCard } from "@/components/blog/PostCard";
 import { Tag } from "@/components/shared/Tag";
 
 interface TagPageProps {
-    params: Promise<{ tag: string }>;
+    params: Promise<{ tag: string; lang: string }>;
 }
 
 /** Pre-generate a page for every tag that exists in the content directory. */
-export async function generateStaticParams() {
-    return getAllTags().map((tag) => ({
+export async function generateStaticParams({ params }: { params: { lang: string } }) {
+    const { lang } = params;
+    return getAllTags(lang).map((tag) => ({
         tag: encodeURIComponent(tag.toLowerCase()),
     }));
 }
@@ -18,21 +19,25 @@ export async function generateStaticParams() {
 export async function generateMetadata({
     params,
 }: TagPageProps): Promise<Metadata> {
-    const { tag } = await params;
+    const { tag, lang } = await params;
     const decoded = decodeURIComponent(tag);
+    const isSpanish = lang === "es";
 
     return {
-        title: `Posts tagged "${decoded}"`,
-        description: `Browse all articles about ${decoded} — software architecture, Python, Next.js, AI and more.`,
+        title: isSpanish ? `Posts con la etiqueta "${decoded}"` : `Posts tagged "${decoded}"`,
+        description: isSpanish
+            ? `Explora todos los artículos sobre ${decoded} — arquitectura de software, Python, Next.js, IA y más.`
+            : `Browse all articles about ${decoded} — software architecture, Python, Next.js, AI and more.`,
     };
 }
 
 export default async function TagPage({ params }: TagPageProps) {
-    const { tag } = await params;
+    const { tag, lang } = await params;
     const decoded = decodeURIComponent(tag);
-    const posts = getPostsByTag(decoded);
-    const allTags = getAllTags();
-    const allPosts = getAllPosts();
+    const posts = getPostsByTag(decoded, lang);
+    const allTags = getAllTags(lang);
+    const allPosts = getAllPosts(lang);
+    const isSpanish = lang === "es";
 
     if (posts.length === 0) notFound();
 
@@ -52,13 +57,13 @@ export default async function TagPage({ params }: TagPageProps) {
                     {/* Header */}
                     <div className="mb-10">
                         <p className="mb-2 text-sm font-medium uppercase tracking-widest text-[var(--text-muted)]">
-                            Tag
+                            {isSpanish ? "Etiqueta" : "Tag"}
                         </p>
                         <h1 className="font-display text-3xl font-bold text-[var(--text-primary)] sm:text-4xl">
                             {decoded}
                         </h1>
                         <p className="mt-2 text-[var(--text-secondary)]">
-                            {posts.length} article{posts.length !== 1 ? "s" : ""}
+                            {posts.length} {isSpanish ? (posts.length !== 1 ? "artículos" : "artículo") : (posts.length !== 1 ? "articles" : "article")}
                         </p>
                     </div>
 
@@ -66,7 +71,7 @@ export default async function TagPage({ params }: TagPageProps) {
                     <ul className="space-y-4" role="list">
                         {posts.map((post) => (
                             <li key={post.slug}>
-                                <PostCard post={post} />
+                                <PostCard post={post} lang={lang} />
                             </li>
                         ))}
                     </ul>
@@ -76,7 +81,7 @@ export default async function TagPage({ params }: TagPageProps) {
                 <aside className="mt-12 lg:mt-0">
                     <div className="card-glass p-5">
                         <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-[var(--text-muted)]">
-                            All topics
+                            {isSpanish ? "Todos los temas" : "All topics"}
                         </p>
                         <div className="flex flex-wrap gap-2">
                             {allTags.map((t) => (
@@ -84,6 +89,7 @@ export default async function TagPage({ params }: TagPageProps) {
                                     key={t}
                                     name={t}
                                     count={tagCounts[t]}
+                                    lang={lang}
                                     className={
                                         t.toLowerCase() === decoded.toLowerCase()
                                             ? "border-[var(--brand)] bg-[var(--brand)] bg-opacity-20"

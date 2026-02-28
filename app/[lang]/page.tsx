@@ -6,6 +6,7 @@ import { PostCard } from "@/components/blog/PostCard";
 import { Hero } from "@/components/layout/Hero";
 import { AnimatedSection } from "@/components/shared/AnimatedSection";
 import { siteConfig } from "@/lib/utils";
+import { getDictionary, Locale } from "@/lib/dictionary";
 
 export const metadata: Metadata = {
   title: siteConfig.title,
@@ -18,8 +19,14 @@ const stats = [
   { value: "∞", label: "Cups of coffee" },
 ];
 
-export default function HomePage() {
-  const featuredPosts = getFeaturedPosts(4);
+export default async function HomePage({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}) {
+  const { lang } = await params;
+  const dict = getDictionary(lang as Locale);
+  const featuredPosts = getFeaturedPosts(4, lang);
 
   return (
     <>
@@ -27,6 +34,7 @@ export default function HomePage() {
       <Hero
         githubUrl={siteConfig.author.github}
         linkedinUrl={siteConfig.author.linkedin}
+        dict={dict.hero}
       />
 
       {/* ── Featured Posts ─────────────────────────────────────── */}
@@ -36,18 +44,18 @@ export default function HomePage() {
             <div className="mb-10 flex items-end justify-between">
               <div>
                 <p className="mb-1 text-sm font-semibold uppercase tracking-widest text-[var(--brand-light)]">
-                  Writing
+                  {lang === 'es' ? 'Escritos' : 'Writing'}
                 </p>
                 <h2 className="font-display text-3xl font-bold text-[var(--text-primary)] sm:text-4xl">
-                  Latest Articles
+                  {lang === 'es' ? 'Últimos Artículos' : 'Latest Articles'}
                 </h2>
               </div>
               <Link
-                href="/blog"
+                href={`/${lang}/blog`}
                 id="homepage-view-all-posts"
                 className="group hidden items-center gap-1.5 text-sm font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--brand-light)] sm:flex"
               >
-                View all
+                {lang === 'es' ? 'Ver todos' : 'View all'}
                 <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
               </Link>
             </div>
@@ -61,17 +69,17 @@ export default function HomePage() {
                 delay={i * 0.08}
                 className={i === 0 ? "sm:col-span-2" : ""}
               >
-                <PostCard post={post} featured={i === 0} />
+                <PostCard post={post} featured={i === 0} lang={lang} />
               </AnimatedSection>
             ))}
           </div>
 
           <AnimatedSection delay={0.3} className="mt-6 sm:hidden">
             <Link
-              href="/blog"
+              href={`/${lang}/blog`}
               className="flex items-center gap-1.5 text-sm font-medium text-[var(--brand-light)]"
             >
-              View all articles
+              {lang === 'es' ? 'Ver todos los artículos' : 'View all articles'}
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </AnimatedSection>
@@ -90,27 +98,34 @@ export default function HomePage() {
               {/* Bio */}
               <div className="flex-1">
                 <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-[var(--brand-light)]">
-                  About
+                  {lang === 'es' ? 'Sobre mí' : 'About'}
                 </p>
                 <h2 className="font-display text-2xl font-bold text-[var(--text-primary)] sm:text-3xl">
                   Jorge Ochoa
                 </h2>
-                <p className="mt-4 leading-relaxed text-[var(--text-secondary)]">
-                  Software architect and full-stack developer based in El
-                  Salvador. Currently building{" "}
-                  <span className="font-medium text-[var(--text-primary)]">
-                    Orbis 8
-                  </span>
-                  , a multi-tenant ERP SaaS for SMBs, using Python, Go,
-                  and Next.js. Passionate about clean architecture, AI
-                  engineering, and developer tooling.
-                </p>
+                <div className="mt-4 leading-relaxed text-[var(--text-secondary)]">
+                  {lang === 'es' ? (
+                    <p>
+                      Arquitecto de software y desarrollador full-stack basado en El Salvador.
+                      Actualmente construyendo <span className="font-medium text-[var(--text-primary)]">Orbis 8</span>,
+                      un ERP SaaS multi-tenant para PYMES, utilizando Python, Go y Next.js.
+                      Apasionado por la arquitectura limpia, ingeniería de IA y herramientas para desarrolladores.
+                    </p>
+                  ) : (
+                    <p>
+                      Software architect and full-stack developer based in El Salvador.
+                      Currently building <span className="font-medium text-[var(--text-primary)]">Orbis 8</span>,
+                      a multi-tenant ERP SaaS for SMBs, using Python, Go, and Next.js.
+                      Passionate about clean architecture, AI engineering, and developer tooling.
+                    </p>
+                  )}
+                </div>
                 <Link
-                  href="/about"
+                  href={`/${lang}/about`}
                   id="homepage-about-link"
                   className="group/link mt-5 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--brand-light)] transition-opacity hover:opacity-80"
                 >
-                  More about me
+                  {lang === 'es' ? 'Más sobre mí' : 'More about me'}
                   <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover/link:translate-x-0.5" />
                 </Link>
               </div>
@@ -126,7 +141,11 @@ export default function HomePage() {
                       {value}
                     </span>
                     <span className="mt-0.5 text-xs text-[var(--text-muted)]">
-                      {label}
+                      {lang === 'es' ? (
+                        label === 'Years building' ? 'Años construyendo' :
+                          label === 'Projects shipped' ? 'Proyectos lanzados' :
+                            label === 'Cups of coffee' ? 'Tazas de café' : label
+                      ) : label}
                     </span>
                   </div>
                 ))}

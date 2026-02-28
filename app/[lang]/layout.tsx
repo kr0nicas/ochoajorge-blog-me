@@ -5,7 +5,7 @@ import { Toaster } from "sonner";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { siteConfig } from "@/lib/utils";
-import "./globals.css";
+import "../globals.css";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
   creator: siteConfig.author.name,
   openGraph: {
     type: "website",
-    locale: "en_US",
+    locale: "es_SV",
     url: siteConfig.url,
     title: siteConfig.title,
     description: siteConfig.description,
@@ -82,23 +82,31 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export async function generateStaticParams() {
+  return [{ lang: "es" }, { lang: "en" }];
+}
+
+export default async function RootLayout({
   children,
+  params,
 }: {
   children: React.ReactNode;
+  params: Promise<{ lang: string }>;
 }) {
+  const { lang } = await params;
+
   return (
     <html
-      lang="en"
+      lang={lang}
       suppressHydrationWarning
       className={`${inter.variable} ${outfit.variable} ${jetbrainsMono.variable}`}
     >
       <body className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] antialiased">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <div className="relative flex min-h-screen flex-col">
-            <Header />
+            <Header lang={lang} />
             <main className="flex-1">{children}</main>
-            <Footer />
+            <Footer lang={lang} />
           </div>
           <Toaster
             theme="dark"

@@ -6,14 +6,12 @@ import { cn, slugify } from "@/lib/utils";
 interface SeriesBannerProps {
     series: { name: string; part: number };
     currentSlug: string;
+    lang: string;
 }
 
-/**
- * SeriesBanner — displayed inside a post if it belongs to a series.
- * Shows the progress and links to other parts.
- */
-export function SeriesBanner({ series, currentSlug }: SeriesBannerProps) {
-    const seriesPosts = getPostsBySeries(series.name);
+export function SeriesBanner({ series, currentSlug, lang }: SeriesBannerProps) {
+    const isSpanish = lang === "es";
+    const seriesPosts = getPostsBySeries(series.name, lang);
     const totalParts = seriesPosts.length;
 
     return (
@@ -25,9 +23,9 @@ export function SeriesBanner({ series, currentSlug }: SeriesBannerProps) {
                 </div>
                 <div className="flex-1 min-w-0">
                     <span className="inline-block rounded-full bg-[var(--brand)]/20 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-[var(--brand-light)]">
-                        Part {series.part} of {totalParts}
+                        {isSpanish ? `Parte ${series.part} de ${totalParts}` : `Part ${series.part} of ${totalParts}`}
                     </span>
-                    <Link href={`/series/${slugify(series.name)}`} className="block group/title">
+                    <Link href={`/${lang}/series/${slugify(series.name)}`} className="block group/title">
                         <h3 className="font-display text-lg font-bold text-[var(--text-primary)] mt-0.5 truncate group-hover/title:text-[var(--brand-light)] transition-colors">
                             {series.name}
                         </h3>
@@ -45,7 +43,7 @@ export function SeriesBanner({ series, currentSlug }: SeriesBannerProps) {
                         return (
                             <li key={post.slug}>
                                 <Link
-                                    href={`/blog/${post.slug}`}
+                                    href={`/${lang}/blog/${post.slug}`}
                                     className={cn(
                                         "group relative flex items-center gap-4 rounded-xl px-4 py-3 text-sm transition-all duration-300",
                                         isCurrent
@@ -73,7 +71,7 @@ export function SeriesBanner({ series, currentSlug }: SeriesBannerProps) {
                                         <ChevronRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1 opacity-20 group-hover:opacity-100" />
                                     ) : (
                                         <span className="text-[10px] uppercase font-bold tracking-widest bg-[var(--brand)]/20 px-2 py-0.5 rounded text-[var(--brand-light)]">
-                                            Current
+                                            {isSpanish ? "Actual" : "Current"}
                                         </span>
                                     )}
                                 </Link>
