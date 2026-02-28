@@ -41,7 +41,7 @@ export default async function HomePage({
 
       {/* ── Featured Posts ─────────────────────────────────────── */}
       {featuredPosts.length > 0 && (
-        <section className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
+        <section className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
           <AnimatedSection>
             <div className="mb-6 flex items-end justify-between">
               <div>
