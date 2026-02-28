@@ -17,7 +17,13 @@ Antes de crear el archivo, responder:
 
 ## 2. Crear el archivo MDX
 
-Crear en `content/posts/{slug}.mdx` con este frontmatter exacto:
+Crear el archivo base usando el script de scaffolding:
+
+```bash
+npm run post:new "Título de tu Post"
+```
+
+Esto generará el archivo en `content/posts/{slug}.mdx` con este frontmatter pre-configurado:
 
 ```yaml
 ---
@@ -69,16 +75,26 @@ Bullet points concisos de los takeaways principales.
 Cierre con call-to-action suave (¿qué sigue? ¿Tienes preguntas? → comentarios Giscus).
 ```
 
-## 4. SEO Checklist Pre-publicación
+## 4. Auditoría SEO Automática
 
-Antes de cambiar `draft: false`:
-- [ ] Título tiene keyword principal en los primeros 3 palabras
-- [ ] Description tiene entre 150-160 caracteres
+Antes de cambiar `draft: false`, ejecuta la validación:
+
+```bash
+npm run seo:audit
+```
+
+Esta herramienta verificará automáticamente:
+- [ ] Longitud de la descripción (150-160 caracteres)
+- [ ] Existencia de tags
+- [ ] Integridad de los metadatos de series
+- [ ] Título presente
+- [ ] Código con syntax highlighting correcto
+
+Extra manual:
+- [ ] Título tiene keyword principal en las primeras 3 palabras
 - [ ] Al menos un `h2` con keyword secundaria
 - [ ] Imágenes tienen `alt` descriptivo
 - [ ] Links internos a otros posts relevantes (si existen)
-- [ ] Tags son consistentes con los usados en otros posts
-- [ ] Código tiene syntax highlighting correcto (lenguaje especificado)
 
 ## 5. Publicar
 

@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
+    "post:new": "tsx scripts/new-post.ts",
+    "seo:audit": "tsx scripts/seo-audit.ts",
     "prepare": "husky"
   },
   "lint-staged": {

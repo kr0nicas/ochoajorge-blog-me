@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Calendar, Clock, ArrowLeft } from "lucide-react";
 import type { Post } from "@/lib/types";
-import { formatDate } from "@/lib/posts";
+import { formatDate } from "@/lib/utils";
 
 interface PostHeaderProps {
     post: Post;
