@@ -41,14 +41,14 @@ export default async function HomePage({
 
       {/* ── Featured Posts ─────────────────────────────────────── */}
       {featuredPosts.length > 0 && (
-        <section className="mx-auto max-w-5xl px-4 py-20 sm:px-6 lg:px-8">
+        <section className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
           <AnimatedSection>
-            <div className="mb-10 flex items-end justify-between">
+            <div className="mb-6 flex items-end justify-between">
               <div>
                 <p className="mb-1 text-sm font-semibold uppercase tracking-widest text-[var(--brand-light)]">
                   {lang === 'es' ? 'Escritos' : 'Writing'}
                 </p>
-                <h2 className="font-display text-3xl font-bold text-[var(--text-primary)] sm:text-4xl">
+                <h2 className="font-display text-2xl font-bold text-[var(--text-primary)] sm:text-3xl">
                   {lang === 'es' ? 'Últimos Artículos' : 'Latest Articles'}
                 </h2>
               </div>
@@ -89,10 +89,10 @@ export default async function HomePage({
       )}
 
       {/* ── About Teaser ───────────────────────────────────────── */}
-      <section className="mx-auto max-w-5xl px-4 pb-24 sm:px-6 lg:px-8">
+      <section className="mx-auto max-w-5xl px-4 pb-16 sm:px-6 lg:px-8">
         <AnimatedSection>
           {/* Glass card with subtle border glow on hover */}
-          <div className="group relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[rgba(19,19,26,0.7)] p-8 backdrop-blur-xl transition-all duration-500 hover:border-[rgba(99,102,241,0.25)] hover:shadow-[0_0_60px_rgba(99,102,241,0.08)] lg:p-10">
+          <div className="group relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[rgba(19,19,26,0.7)] p-6 backdrop-blur-xl transition-all duration-500 hover:border-[rgba(99,102,241,0.25)] hover:shadow-[0_0_60px_rgba(99,102,241,0.08)] lg:p-8">
             {/* Decorative top-right glow orb */}
             <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[radial-gradient(circle,rgba(99,102,241,0.12),transparent_70%)] transition-opacity duration-500 group-hover:opacity-150" />
 
