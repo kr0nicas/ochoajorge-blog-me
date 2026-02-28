@@ -3,12 +3,11 @@
 
 /* ─── Google Fonts are loaded via next/font in layout.tsx ─── */
 
-/* ─── Design Tokens ──────────────────────────────────────────────── */
 :root {
-  /* Background scale */
-  --bg-base: #0a0a0f;
-  --bg-surface: #13131a;
-  --bg-elevated: #1a1a24;
+  /* Background scale (Inspired by steipete.me technical navy) */
+  --bg-base: #10141d;
+  --bg-surface: #1a1e2a;
+  --bg-elevated: #24293a;
 
   /* Brand: Indigo */
   --brand: #6366f1;

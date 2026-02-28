@@ -53,9 +53,8 @@ export function Hero({ githubUrl, linkedinUrl, blueskyUrl, lang, dict }: HeroPro
 
     return (
         <section ref={ref} className="relative overflow-hidden">
-            {/* ── Layered background ──────────────────────────────── */}
-            <div className="absolute inset-0 bg-grid opacity-20" />
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_90%_70%_at_50%_-10%,rgba(99,102,241,0.15),transparent)]" />
+            {/* ── Minimalist Background ──────────────────────────── */}
+            <div className="absolute inset-0 bg-[var(--bg-base)]" />
 
             {/* ── Content ─────────────────────────────────────────── */}
             <motion.div
@@ -75,7 +74,6 @@ export function Hero({ githubUrl, linkedinUrl, blueskyUrl, lang, dict }: HeroPro
                             variants={itemVariants}
                             className="relative group shrink-0"
                         >
-                            <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-[var(--brand)] to-[var(--accent)] opacity-40 blur-sm group-hover:opacity-75 transition-opacity duration-500" />
                             <div className="relative h-16 w-16 sm:h-20 sm:w-20 overflow-hidden rounded-full border-2 border-[var(--border)] bg-[var(--bg-elevated)] shadow-2xl">
                                 <div className="absolute inset-0 bg-[url('https://6pxof7rpjdk6gkca.public.blob.vercel-storage.com/foto_personal-LKc8SjGUPtPc9VIdVoJgxe1EnD8H8H.jpg')] bg-cover bg-center grayscale group-hover:grayscale-0 transition-all duration-700 scale-110 group-hover:scale-100" />
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-60" />
