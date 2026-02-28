@@ -77,7 +77,7 @@ export function Hero({ githubUrl, linkedinUrl, blueskyUrl, lang, dict }: HeroPro
                         >
                             <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-[var(--brand)] to-[var(--accent)] opacity-40 blur-md group-hover:opacity-75 transition-opacity duration-500" />
                             <div className="relative h-28 w-28 sm:h-32 sm:w-32 overflow-hidden rounded-full border-2 border-[var(--border)] bg-[var(--bg-elevated)] shadow-2xl">
-                                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400&auto=format&fit=crop')] bg-cover bg-center grayscale group-hover:grayscale-0 transition-all duration-700 scale-110 group-hover:scale-100" />
+                                <div className="absolute inset-0 bg-[url('https://lnsc5jfklua5d1al.private.blob.vercel-storage.com/personal-foto-QBwWyjNr5nIBgCmOJTFF9toven4vJX.jpg')] bg-cover bg-center grayscale group-hover:grayscale-0 transition-all duration-700 scale-110 group-hover:scale-100" />
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-60" />
                             </div>
                         </motion.div>
