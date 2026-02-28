@@ -75,7 +75,7 @@ export function Hero({ githubUrl, linkedinUrl, blueskyUrl, lang, dict }: HeroPro
                             className="relative group shrink-0"
                         >
                             <div className="relative h-16 w-16 sm:h-20 sm:w-20 overflow-hidden rounded-full border-2 border-[var(--border)] bg-[var(--bg-elevated)] shadow-2xl">
-                                <div className="absolute inset-0 bg-[url('https://6pxof7rpjdk6gkca.public.blob.vercel-storage.com/foto_personal-LKc8SjGUPtPc9VIdVoJgxe1EnD8H8H.jpg')] bg-cover bg-center grayscale group-hover:grayscale-0 transition-all duration-700 scale-110 group-hover:scale-100" />
+                                <div className="absolute inset-0 bg-[url('https://6pxof7rpjdk6gkca.public.blob.vercel-storage.com/IMG20260121162350~2.jpeg')] bg-cover bg-center grayscale group-hover:grayscale-0 transition-all duration-700 scale-110 group-hover:scale-100" />
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-60" />
                             </div>
                         </motion.div>
