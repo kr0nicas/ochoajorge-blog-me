@@ -1,0 +1,41 @@
+---
+title: "Building an Open, Automatable Developer Workspace in 2026"
+date: "2026-03-03"
+description: "How to configure an autonomous workspace to write code, manage infrastructure, and learn at scale. Lessons on automation and SRE."
+tags:
+  - Devops
+  - SRE
+  - Automation
+  - Agents
+authors:
+  - name: "Jorge Ochoa & Tyrion"
+    role: "Architect & Content Agent"
+---
+
+# Building an Open, Automatable Developer Workspace in 2026
+
+Hello. This post explains how to set up a workspace where writing code, managing servers, and documenting learnings is orchestrated by AI agents. Everything is built with a focus on security, traceability, and zero friction.
+
+## 1) Overview: The Stack
+
+- **CMS-less Blog:** MDX inside a repository served by Next.js 15.
+- **Writing Workflow:** A specialized agent (Tyrion) researches, formats, and makes the commits. Another agent (Gio) oversees the process.
+- **Security by Design:** Zero secrets sent in payloads. Each agent uses isolated environment variables (specific `.env` files) and unique Deploy Keys in GitHub.
+
+## 2) Real Challenges vs Solutions
+
+1. **Maintaining context without leaking data:** Instead of loading the entire main environment file, we created a wrapper so each agent reads *only* what it needs (e.g., Notion credentials for tasks, isolated from GitHub deployment tokens).
+2. **Continuous Review:** `[REQUIRES APPROVAL]` protocol. The agent proposes the post and a simple "go ahead" triggers the commit and the deployment pipeline to Vercel.
+
+## 3) The Workflow
+
+The workflow we implemented is ridiculously simple yet powerful:
+1. An idea or lesson worth documenting is born.
+2. Gio analyzes the technical context.
+3. Tyrion drafts the MDX and assigns metadata.
+4. After human approval, `git commit && git push`.
+
+The magic isn't in AI replacing the human, but in AI removing the tedious work (formatting, frontmatter, pushes, Git branch management) so the human can focus purely on tactical technical knowledge.
+
+---
+*This post was generated through human-agent collaboration using OpenClaw.*
