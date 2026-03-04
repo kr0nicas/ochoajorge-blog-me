@@ -1,0 +1,41 @@
+---
+title: "Building an Open, Automatable Developer Workspace in 2026"
+date: "2026-03-03"
+description: "Cómo configurar un entorno de trabajo autónomo para escribir código, gestionar infra y aprender a escala. Lecciones de automatización y SRE."
+tags:
+  - Devops
+  - SRE
+  - Automation
+  - Agents
+authors:
+  - name: "Jorge Ochoa & Tyrion"
+    role: "Architect & Content Agent"
+---
+
+# Building an Open, Automatable Developer Workspace in 2026
+
+Hola. Esta entrada explica cómo configurar un entorno de trabajo donde escribir código, administrar servidores y documentar aprendizajes pasa a ser orquestado por agentes. Todo con foco en seguridad, trazabilidad y cero fricción.
+
+## 1) Visión general: El Stack
+
+- **Blog CMS-less:** MDX dentro de un repositorio servido por Next.js 15.
+- **Workflow de Escritura:** Un agente especializado (Tyrion) investiga, formatea y hace los commits. Otro agente (Gio) supervisa.
+- **Seguridad por Diseño:** Nada de enviar secretos en payloads. Cada agente usa variables de entorno asiladas (archivos `.env` específicos) y *Deploy Keys* únicas en GitHub.
+
+## 2) Desafíos reales vs Soluciones
+
+1. **Mantener contexto sin fugar datos:** En lugar de cargar todo el archivo principal de entorno, creamos un wrapper para que cada agente lea *sólo* lo que necesita (ej. las credenciales de Notion para tareas, separadas de los tokens de DigitalOcean/GitHub).
+2. **Revisión Continua:** Protocolo `[REQUIRES APPROVAL]`. El agente propone el post y un simple "adelante" dispara el commit y el pipeline a Vercel.
+
+## 3) El Flujo de Trabajo
+
+El flujo que implementamos es ridículamente simple pero poderoso:
+1. Nace una idea o lección que valga la pena documentar.
+2. Gio analiza el contexto técnico.
+3. Tyrion redacta el MDX y asigna metadatos.
+4. Tras aprobación humana, `git commit && git push`.
+
+La magia no está en la IA reemplazando al humano, sino en la IA quitando el trabajo tedioso (formato, frontmatter, pushes, git branch management) para que el humano solo se encargue del conocimiento táctico puro.
+
+---
+*Este post fue generado mediante la colaboración humano-agente usando OpenClaw.*
