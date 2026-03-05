@@ -23,9 +23,9 @@ export function PostHeader({ post, lang }: PostHeaderProps) {
             </Link>
 
             {/* Tags */}
-            {post.tags.length > 0 && (
+            {(post.tags ?? []).length > 0 && (
                 <div className="mb-5 flex flex-wrap gap-2">
-                    {post.tags.map((tag) => (
+                    {(post.tags ?? []).map((tag) => (
                         <Link
                             key={tag}
                             href={`/${lang}/tags/${encodeURIComponent(tag.toLowerCase())}`}

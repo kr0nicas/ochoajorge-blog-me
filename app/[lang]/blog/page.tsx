@@ -22,7 +22,7 @@ export default async function BlogPage({
     const tagCounts: Record<string, number> = {};
     for (const tag of tags) {
         tagCounts[tag] = posts.filter((p) =>
-            p.tags.map((t) => t.toLowerCase()).includes(tag.toLowerCase())
+            (p.tags ?? []).map((t) => t.toLowerCase()).includes(tag.toLowerCase())
         ).length;
     }
 

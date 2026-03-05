@@ -96,12 +96,12 @@ export function Callout({
    ══════════════════════════════════════════════════════════════ */
 
 export function ComparisonTable({
-    headers,
-    rows,
+    headers = [],
+    rows = [],
     highlight = 0,
 }: {
-    headers: string[];
-    rows: string[][];
+    headers?: string[];
+    rows?: string[][];
     highlight?: number; // index of the "winning" column
 }) {
     return (

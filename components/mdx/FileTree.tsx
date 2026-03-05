@@ -149,10 +149,10 @@ export function FileTree({
     children,
     title,
 }: {
-    children: string;
+    children?: string;
     title?: string;
 }) {
-    const lines = children
+    const lines = (children ?? "")
         .split("\n")
         .filter((l) => l.trim() !== "");
     const tree = buildTree(lines);

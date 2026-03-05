@@ -74,7 +74,7 @@ export function getAllPosts(locale: string = "es"): Post[] {
  */
 export function getPostsByTag(tag: string, locale: string = "es"): Post[] {
     return getAllPosts(locale).filter((post) =>
-        post.tags.map((t) => t.toLowerCase()).includes(tag.toLowerCase())
+        (post.tags ?? []).map((t) => t.toLowerCase()).includes(tag.toLowerCase())
     );
 }
 

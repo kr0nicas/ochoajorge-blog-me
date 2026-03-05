@@ -45,7 +45,7 @@ export default async function TagPage({ params }: TagPageProps) {
     const tagCounts: Record<string, number> = {};
     for (const t of allTags) {
         tagCounts[t] = allPosts.filter((p) =>
-            p.tags.map((x) => x.toLowerCase()).includes(t.toLowerCase())
+            (p.tags ?? []).map((x) => x.toLowerCase()).includes(t.toLowerCase())
         ).length;
     }
 

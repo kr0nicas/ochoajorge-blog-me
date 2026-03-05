@@ -83,9 +83,9 @@ export function RelatedPosts({ currentPost, lang }: RelatedPostsProps) {
                         )}
 
                         {/* Tags */}
-                        {post.tags.slice(0, 2).length > 0 && (
+                        {(post.tags ?? []).slice(0, 2).length > 0 && (
                             <div className="mb-3 flex flex-wrap gap-1.5">
-                                {post.tags.slice(0, 2).map((tag) => (
+                                {(post.tags ?? []).slice(0, 2).map((tag) => (
                                     <Tag key={tag} name={tag} linkable={false} lang={lang} />
                                 ))}
                             </div>

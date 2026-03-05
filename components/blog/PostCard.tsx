@@ -34,9 +34,9 @@ export function PostCard({ post, featured = false, className, lang = "es" }: Pos
             )}
 
             {/* Tags row */}
-            {post.tags.length > 0 && (
+            {(post.tags ?? []).length > 0 && (
                 <div className="mb-3 flex flex-wrap gap-2">
-                    {post.tags.slice(0, 3).map((tag) => (
+                    {(post.tags ?? []).slice(0, 3).map((tag) => (
                         <Tag key={tag} name={tag} lang={lang} />
                     ))}
                 </div>

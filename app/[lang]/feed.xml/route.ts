@@ -29,7 +29,7 @@ export async function GET(
             <guid isPermaLink="true">${url}</guid>
             <pubDate>${pubDate}</pubDate>
             <description><![CDATA[${post.description}]]></description>
-            ${post.tags.map(tag => `<category><![CDATA[${tag}]]></category>`).join('')}
+            ${(post.tags ?? []).map(tag => `<category><![CDATA[${tag}]]></category>`).join('')}
         </item>`;
         })
         .join("");
