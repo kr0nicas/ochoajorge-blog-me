@@ -1,106 +1,199 @@
 ---
-description: Crear un nuevo post MDX con estructura correcta, frontmatter, SEO y ubicación
+description: Crear un nuevo post MDX con estructura correcta, frontmatter, SEO, MDX components y ubicación
 ---
 
-# New Post Workflow
+# /new_post Workflow
 
-Este workflow garantiza que cada post nuevo tenga la estructura, SEO y calidad correcta desde el inicio.
+Workflow completo para crear un post nuevo. Garantiza estructura, SEO, localización correcta y uso de los MDX components interactivos desde el inicio.
 
-## 1. Definir el post
+---
 
-Antes de crear el archivo, responder:
-- **Slug**: nombre del archivo (kebab-case, sin fecha, ej: `hexagonal-arch-python`)
-- **Título**: descriptivo y con keyword principal al inicio
-- **Descripción**: 150-160 caracteres exactos para SEO
-- **Tags**: 2-5 tags relevantes del pillar content del blog
-- **Audiencia objetivo**: ¿Para quién es este post?
+## Paso 1 — Definir el Post
 
-## 2. Crear el archivo MDX
+Responder antes de escribir una línea:
 
-Crear el archivo base usando el script de scaffolding:
+| Campo | Decisión |
+|---|---|
+| **Slug** | kebab-case, sin fecha: `hexagonal-arch-python` |
+| **Idioma** | `es` (principal) o `en` |
+| **Título** | Keyword principal en las primeras 3 palabras |
+| **Descripción** | Exactamente 150-160 caracteres |
+| **Tags** | 2-5 tags en el idioma del post. Tag slug: `arquitectura-limpia` |
+| **Serie** | ¿Pertenece a una serie existente? Verificar con `getAllSeries(lang)` en `lib/posts.ts` |
+| **Pillar** | Arquitectura / Python & Backend / Frontend / IA Aplicada / ERP SaaS |
 
-```bash
-npm run post:new "Título de tu Post"
-```
+---
 
-Esto generará el archivo en `content/posts/{slug}.mdx` con este frontmatter pre-configurado:
+## Paso 2 — Crear el Archivo MDX
+
+**Ruta correcta:**
+- Español: `content/posts/es/{slug}.mdx`
+- Inglés: `content/posts/en/{slug}.mdx`
+
+**Frontmatter completo:**
 
 ```yaml
 ---
-title: "Título del Post Aquí"
-description: "Descripción de exactamente 150-160 caracteres que será usada en SEO y en las cards del listado."
-date: "YYYY-MM-DD"
-tags: ["tag1", "tag2", "tag3"]
+title: "Título con Keyword al Inicio"
+description: "Descripción de exactamente 150-160 caracteres optimizada para SEO y legible para humanos. Revisa el contador."
+date: "2026-03-04"
+tags: ["arquitectura", "python", "fastapi"]
+lang: "es"
 draft: true
-readingTime: true
-coverImage: "/images/posts/{slug}.jpg"
+featured: false
+series:
+  name: "Arquitectura de Software Avanzada"  # solo si aplica
+  part: 1
 ---
 ```
 
-> Nota: `draft: true` hasta que esté listo para publicar. Cambia a `false` para publicar.
+> `draft: true` siempre hasta que esté listo. Deploy no lo incluirá en producción.
 
-## 3. Estructura del Post
+---
 
-Usar esta estructura como base:
+## Paso 3 — Estructura Base del Post
 
 ```mdx
 # Título del Post
 
-Párrafo introductorio que engancha al lector. Explica el problema o la pregunta central en 2-3 oraciones.
+Párrafo de apertura: engancha en 2-3 oraciones. Nombra el problema y por qué importa al lector.
 
 ## El Problema
 
-Describe el contexto y por qué este tema importa.
+Contexto. ¿Cuándo te topas con esto en la práctica?
 
-## La Solución (o: Concepto Central)
+## La Solución
 
-Desarrollo del tema principal.
+Desarrollo principal del tema.
 
-### Sub-sección 1
+### Sub-tema 1
 
-### Sub-sección 2
+<Callout type="tip" title="Tip clave">
+  Insight directo que el lector puede aplicar ahora mismo.
+</Callout>
 
-## Código / Implementación
+### Sub-tema 2
 
-```python
-# Ejemplo de código con syntax highlighting
-```
+<ComparisonTable
+  headers={["Opción A", "Opción B"]}
+  highlight={0}
+  rows={[
+    ["Ventaja 1", "Desventaja 1"],
+    ["Ventaja 2", "Desventaja 2"],
+  ]}
+/>
+
+## Implementación Paso a Paso
+
+<Steps>
+  <Step title="Primer paso">
+    Descripción del paso con código si aplica.
+    ```python
+    # Código aquí
+    ```
+  </Step>
+  <Step title="Segundo paso">
+    ...
+  </Step>
+</Steps>
+
+## Estructura de Archivos
+
+<FileTree title="Estructura del proyecto">
+{`
+  src/
+    domain/
+      entities/
+        entity.py  [highlight]
+      ports/
+    infrastructure/
+      adapters/
+`}
+</FileTree>
+
+## Antes y Después (Opcional)
+
+<CodeComparison
+  before={{ label: "❌ Sin patrón", code: `código acoplado aquí` }}
+  after={{ label: "✅ Con patrón", code: `código limpio aquí` }}
+/>
 
 ## Lecciones Aprendidas
 
-Bullet points concisos de los takeaways principales.
+- Bullet conciso #1
+- Bullet conciso #2
+- Bullet conciso #3
 
 ## Conclusión
 
-Cierre con call-to-action suave (¿qué sigue? ¿Tienes preguntas? → comentarios Giscus).
+Cierre directo. ¿Qué sigue? ¿Hay otro post de la serie? → link.
+¿Dudas? → invitar a comentar (Giscus se carga automáticamente).
 ```
 
-## 4. Auditoría SEO Automática
+---
 
-Antes de cambiar `draft: false`, ejecuta la validación:
+## Paso 4 — MDX Components Disponibles
 
-```bash
-npm run seo:audit
+> Estos no necesitan import. Están registrados globalmente en `lib/mdx.tsx`.
+
+| Componente | Uso |
+|---|---|
+| `<Callout type="tip/warning/danger/note/success">` | Alertas y notas destacadas |
+| `<FileTree>` | Árbol de archivos interactivo con `[highlight]` |
+| `<Steps> + <Step title="">` | Guía numerada paso a paso |
+| `<ComparisonTable headers rows highlight>` | Tabla comparativa con columna ganadora |
+| `<CodeComparison before after>` | Antes/Después con tabs y copy |
+
+---
+
+## Paso 5 — Imágenes
+
+**NUNCA** subir imágenes al repo Git.
+
+1. Ir a `https://ochoajorge.me/es/admin/upload`
+2. Subir → copiar URL de Vercel Blob
+3. Usar en MDX:
+```mdx
+![Alt descriptivo](https://6pxof7rpjdk6gkca.public.blob.vercel-storage.com/imagen.webp)
 ```
 
-Esta herramienta verificará automáticamente:
-- [ ] Longitud de la descripción (150-160 caracteres)
-- [ ] Existencia de tags
-- [ ] Integridad de los metadatos de series
-- [ ] Título presente
-- [ ] Código con syntax highlighting correcto
+---
 
-Extra manual:
-- [ ] Título tiene keyword principal en las primeras 3 palabras
-- [ ] Al menos un `h2` con keyword secundaria
-- [ ] Imágenes tienen `alt` descriptivo
-- [ ] Links internos a otros posts relevantes (si existen)
+## Paso 6 — Checklist SEO Pre-Publicación
 
-## 5. Publicar
+Antes de cambiar `draft: false`, verificar:
+
+- [ ] `title` tiene keyword principal en las primeras 3 palabras
+- [ ] `description` tiene entre 150-160 caracteres exactos
+- [ ] `tags` están en el idioma del post (ES/EN)  
+- [ ] `date` es correcta en formato `YYYY-MM-DD`
+- [ ] Al menos 1 `h2` con keyword secundaria
+- [ ] Hay al menos un link interno a otro post del blog
+- [ ] Imágenes (si las hay) tienen `alt` descriptivo
+- [ ] Post tiene entre 1,500-3,000 palabras para máximo impacto SEO
+- [ ] Si es parte de una serie: `series.name` es idéntico a los otros posts
+
+---
+
+## Paso 7 — Publicar
 
 ```bash
-# Cambiar draft: false en el frontmatter, luego:
-git add content/posts/{slug}.mdx
+# 1. Cambiar draft: false en el frontmatter
+# 2. Verificar build limpio
+npm run build
+
+# 3. Commit y push (Vercel despliega automáticamente)
+git add content/posts/es/{slug}.mdx
 git commit -m "content(posts): add {slug} post"
-git push origin main  # Vercel despliega automáticamente
+git push origin main
 ```
+
+---
+
+## Tips para Agentes IA
+
+- **Los posts relacionados** se calculan automáticamente por tags y series — no hace falta linkear manualmente en el código
+- **El sitemap** se regenera en cada build — el post aparece automáticamente
+- **La ToC** se genera desde los headings `h2`, `h3`, `h4` del post — usa buenos headings descriptivos
+- **Los tags** de la misma serie deben solapar para que `RelatedPosts` surfacee los posts correctamente
+- **La serialización de series** requiere `series.name` EXACTO — copia/pega del frontmatter del primer post

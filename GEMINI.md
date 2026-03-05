@@ -63,17 +63,28 @@ Implementa una página de tags en el blog:
 - Link desde cada Tag component en PostCard y PostHeader
 ```
 
-## 🚀 6. Roadmap de Features (Post-MVP)
+## 🚀 6. Roadmap de Features
 
-| Prioridad | Feature | Motivo |
-|-----------|---------|--------|
-| Alta | Sistema de tags/categorías | Navegación y SEO long-tail |
-| Alta | Serie de posts (series) | Retención del lector |
-| Media | Búsqueda con fuse.js | UX para lectors frecuentes |
-| Media | RSS feed | Audiencia técnica lo usa |
-| Media | Giscus (comentarios) | Comunidad sin base de datos |
-| Baja | Newsletter (Resend) | Cuando haya audiencia base |
-| Baja | Casos de estudio interactivos | Diferenciador premium |
+| Estado | Feature | Notas |
+|--------|---------|-------|
+| ✅ DONE | Sistema de temas Dark/Light | CSS variables + ThemeToggle + LinkedIn Light |
+| ✅ DONE | Tags/categorías con páginas | SSG, SEO, links desde PostCard |
+| ✅ DONE | Serie de posts (series) | SeriesBanner, RelatedPosts, generateStaticParams |
+| ✅ DONE | Posts relacionados | Scoring: serie > tags overlap |
+| ✅ DONE | Tabla de Contenidos (ToC) | Sticky, IntersectionObserver activo |
+| ✅ DONE | Reading Progress bar | Componente ReadingProgress |
+| ✅ DONE | OG Image dinámica por post | next/og en opengraph-image.tsx |
+| ✅ DONE | Vercel Analytics + Speed Insights | En layout.tsx, zero-config |
+| ✅ DONE | Sitemap.xml dinámico | app/sitemap.ts: posts, tags, series, estáticas |
+| ✅ DONE | Página /uses | 6 secciones: hardware, stack, AI, cloud, tools |
+| ✅ DONE | Newsletter Resend | Server Action + NewsletterForm compact/full |
+| ✅ DONE | Modo Lector | ReaderMode toggle, Escape, localStorage |
+| ✅ DONE | MDX Components Interactivos | FileTree, Callout, Steps, ComparisonTable, CodeComparison |
+| 🔜 TODO | RSS Feed | `app/feed.xml/route.ts`, audiencia técnica lo usa |
+| 🔜 TODO | Giscus Comments activado | Requiere repo público + Discussions habilitadas |
+| 🔜 TODO | Página CV/Resume | SSG + PDF descargable en Vercel Blob |
+| 🔜 TODO | Búsqueda avanzada con fuse.js | Mejorar el search modal actual |
+| 🔜 TODO | Casos de estudio interactivos | Diferenciador premium de largo plazo |
 
 ## 🔄 7. Git Conventions
 
