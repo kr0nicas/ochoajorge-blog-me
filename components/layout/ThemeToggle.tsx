@@ -1,17 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { Sun, Moon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export function ThemeToggle() {
     const { resolvedTheme, setTheme } = useTheme();
-    const [mounted, setMounted] = useState(false);
-
-    useEffect(() => { setMounted(true); }, []);
-
-    if (!mounted) {
+    if (!resolvedTheme) {
         return <div className="h-9 w-9 rounded-full" aria-hidden="true" />;
     }
 

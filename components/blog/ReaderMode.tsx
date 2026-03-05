@@ -12,16 +12,15 @@ import { motion, AnimatePresence } from "framer-motion";
  * and the article expands to a comfortable reading width.
  */
 export function ReaderMode({ lang = "es" }: { lang?: string }) {
-    const [active, setActive] = useState(false);
-    const [mounted, setMounted] = useState(false);
+    const [active, setActive] = useState<boolean>(() => {
+        if (typeof window === "undefined") return false;
+        return localStorage.getItem("reader-mode") === "true";
+    });
     const isSpanish = lang === "es";
 
     useEffect(() => {
-        setMounted(true);
-        const saved = localStorage.getItem("reader-mode") === "true";
-        setActive(saved);
-        if (saved) document.body.classList.add("reader-mode");
-    }, []);
+        document.body.classList.toggle("reader-mode", active);
+    }, [active]);
 
     const toggle = useCallback(() => {
         setActive((prev) => {
@@ -40,8 +39,6 @@ export function ReaderMode({ lang = "es" }: { lang?: string }) {
         window.addEventListener("keydown", handler);
         return () => window.removeEventListener("keydown", handler);
     }, [active, toggle]);
-
-    if (!mounted) return null;
 
     return (
         <motion.button

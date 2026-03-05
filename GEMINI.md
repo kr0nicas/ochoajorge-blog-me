@@ -11,12 +11,12 @@ Este archivo provee el contexto fundacional y directrices estratégicas para **G
 ## 🏗️ 2. Arquitectura del Blog
 
 ### Filosofía: Content-First, Zero Backend
-- **CMS:** MDX files en `content/posts/` — no hay base de datos, no hay CMS externo.
+- **CMS:** MDX files en `content/posts/{es|en}/` — no hay base de datos, no hay CMS externo.
 - **Deploy:** Vercel (git push = deploy automático). SSG para posts, ISR para páginas dinámicas.
 - **Principio:** Cada decisión técnica debe servir al contenido, no a la complejidad técnica.
 
 ### Stack Decisiones Permanentes
-- **Next.js 15** (App Router) — SSG/ISR para máximo rendimiento
+- **Next.js 16** (App Router) — SSG/ISR para máximo rendimiento
 - **Tailwind v4** — design tokens, no estilos mágicos
 - **shadcn/ui** — componentes accesibles, sin sobreingeniería
 - **MDX** — Markdown + JSX para posts interactivos
@@ -56,7 +56,7 @@ Cuando el usuario pida implementar algo nuevo:
 ### Ejemplo de Implementation Prompt:
 ```
 Implementa una página de tags en el blog:
-- Ruta: `app/tags/[tag]/page.tsx` (SSG)
+- Ruta: `app/[lang]/tags/[tag]/page.tsx` (SSG)
 - `generateStaticParams()`: obtener todos los tags únicos de `lib/posts.ts`
 - `generateMetadata()`: meta title = "Posts sobre {tag} | Jorge Ochoa"
 - Layout: grid de PostCards filtradas por tag
@@ -80,7 +80,7 @@ Implementa una página de tags en el blog:
 | ✅ DONE | Newsletter Resend | Server Action + NewsletterForm compact/full |
 | ✅ DONE | Modo Lector | ReaderMode toggle, Escape, localStorage |
 | ✅ DONE | MDX Components Interactivos | FileTree, Callout, Steps, ComparisonTable, CodeComparison |
-| 🔜 TODO | RSS Feed | `app/feed.xml/route.ts`, audiencia técnica lo usa |
+| ✅ DONE | RSS Feed | `app/[lang]/feed.xml/route.ts`, feed por idioma |
 | 🔜 TODO | Giscus Comments activado | Requiere repo público + Discussions habilitadas |
 | 🔜 TODO | Página CV/Resume | SSG + PDF descargable en Vercel Blob |
 | 🔜 TODO | Búsqueda avanzada con fuse.js | Mejorar el search modal actual |
@@ -92,6 +92,6 @@ Conventional Commits: `type(scope): subject`
 - `feat(blog): add RSS feed generation`
 - `fix(seo): correct og:image path for posts`
 - `content(posts): add hexagonal architecture post`
-- `chore(deps): update next to 15.x`
+- `chore(deps): update next to 16.x`
 
 **Tipo extra:** `content` — para commits de nuevos posts o ediciones de contenido.

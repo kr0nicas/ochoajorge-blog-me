@@ -1,136 +1,101 @@
-# CLAUDE.md — Personal Blog
+# CLAUDE.md - Personal Blog Implementation Guide
 
-This file provides guidance to Claude Code when working with this repository.
-All code identifiers must be in **English**. Comments and user-facing strings may be in Spanish or English.
+This file provides practical guidance for AI coding agents working in this repository.
+All code identifiers must be in English.
 
-## Project Overview
+## Project Snapshot
 
-A personal blog built with Next.js 15 (App Router), Tailwind CSS v4, and MDX. No database — content lives as `.mdx` files in `content/posts/`. Hosted on Vercel.
+- Framework: Next.js 16 (App Router)
+- Language: TypeScript (strict)
+- Content model: MDX files in `content/posts/{lang}/`
+- Locales: `es` and `en`
+- Default locale redirect: `/` -> `/es` (see `middleware.js`)
 
-**Stack:**
-- **Framework**: Next.js 15 with App Router
-- **Styling**: Tailwind CSS v4
-- **Content**: MDX (`.mdx` files in `content/posts/`)
-- **UI Components**: shadcn/ui
-- **Animations**: Framer Motion
-- **Deployment**: Vercel
-
-## Build & Run Commands
+## Commands
 
 ```bash
-npm run dev        # Start dev server on localhost:3000
-npm run build      # Production build
-npm run lint       # ESLint
-npm run type-check # tsc --noEmit
+npm run dev
+npm run build
+npm run lint
+npm run type-check
+npm run post:new -- "Post Title" [es|en]
+npm run seo:audit [es|en]
 ```
 
-## Architecture
+## Content Architecture
 
-### Content Layer: MDX Files
-- All blog posts live in `content/posts/*.mdx`
-- Frontmatter contains: `title`, `description`, `date`, `tags`, `draft`, `coverImage`
-- `lib/posts.ts` handles all file parsing, sorting, and filtering
-- `lib/mdx.ts` configures the MDX processor (remark/rehype plugins)
+### Post Location
 
-### Routing (App Router)
-- `/` — Homepage: hero + featured posts
-- `/blog` — All posts listing with search/filter
-- `/blog/[slug]` — Individual post (SSG with `generateStaticParams`)
-- `/about` — About page
-- `/projects` — Projects showcase
+- Spanish posts: `content/posts/es/*.mdx`
+- English posts: `content/posts/en/*.mdx`
 
-### Frontend Pattern: Server Components First
-- **Server Components by default** — fetch data in the component directly
-- **Client Components** (`'use client'`) — only for interactive UI (search, theme toggle, animations)
-- **No custom hooks for data fetching** — use RSC and `async/await` directly
-- **Hooks allowed** for client-side state (theme, search, UI state)
+### Parsed By
 
-### Component Structure
-```
-components/
-├── ui/           # shadcn/ui primitives (generated)
-├── blog/         # PostCard, PostHeader, TableOfContents, CodeBlock, ReadingProgress
-├── layout/       # Header, Footer, ThemeToggle, MobileMenu
-└── shared/       # Tag, AnimatedSection, GradientText
-```
+- `lib/posts.ts` handles slug discovery, frontmatter parsing, sorting, tags, and series.
+- `lib/mdx.tsx` compiles MDX and registers MDX components.
 
-## Critical Rules
+### Frontmatter Contract
 
-### MDX Posts Frontmatter Schema
-Every post MUST have this frontmatter:
+Required in practice:
+
 ```yaml
 ---
-title: "Post Title"
-description: "Brief description for SEO and cards (150-160 chars)"
-date: "2025-01-15"
-tags: ["nextjs", "architecture", "python"]
-draft: false
-coverImage: "/images/posts/post-slug.jpg"  # optional
+title: "Post title"
+description: "150-160 char SEO description"
+date: "YYYY-MM-DD"
+tags: ["tag-1", "tag-2"]
+draft: true
 ---
 ```
 
-### SEO (mandatory on every page)
-- Every `page.tsx` must export `generateMetadata()` or a static `metadata` object
-- Use descriptive `title` with site name suffix: `"Post Title | Jorge Ochoa"`
-- `description` must be 150-160 characters
-- OG image defined via `opengraph-image.tsx` or metadata API
+Optional and supported:
 
-### Code Quality
-- TypeScript strict mode — no `any`, no `@ts-ignore` without comment
-- `eslint` clean — no warnings in CI
-- Images: always use `next/image` with proper `width/height` or `fill`
-- Fonts: always use `next/font` — never Google Fonts CDN link
+```yaml
+lang: "es"          # optional; folder is source of truth
+featured: false
+coverImage: "https://..."
+series:
+  name: "Series Name"
+  part: 1
+```
 
-### Performance Targets
-- Core Web Vitals > 90 on all pages
-- Images: WebP format, lazy loading by default
-- Code splitting: dynamic imports for heavy components
+## Routing
 
-### Styling
-- Tailwind CSS v4 utility classes
-- Design tokens defined in `app/globals.css` via `@theme`
-- Dark mode: `class` strategy via `next-themes`
-- No inline styles unless absolutely necessary
+- `/{lang}`: home
+- `/{lang}/blog`: post list
+- `/{lang}/blog/{slug}`: post page
+- `/{lang}/tags/{tag}`: filtered posts by tag
+- `/{lang}/series/{slug}`: series page
+- `/{lang}/feed.xml`: RSS feed
 
-## Agent Skills Available
-
-See `.agent/skills/` for detailed guidance:
-- `nextjs-developer` — App Router, RSC, data fetching
-- `next-best-practices` — Conventions, async APIs, error boundaries
-- `ui-ux-pro-max` — Glassmorphism, dark mode, animations
-- `shadcn-ui` — Component library usage
-- `tailwind-design-system` — Design tokens, component patterns
-- `security_audit` — Security scanning
-- `documentation_architect` — README and docs generation
-- `python-best-practices` — For build scripts and tooling
-
-## Agent Personas
-
-See `.agent/personas/` for role definitions:
-- `architect.md` — System design, architectural decisions
-- `frontend_expert.md` — UI/UX implementation
-- `security_officer.md` — Security review
-- `content_strategist.md` — Post structure, SEO, audience
-
-## Workflows
-
-See `.agent/workflows/`:
-- `/new_post` — Create a new MDX blog post with proper structure
-- `/deploy` — Deploy to Vercel production
-- `/seo_audit` — SEO checklist before publishing
-- `/fix_bug` — Standard debugging process
-
-## Quick Navigation (for AI agents)
+## File Map
 
 | Task | File |
-|------|------|
-| Add a new post | `content/posts/new-post.mdx` |
-| Post parser logic | `lib/posts.ts` |
-| MDX configuration | `lib/mdx.ts` (or `next.config.ts`) |
-| Design tokens | `app/globals.css` — `@theme` block |
-| Homepage layout | `app/page.tsx` |
-| Blog listing page | `app/blog/page.tsx` |
-| Individual post | `app/blog/[slug]/page.tsx` |
-| Site metadata | `app/layout.tsx` — `metadata` export |
-| Tailwind config | `tailwind.config.ts` |
-| Next.js config | `next.config.ts` |
+|---|---|
+| Add/edit posts | `content/posts/{es|en}/*.mdx` |
+| Post parser and metadata | `lib/posts.ts` |
+| MDX compiler/components | `lib/mdx.tsx`, `components/mdx/MDXComponents.tsx` |
+| Post page layout | `app/[lang]/blog/[slug]/page.tsx` |
+| Blog listing | `app/[lang]/blog/page.tsx` |
+| Site metadata/config | `lib/utils.ts`, `app/[lang]/layout.tsx` |
+| Locale behavior | `middleware.js`, `lib/dictionary.ts` |
+
+## Agent Workflow
+
+For new entries, follow this sequence:
+
+1. Create scaffold with `npm run post:new`.
+2. Write MDX content in the correct locale folder.
+3. Keep `draft: true` until content is ready.
+4. Run `npm run seo:audit` and `npm run build`.
+5. Set `draft: false` only when publishing.
+
+Detailed writing workflow lives at `.agent/workflows/new_post.md`.
+
+## Quality Rules
+
+- Prefer Server Components; use client components only for interactivity.
+- Do not introduce `any` unless absolutely unavoidable.
+- Keep metadata complete for every page.
+- Use existing design tokens and component patterns.
+- Do not add external runtime dependencies unless necessary.

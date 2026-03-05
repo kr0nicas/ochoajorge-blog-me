@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Layers } from "lucide-react";
 import type { Post } from "@/lib/types";
 import { getAllPosts, getPostsBySeries } from "@/lib/posts";
-import { formatDate, slugify } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import { Tag } from "@/components/shared/Tag";
 
 interface RelatedPostsProps {

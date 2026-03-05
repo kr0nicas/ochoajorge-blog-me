@@ -3,10 +3,11 @@
 import { useState, useRef } from "react";
 import { Upload, Copy, Check, FileImage, Loader2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 import type { PutBlobResult } from "@vercel/blob";
 
-export default function AdminUploadPage({ params }: { params: Promise<{ lang: string }> }) {
+export default function AdminUploadPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [blob, setBlob] = useState<PutBlobResult | null>(null);
     const [copied, setCopied] = useState(false);
@@ -118,9 +119,15 @@ export default function AdminUploadPage({ params }: { params: Promise<{ lang: st
                 {blob && (
                     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
                         <div className="flex items-center gap-4 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-4">
-                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-elevated)] text-[var(--brand-light)] overflow-hidden">
+                            <div className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[var(--bg-elevated)] text-[var(--brand-light)]">
                                 {blob.url.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                                    <img src={blob.url} alt="Preview" className="h-full w-full object-cover" />
+                                    <Image
+                                        src={blob.url}
+                                        alt="Preview"
+                                        fill
+                                        className="object-cover"
+                                        sizes="48px"
+                                    />
                                 ) : (
                                     <FileImage className="h-6 w-6" />
                                 )}

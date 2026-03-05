@@ -18,7 +18,6 @@ export function TableOfContents({ lang = "es" }: TableOfContentsProps) {
     const [headings, setHeadings] = useState<Heading[]>([]);
     const [activeId, setActiveId] = useState<string>("");
 
-    // Collect headings from the article on mount
     useEffect(() => {
         const article = document.getElementById("article-content");
         if (!article) return;
@@ -27,13 +26,15 @@ export function TableOfContents({ lang = "es" }: TableOfContentsProps) {
             "h2[id], h3[id], h4[id]"
         );
 
-        const parsed: Heading[] = Array.from(nodes).map((el) => ({
+        const parsed = Array.from(nodes).map((el) => ({
             id: el.id,
             text: el.textContent?.replace(/#/g, "").trim() ?? "",
             level: parseInt(el.tagName[1], 10),
         }));
 
-        setHeadings(parsed);
+        // Defer update to avoid synchronous setState in effect body.
+        const rafId = window.requestAnimationFrame(() => setHeadings(parsed));
+        return () => window.cancelAnimationFrame(rafId);
     }, []);
 
     // IntersectionObserver to track active heading

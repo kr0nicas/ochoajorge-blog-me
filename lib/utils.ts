@@ -69,7 +69,7 @@ export function formatDate(dateString: string, locale: string = "es"): string {
             month: "long",
             day: "numeric",
         });
-    } catch (e) {
+    } catch {
         return dateString;
     }
 }

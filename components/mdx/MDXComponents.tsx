@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Check, Copy, CheckCheck } from "lucide-react";
+import { Children, cloneElement, isValidElement, useState, type ReactElement } from "react";
+import { Copy, CheckCheck } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -168,13 +168,17 @@ export function ComparisonTable({
    </Steps>
    ══════════════════════════════════════════════════════════════ */
 
-let stepCounter = 0;
-
 export function Steps({ children }: { children: React.ReactNode }) {
-    stepCounter = 0;
+    const childrenWithIndex = Children.map(children, (child, index) => {
+        if (!isValidElement(child)) return child;
+        return cloneElement(child as ReactElement<{ index?: number }>, {
+            index: index + 1,
+        });
+    });
+
     return (
         <div className="not-prose my-6 space-y-4">
-            {children}
+            {childrenWithIndex}
         </div>
     );
 }
@@ -182,11 +186,13 @@ export function Steps({ children }: { children: React.ReactNode }) {
 export function Step({
     title,
     children,
+    index,
 }: {
     title: string;
     children: React.ReactNode;
+    index?: number;
 }) {
-    const num = ++stepCounter;
+    const num = index ?? 0;
 
     return (
         <div className="flex gap-4 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-5">
