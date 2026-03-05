@@ -4,6 +4,7 @@ export const dictionaries = {
             blog: "Blog",
             projects: "Proyectos",
             about: "Sobre mí",
+            uses: "Stack",
             search: "Buscar...",
         },
         hero: {
@@ -23,13 +24,21 @@ export const dictionaries = {
             part: "Parte",
             back: "Volver",
             discussion: "Discusión",
-        }
+        },
+        newsletter: {
+            heading: "Aprendamos juntos",
+            description: "Artículos sobre arquitectura de software, Python, Next.js e IA aplicada. Sin spam, sin relleno — solo contenido que vale tu tiempo.",
+            placeholder: "tu@email.com",
+            button: "Suscribirse",
+            disclaimer: "Sin spam. Cancela cuando quieras.",
+        },
     },
     en: {
         nav: {
             blog: "Blog",
             projects: "Projects",
             about: "About",
+            uses: "Uses",
             search: "Search...",
         },
         hero: {
@@ -49,7 +58,14 @@ export const dictionaries = {
             part: "Part",
             back: "Back",
             discussion: "Discussion",
-        }
+        },
+        newsletter: {
+            heading: "Let's learn together",
+            description: "Articles on software architecture, Python, Next.js, and applied AI. No spam, no filler — only content worth your time.",
+            placeholder: "you@email.com",
+            button: "Subscribe",
+            disclaimer: "No spam. Unsubscribe anytime.",
+        },
     },
 };
 

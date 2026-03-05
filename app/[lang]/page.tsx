@@ -5,6 +5,7 @@ import { getFeaturedPosts } from "@/lib/posts";
 import { PostCard } from "@/components/blog/PostCard";
 import { Hero } from "@/components/layout/Hero";
 import { AnimatedSection } from "@/components/shared/AnimatedSection";
+import { NewsletterForm } from "@/components/shared/NewsletterForm";
 import { siteConfig } from "@/lib/utils";
 import { getDictionary, Locale } from "@/lib/dictionary";
 
@@ -86,6 +87,13 @@ export default async function HomePage({
           </AnimatedSection>
         </section>
       )}
+
+      {/* ── Newsletter ──────────────────────────────────────────── */}
+      <section className="mx-auto max-w-5xl px-4 pb-12 sm:px-6 lg:px-8">
+        <AnimatedSection delay={0.2}>
+          <NewsletterForm lang={lang} variant="full" />
+        </AnimatedSection>
+      </section>
 
       {/* ── About Teaser ───────────────────────────────────────── */}
       <section className="mx-auto max-w-5xl px-4 pb-16 sm:px-6 lg:px-8">

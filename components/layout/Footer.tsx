@@ -36,6 +36,7 @@ export function Footer({ lang }: FooterProps) {
     const footerLinks = [
         { href: `/${lang}/blog`, label: dict.nav.blog },
         { href: `/${lang}/projects`, label: dict.nav.projects },
+        { href: `/${lang}/uses`, label: dict.nav.uses },
         { href: `/${lang}/about`, label: dict.nav.about },
     ];
 
