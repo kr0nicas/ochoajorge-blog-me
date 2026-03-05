@@ -4,10 +4,13 @@ import { siteConfig } from "@/lib/utils";
 import { ArrowRight, Mail, MapPin, Briefcase, Github, Linkedin, Twitter } from "lucide-react";
 import Link from "next/link";
 
-export const metadata: Metadata = {
-    title: "About | Jorge Ochoa",
-    description: "Technology Architect at Equifax LATAM, based in El Salvador. Building cloud-native systems on GCP and sharing lessons on architecture, DevOps, and software engineering.",
-};
+export function generateMetadata() {
+    return {
+        metadataBase: new URL("https://ochoajorge.me"),
+        title: "About | Jorge Ochoa",
+        description: "Technology Architect at Equifax LATAM, based in El Salvador. Building cloud-native systems on GCP and sharing lessons on architecture, DevOps, and software engineering.",
+    };
+}
 
 const experience = {
     es: [

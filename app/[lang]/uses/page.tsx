@@ -13,6 +13,7 @@ export async function generateMetadata({
     const { lang } = await params;
     const isSpanish = lang === "es";
     return {
+        metadataBase: new URL("https://ochoajorge.me"),
         title: isSpanish ? "Stack & Herramientas | Jorge Ochoa" : "Uses & Tools | Jorge Ochoa",
         description: isSpanish
             ? "El hardware, software y servicios que uso a diario para construir sistemas de alto rendimiento."
