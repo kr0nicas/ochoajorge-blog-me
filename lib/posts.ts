@@ -41,7 +41,7 @@ export function getPostBySlug(slug: string, locale: string = "es"): PostWithCont
         title: data.title ?? slug,
         description: data.description ?? "",
         date: data.date ?? new Date().toISOString().split("T")[0],
-        tags: data.tags ?? [],
+        tags: Array.isArray(data.tags) ? data.tags : [],
         draft: data.draft ?? false,
         coverImage: data.coverImage,
         readingTime: Math.ceil(stats.minutes),
