@@ -87,7 +87,7 @@ export default async function AboutPage({ params }: { params: Promise<{ lang: st
                     <div className="h-4 w-px bg-[var(--border)] hidden sm:block" />
                     <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
                         <Mail className="h-4 w-4 text-[var(--brand-light)]" />
-                        jorge@example.com
+                        ochoa.j@gmail.com
                     </div>
                 </div>
             </div>
