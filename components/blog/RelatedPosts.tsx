@@ -28,11 +28,13 @@ function getRelatedPosts(currentPost: Post, lang: string): Post[] {
     }
 
     // Priority 2: shared tags — scored by overlap
+    // Guard against undefined tags on either currentPost or other posts
+    const currentTags = (currentPost.tags ?? []).map((ct) => ct.toLowerCase());
     const scored = allPosts
         .map((post) => {
-            const overlap = post.tags.filter((t) =>
-                currentPost.tags.map((ct) => ct.toLowerCase()).includes(t.toLowerCase())
-            ).length;
+            const overlap = (post.tags ?? [])
+                .filter((t) => currentTags.includes(t.toLowerCase()))
+                .length;
             return { post, overlap };
         })
         .filter(({ overlap }) => overlap > 0)
