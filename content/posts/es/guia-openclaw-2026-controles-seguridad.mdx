@@ -1,6 +1,6 @@
 ---
 title: "OpenClaw 2026: Guía de Seguridad para tu Agente de IA Personal"
-description: "Aprende a configurar controles de seguridad en OpenClaw 2026 sin ser experto técnico. Protege tus datos y automatizaciones desde el primer día."
+description: "Aprende a configurar controles de seguridad en OpenClaw 2026 sin ser experto técnico. Protege tus datos y todas tus automatizaciones desde el primer día."
 date: "2026-03-05"
 tags: ["openclaw", "seguridad", "ia-aplicada", "automatización", "guía"]
 lang: "es"
@@ -168,6 +168,20 @@ Antes de dejar que tu agente opere de forma autónoma, confirma estos puntos:
 - [ ] Al menos las acciones de eliminar/enviar/publicar están en Nivel 3
 - [ ] Tienes una forma de desactivar el agente rápidamente si algo va mal
 - [ ] El agente solo tiene acceso a los servicios que realmente necesita
+
+---
+
+## Monitoreo: Saber Qué Está Haciendo tu Agente
+
+Configurar los permisos correctos es la mitad del trabajo. La otra mitad es **saber qué está haciendo tu agente en tiempo real**.
+
+OpenClaw registra cada acción relevante de tus agentes en logs accesibles. Revísalos periódicamente, especialmente al principio. Si ves algo inesperado — una acción que no recuerdas haber autorizado, un acceso a un servicio que no debería — es una señal de que algo en tu configuración necesita ajuste.
+
+<Callout type="tip" title="Hábito recomendado">
+  Dedica 5 minutos una vez por semana a revisar el resumen de actividad de tus agentes. No necesitas leer cada línea del log — solo busca anomalías: acciones fuera de horario habitual, accesos a servicios inusuales, o errores repetitivos.
+</Callout>
+
+Si te interesa ver cómo un workspace completo con múltiples agentes puede construirse de forma segura y automatizada, puedes leer sobre la arquitectura en detalle en [Construyendo un workspace abierto y automatizable en 2026](/es/blog/building-open-automatable-workspace-2026).
 
 ---
 
