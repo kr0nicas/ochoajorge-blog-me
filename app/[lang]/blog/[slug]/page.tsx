@@ -7,6 +7,7 @@ import { PostHeader } from "@/components/blog/PostHeader";
 import { ReadingProgress } from "@/components/blog/ReadingProgress";
 import { TableOfContents } from "@/components/blog/TableOfContents";
 import { SeriesBanner } from "@/components/blog/SeriesBanner";
+import { RelatedPosts } from "@/components/blog/RelatedPosts";
 import { Comments } from "@/components/blog/Comments";
 import { Github } from "lucide-react";
 
@@ -97,7 +98,7 @@ export default async function PostPage({ params }: PostPageProps) {
                             {/* MDX Content */}
                             <div
                                 id="article-content"
-                                className="prose-blog prose prose-invert max-w-none"
+                                className="prose-blog prose max-w-none"
                             >
                                 {post.series && (
                                     <SeriesBanner
@@ -109,6 +110,9 @@ export default async function PostPage({ params }: PostPageProps) {
 
                                 {content}
                             </div>
+
+                            {/* Related Posts */}
+                            <RelatedPosts currentPost={post} lang={lang} />
 
                             {/* Discussion */}
                             <Comments lang={lang} />

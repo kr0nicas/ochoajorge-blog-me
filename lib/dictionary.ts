@@ -8,7 +8,7 @@ export const dictionaries = {
         },
         hero: {
             title: "Arquitecto de Software & Estratega",
-            subtitle: "Construyendo sistemas de alto rendimiento y compartiendo lecciones sobre arquitectura, Python e IA.",
+            subtitle: "Construyendo sistemas de alto rendimiento y compartiendo lecciones sobre arquitectura, usando las tecnologias de vanguardia.",
         },
         footer: {
             built_with: "Construido con",

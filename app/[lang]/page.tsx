@@ -91,9 +91,9 @@ export default async function HomePage({
       <section className="mx-auto max-w-5xl px-4 pb-16 sm:px-6 lg:px-8">
         <AnimatedSection>
           {/* Glass card with subtle border glow on hover */}
-          <div className="group relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[rgba(19,19,26,0.7)] p-6 backdrop-blur-xl transition-all duration-500 hover:border-[rgba(99,102,241,0.25)] hover:shadow-[0_0_60px_rgba(99,102,241,0.08)] lg:p-8">
-            {/* Decorative top-right glow orb */}
-            <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[radial-gradient(circle,rgba(99,102,241,0.12),transparent_70%)] transition-opacity duration-500 group-hover:opacity-150" />
+          <div className="group relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--glass-bg)] p-6 backdrop-blur-xl transition-all duration-500 hover:border-[var(--border-brand)] hover:shadow-[var(--shadow-brand)] lg:p-8">
+            {/* Decorative glow orb — theme-aware */}
+            <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[radial-gradient(circle,rgba(var(--brand-rgb),0.12),transparent_70%)] transition-opacity duration-500 group-hover:opacity-150" />
 
             <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:gap-12">
               {/* Bio */}
@@ -136,7 +136,7 @@ export default async function HomePage({
                 {stats.map(({ value, label }) => (
                   <div
                     key={label}
-                    className="flex flex-col items-center rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-4 text-center transition-all duration-200 hover:border-[rgba(99,102,241,0.25)] lg:items-start lg:text-left"
+                    className="flex flex-col items-center rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-4 text-center transition-all duration-200 hover:border-[var(--border-brand)] lg:items-start lg:text-left"
                   >
                     <span className="font-display text-2xl font-bold gradient-text">
                       {value}

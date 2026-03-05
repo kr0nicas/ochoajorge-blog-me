@@ -1,6 +1,15 @@
 import type { Config } from "tailwindcss";
 
+/**
+ * Tailwind Config — Personal Blog
+ * 
+ * Principio: Los colores de Tailwind apuntan a variables CSS.
+ * El cambio de tema se hace en globals.css (dark/light classes).
+ * 
+ * NUNCA hardcodear colores aquí directamente.
+ */
 const config: Config = {
+    // next-themes añade la clase "dark" o "light" al <html>
     darkMode: "class",
     content: [
         "./pages/**/*.{js,ts,jsx,tsx,mdx}",
@@ -11,42 +20,62 @@ const config: Config = {
     ],
     theme: {
         extend: {
+            // ─── Colors — all backed by CSS variables ────────────────
             colors: {
                 background: "var(--background)",
                 foreground: "var(--foreground)",
-                // Brand palette
                 brand: {
-                    DEFAULT: "#6366f1",  // indigo principal
-                    light: "#818cf8",
-                    dark: "#4f46e5",
+                    DEFAULT: "var(--brand)",
+                    light: "var(--brand-light)",
+                    dark: "var(--brand-dark)",
                 },
                 accent: {
-                    DEFAULT: "#22d3ee",  // cyan para highlights y código
-                    light: "#67e8f9",
-                    dark: "#0891b2",
+                    DEFAULT: "var(--accent)",
+                    light: "var(--accent-light)",
+                    dark: "var(--accent-dark)",
                 },
                 surface: {
-                    DEFAULT: "#13131a",
-                    elevated: "#1a1a24",
-                    border: "#ffffff0d",
+                    DEFAULT: "var(--bg-surface)",
+                    elevated: "var(--bg-elevated)",
+                    base: "var(--bg-base)",
+                },
+                text: {
+                    primary: "var(--text-primary)",
+                    secondary: "var(--text-secondary)",
+                    muted: "var(--text-muted)",
+                },
+                border: {
+                    DEFAULT: "var(--border)",
+                    strong: "var(--border-strong)",
+                    brand: "var(--border-brand)",
                 },
             },
+            // ─── Typography ──────────────────────────────────────────
             fontFamily: {
-                sans: ["var(--font-jetbrains-mono)", "ui-monospace", "monospace"],
-                display: ["var(--font-jetbrains-mono)", "ui-monospace", "monospace"],
+                sans: ["var(--font-inter)", "system-ui", "sans-serif"],
+                display: ["var(--font-outfit)", "system-ui", "sans-serif"],
                 mono: ["var(--font-jetbrains-mono)", "ui-monospace", "monospace"],
             },
+            // ─── Prose ───────────────────────────────────────────────
             typography: {
                 DEFAULT: {
                     css: {
                         maxWidth: "72ch",
                         color: "var(--tw-prose-body)",
-                        "[class~='lead']": {
-                            color: "var(--tw-prose-lead)",
-                        },
+                        "[class~='lead']": { color: "var(--tw-prose-lead)" },
                     },
                 },
             },
+            // ─── Box Shadows — reference CSS vars ───────────────────
+            boxShadow: {
+                "brand-glow": "var(--shadow-brand)",
+                "brand-sm": "var(--shadow-brand-sm)",
+                "accent-glow": "var(--shadow-accent)",
+                "card": "var(--shadow-md)",
+                "sm": "var(--shadow-sm)",
+                "lg": "var(--shadow-lg)",
+            },
+            // ─── Animations ──────────────────────────────────────────
             animation: {
                 "float": "float 6s ease-in-out infinite",
                 "float-delayed": "float 6s ease-in-out 3s infinite",
@@ -78,23 +107,19 @@ const config: Config = {
                     "50%": { opacity: "1" },
                 },
             },
-            boxShadow: {
-                "brand-glow": "0 0 30px rgba(99, 102, 241, 0.3)",
-                "accent-glow": "0 0 20px rgba(34, 211, 238, 0.25)",
-                "glass": "0 8px 32px rgba(0, 0, 0, 0.4)",
-                "card": "0 4px 20px rgba(0, 0, 0, 0.3)",
-            },
+            // ─── Border Radius ───────────────────────────────────────
             borderRadius: {
                 "xl": "1rem",
                 "2xl": "1.5rem",
                 "3xl": "2rem",
             },
+            // ─── Background Images ───────────────────────────────────
             backgroundImage: {
                 "grid-pattern":
                     "linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px)",
-                "brand-gradient": "linear-gradient(135deg, #6366f1, #22d3ee)",
+                "brand-gradient": "linear-gradient(135deg, var(--brand-light), var(--accent))",
                 "hero-gradient":
-                    "radial-gradient(ellipse 80% 80% at 50% -20%, rgba(99,102,241,0.3), rgba(255,255,255,0))",
+                    "radial-gradient(ellipse 80% 80% at 50% -20%, rgba(var(--brand-rgb),0.25), transparent)",
             },
         },
     },

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Inter, Outfit, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "sonner";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { siteConfig } from "@/lib/utils";
@@ -101,15 +103,16 @@ export default async function RootLayout({
       suppressHydrationWarning
       className={`${inter.variable} ${outfit.variable} ${jetbrainsMono.variable}`}
     >
-      <body className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] antialiased">
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+      <body className="min-h-screen antialiased transition-colors duration-300">
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange={false}>
           <div className="relative flex min-h-screen flex-col">
             <Header lang={lang} />
             <main className="flex-1">{children}</main>
             <Footer lang={lang} />
           </div>
+          <Analytics />
+          <SpeedInsights />
           <Toaster
-            theme="dark"
             position="bottom-right"
             toastOptions={{
               style: {

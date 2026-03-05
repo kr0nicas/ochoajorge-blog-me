@@ -139,7 +139,7 @@ export function Search({ dict }: SearchProps) {
                             initial={{ scale: 0.95, opacity: 0, y: -20 }}
                             animate={{ scale: 1, opacity: 1, y: 0 }}
                             exit={{ scale: 0.95, opacity: 0, y: -20 }}
-                            className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-[var(--border-strong)] bg-[#0f0f13] shadow-2xl"
+                            className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-surface)] shadow-[var(--shadow-lg)]"
                         >
                             <div className="flex items-center gap-3 border-b border-[var(--border)] px-4 py-4">
                                 {isLoading ? (

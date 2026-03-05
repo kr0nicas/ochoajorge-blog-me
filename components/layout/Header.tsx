@@ -7,6 +7,7 @@ import { Menu, X, Code2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Search } from "@/components/blog/Search";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { getDictionary, Locale } from "@/lib/dictionary";
 
 interface HeaderProps {
@@ -40,8 +41,8 @@ export function Header({ lang }: HeaderProps) {
             className={cn(
                 "sticky top-0 z-50 w-full border-b transition-all duration-300",
                 scrolled
-                    ? "border-[var(--border-strong)] bg-[rgba(10,10,15,0.85)] shadow-[0_4px_24px_rgba(0,0,0,0.4)] backdrop-blur-xl"
-                    : "border-[var(--border)] bg-[rgba(10,10,15,0.6)] backdrop-blur-md"
+                    ? "border-[var(--border-strong)] bg-[var(--header-bg)] shadow-[0_4px_24px_rgba(0,0,0,0.1)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)] backdrop-blur-xl"
+                    : "border-[var(--border)] bg-[var(--header-bg)]/80 backdrop-blur-md"
             )}
         >
             <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
@@ -57,9 +58,10 @@ export function Header({ lang }: HeaderProps) {
                         <span className="hidden sm:inline">Jorge Ochoa</span>
                     </Link>
 
-                    {/* Desktop Search & Nav */}
+                    {/* Desktop Search, Theme & Nav */}
                     <div className="hidden items-center gap-6 md:flex">
                         <Search dict={dict.nav} />
+                        <ThemeToggle />
                         <nav className="flex items-center gap-1" aria-label="Main navigation">
                             {navLinks.map(({ href, label }) => {
                                 const isActive = pathname === href || (href !== `/${lang}` && pathname.startsWith(href));
@@ -115,9 +117,10 @@ export function Header({ lang }: HeaderProps) {
                         </div>
                     </div>
 
-                    {/* Mobile: Search + Menu Button */}
+                    {/* Mobile: Search + Theme + Menu Button */}
                     <div className="flex items-center gap-2 md:hidden">
                         <Search dict={dict.nav} />
+                        <ThemeToggle />
                         <div className="flex items-center gap-1 rounded-lg border border-[var(--border)] p-0.5 bg-[var(--bg-elevated)]/30">
                             <Link
                                 href={pathname.replace(`/${lang}`, "/es")}
@@ -171,7 +174,7 @@ export function Header({ lang }: HeaderProps) {
                         animate={{ height: "auto", opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-                        className="overflow-hidden border-t border-[var(--border)] bg-[rgba(10,10,15,0.95)] backdrop-blur-xl md:hidden"
+                        className="overflow-hidden border-t border-[var(--border)] bg-[var(--bg-surface)]/95 backdrop-blur-xl md:hidden"
                     >
                         <nav className="mx-auto max-w-5xl space-y-1 px-4 py-3">
                             {navLinks.map(({ href, label }, i) => (

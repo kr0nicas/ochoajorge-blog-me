@@ -3,42 +3,186 @@
 
 /* ─── Google Fonts are loaded via next/font in layout.tsx ─── */
 
-:root {
-  /* Background scale (Inspired by steipete.me technical navy) */
-  --bg-base: #10141d;
-  --bg-surface: #1a1e2a;
-  --bg-elevated: #24293a;
+/* ══════════════════════════════════════════════════════════════
+   DESIGN TOKEN SYSTEM — Blog Personal Jorge Ochoa
+   
+   Arquitectura: 
+   - :root        → Primitives (raw values, no theme awareness)
+   - .dark         → DARK theme (Navy Pro — default)
+   - .light        → LIGHT theme (LinkedIn Professional)
+   
+   Regla: TODO estilo debe usar estas variables. 
+   Nunca usar colores hardcoded en componentes.
+   ══════════════════════════════════════════════════════════════ */
 
-  /* Brand: Indigo */
+/* ─── Primitive Design Tokens (always available) ─────────────── */
+:root {
+  /* Typeface */
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-display: var(--font-outfit), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+
+  /* Radii */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-full: 9999px;
+
+  /* Transitions */
+  --transition-fast: all 0.15s ease;
+  --transition-base: all 0.2s ease;
+  --transition-medium: all 0.3s ease;
+  --transition-slow: all 0.5s ease;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   DARK THEME — "Navy Pro" (default)
+   Inspiración: steipete.me — dark, technical, elegant
+   ══════════════════════════════════════════════════════════════ */
+:root,
+.dark {
+  /* --- Backgrounds --- */
+  --bg-base: #0d1117;
+  --bg-surface: #161b22;
+  --bg-elevated: #1f2937;
+  --bg-overlay: rgba(0, 0, 0, 0.65);
+
+  /* --- Brand: Indigo Neon --- */
   --brand: #6366f1;
   --brand-light: #818cf8;
   --brand-dark: #4f46e5;
+  --brand-rgb: 99, 102, 241;
 
-  /* Accent: Cyan */
+  /* --- Accent: Electric Cyan --- */
   --accent: #22d3ee;
   --accent-light: #67e8f9;
   --accent-dark: #0891b2;
+  --accent-rgb: 34, 211, 238;
 
-  /* Text */
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-muted: #475569;
+  /* --- Text --- */
+  --text-primary: #e6edf3;
+  --text-secondary: #8d96a0;
+  --text-muted: #546070;
+  --text-on-brand: #ffffff;
 
-  /* Borders */
-  --border: rgba(255, 255, 255, 0.06);
-  --border-strong: rgba(255, 255, 255, 0.12);
+  /* --- Borders --- */
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.15);
+  --border-brand: rgba(99, 102, 241, 0.35);
 
-  /* Shadows */
-  --shadow-brand: 0 0 30px rgba(99, 102, 241, 0.25);
-  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4);
-  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.5);
+  /* --- Shadows --- */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.55);
+  --shadow-brand: 0 0 30px rgba(var(--brand-rgb), 0.3);
+  --shadow-brand-sm: 0 0 12px rgba(var(--brand-rgb), 0.2);
+  --shadow-accent: 0 0 20px rgba(var(--accent-rgb), 0.25);
 
-  /* Semantic (used by Tailwind) */
+  /* --- Glass surfaces --- */
+  --glass-bg: rgba(22, 27, 34, 0.75);
+  --glass-bg-strong: rgba(15, 20, 28, 0.88);
+  --glass-border: rgba(255, 255, 255, 0.07);
+
+  /* --- Header --- */
+  --header-bg: rgba(13, 17, 23, 0.82);
+  --header-border: rgba(255, 255, 255, 0.07);
+
+  /* --- Scrollbar --- */
+  --scrollbar-thumb: rgba(255, 255, 255, 0.12);
+  --scrollbar-track: var(--bg-base);
+
+  /* --- Code --- */
+  --code-bg: var(--bg-elevated);
+  --code-color: var(--accent);
+
+  /* --- Tag --- */
+  --tag-bg: rgba(var(--brand-rgb), 0.10);
+  --tag-border: rgba(var(--brand-rgb), 0.22);
+  --tag-color: var(--brand-light);
+  --tag-hover-bg: rgba(var(--brand-rgb), 0.20);
+  --tag-hover-border: rgba(var(--brand-rgb), 0.45);
+
+  /* --- Semantic Tailwind aliases --- */
   --background: var(--bg-base);
   --foreground: var(--text-primary);
 }
 
-/* ─── Base Styles ────────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════
+   LIGHT THEME — "LinkedIn Professional"
+   Inspiración: LinkedIn — limpio, profesional, de alta confianza
+   Con WOW factor: Azul vibrante, superficies con sutiles sombras
+   ══════════════════════════════════════════════════════════════ */
+.light {
+  /* --- Backgrounds --- */
+  --bg-base: #f3f2ef;
+  --bg-surface: #ffffff;
+  --bg-elevated: #f0f4f8;
+  --bg-overlay: rgba(0, 0, 0, 0.4);
+
+  /* --- Brand: LinkedIn Blue (vibrante y preciso) --- */
+  --brand: #0a66c2;
+  --brand-light: #0077b5;
+  --brand-dark: #004182;
+  --brand-rgb: 10, 102, 194;
+
+  /* --- Accent: Teal Energético --- */
+  --accent: #0073b1;
+  --accent-light: #00a0dc;
+  --accent-dark: #004f73;
+  --accent-rgb: 0, 115, 177;
+
+  /* --- Text --- */
+  --text-primary: #191919;
+  --text-secondary: #4f4f4f;
+  --text-muted: #86888a;
+  --text-on-brand: #ffffff;
+
+  /* --- Borders --- */
+  --border: rgba(0, 0, 0, 0.09);
+  --border-strong: rgba(0, 0, 0, 0.16);
+  --border-brand: rgba(var(--brand-rgb), 0.30);
+
+  /* --- Shadows (más sutiles y realistas para modo claro) --- */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.10), 0 2px 4px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.06);
+  --shadow-brand: 0 4px 16px rgba(var(--brand-rgb), 0.22);
+  --shadow-brand-sm: 0 2px 8px rgba(var(--brand-rgb), 0.15);
+  --shadow-accent: 0 4px 12px rgba(var(--accent-rgb), 0.18);
+
+  /* --- Glass surfaces (en light = frosted white) --- */
+  --glass-bg: rgba(255, 255, 255, 0.82);
+  --glass-bg-strong: rgba(255, 255, 255, 0.96);
+  --glass-border: rgba(0, 0, 0, 0.08);
+
+  /* --- Header --- */
+  --header-bg: rgba(255, 255, 255, 0.92);
+  --header-border: rgba(0, 0, 0, 0.10);
+
+  /* --- Scrollbar --- */
+  --scrollbar-thumb: rgba(0, 0, 0, 0.18);
+  --scrollbar-track: var(--bg-elevated);
+
+  /* --- Code --- */
+  --code-bg: #eff6ff;
+  --code-color: #1d4ed8;
+
+  /* --- Tag (en light: fondo azul tenue, borde azul, texto azul) --- */
+  --tag-bg: rgba(var(--brand-rgb), 0.08);
+  --tag-border: rgba(var(--brand-rgb), 0.22);
+  --tag-color: var(--brand);
+  --tag-hover-bg: rgba(var(--brand-rgb), 0.15);
+  --tag-hover-border: rgba(var(--brand-rgb), 0.40);
+
+  /* --- Semantic Tailwind aliases --- */
+  --background: var(--bg-base);
+  --foreground: var(--text-primary);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   BASE STYLES
+   ══════════════════════════════════════════════════════════════ */
 html {
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
@@ -47,27 +191,95 @@ html {
 body {
   background-color: var(--bg-base);
   color: var(--text-primary);
-  font-family: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-family: var(--font-mono);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s ease, color 0.2s ease;
 }
 
-/* ─── Glass Components ───────────────────────────────────────────── */
+/* ─── Custom Scrollbar ───────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--brand);
+}
+
+/* ─── Focus Ring ─────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ─── Selection ──────────────────────────────────────────────── */
+::selection {
+  background: rgba(var(--brand-rgb), 0.25);
+  color: var(--text-primary);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   COMPONENT CLASSES
+   ══════════════════════════════════════════════════════════════ */
+
+/* ─── Glass ──────────────────────────────────────────────────── */
 .glass {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--glass-border);
 }
 
 .glass-strong {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   border: 1px solid var(--border-strong);
 }
 
-/* ─── Text Gradients ─────────────────────────────────────────────── */
+/* ─── Cards ──────────────────────────────────────────────────── */
+.card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition-base);
+}
+
+.card:hover {
+  border-color: var(--border-brand);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.card-glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.card-glass:hover {
+  border-color: var(--border-brand);
+  box-shadow: var(--shadow-brand);
+  transform: translateY(-2px);
+}
+
+/* ─── Text Gradients ─────────────────────────────────────────── */
 .gradient-text {
   background: linear-gradient(135deg, var(--brand-light), var(--accent));
   -webkit-background-clip: text;
@@ -75,70 +287,60 @@ body {
   background-clip: text;
 }
 
-.gradient-text-white {
-  background: linear-gradient(135deg, #ffffff, #94a3b8);
+.gradient-text-muted {
+  background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
-/* ─── Glow Effects ───────────────────────────────────────────────── */
+/* ─── Glow Effects ───────────────────────────────────────────── */
 .glow-brand {
   box-shadow: var(--shadow-brand);
 }
 
+.glow-brand-sm {
+  box-shadow: var(--shadow-brand-sm);
+}
+
 .glow-text-brand {
-  text-shadow: 0 0 20px rgba(99, 102, 241, 0.6);
+  text-shadow: 0 0 20px rgba(var(--brand-rgb), 0.5);
 }
 
-/* ─── Card Component ─────────────────────────────────────────────── */
-.card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: 1rem;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+/* ─── Tag Pill ───────────────────────────────────────────────── */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.2rem 0.7rem;
+  border-radius: var(--radius-full);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  background: var(--tag-bg);
+  border: 1px solid var(--tag-border);
+  color: var(--tag-color);
+  transition: var(--transition-base);
+  text-decoration: none;
+  white-space: nowrap;
 }
 
-.card:hover {
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-card);
-  transform: translateY(-2px);
+.tag:hover {
+  background: var(--tag-hover-bg);
+  border-color: var(--tag-hover-border);
 }
 
-.card-glass {
-  background: rgba(19, 19, 26, 0.8);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--border);
-  border-radius: 1rem;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+/* ─── Grid Pattern Background ────────────────────────────────── */
+.bg-grid {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 60px 60px;
 }
 
-.card-glass:hover {
-  border-color: rgba(99, 102, 241, 0.3);
-  box-shadow: var(--shadow-brand);
-}
-
-/* ─── Custom Scrollbar ───────────────────────────────────────────── */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: var(--bg-base);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--border-strong);
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 102, 241, 0.5);
-}
-
-/* ─── Prose Overrides (MDX Content) ─────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════
+   PROSE — MDX Content Overrides
+   ══════════════════════════════════════════════════════════════ */
 .prose-blog {
   --tw-prose-body: var(--text-secondary);
   --tw-prose-headings: var(--text-primary);
@@ -151,29 +353,29 @@ body {
   --tw-prose-quotes: var(--text-primary);
   --tw-prose-quote-borders: var(--brand);
   --tw-prose-captions: var(--text-muted);
-  --tw-prose-code: var(--accent);
+  --tw-prose-code: var(--code-color);
   --tw-prose-pre-code: var(--text-primary);
-  --tw-prose-pre-bg: var(--bg-surface);
+  --tw-prose-pre-bg: var(--bg-elevated);
   --tw-prose-th-borders: var(--border-strong);
   --tw-prose-td-borders: var(--border);
 }
 
-/* Inline code styling */
+/* Inline code */
 .prose-blog code:not(pre code) {
-  background: var(--bg-elevated);
+  background: var(--code-bg);
   border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.15em 0.4em;
+  border-radius: var(--radius-sm);
+  padding: 0.15em 0.45em;
   font-size: 0.875em;
-  color: var(--accent);
-  font-family: var(--font-jetbrains-mono), monospace;
+  color: var(--code-color);
+  font-family: var(--font-mono);
 }
 
-/* Code blocks from rehype-pretty-code */
+/* Code blocks */
 .prose-blog [data-rehype-pretty-code-figure] pre {
-  background: var(--bg-surface) !important;
+  background: var(--bg-elevated) !important;
   border: 1px solid var(--border);
-  border-radius: 0.75rem;
+  border-radius: var(--radius-md);
   padding: 1.25rem;
   overflow-x: auto;
   font-size: 0.875rem;
@@ -184,11 +386,11 @@ body {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-bottom: none;
-  border-radius: 0.75rem 0.75rem 0 0;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
   padding: 0.5rem 1rem;
   font-size: 0.75rem;
   color: var(--text-muted);
-  font-family: var(--font-jetbrains-mono), monospace;
+  font-family: var(--font-mono);
 }
 
 /* Heading anchor links */
@@ -203,59 +405,7 @@ body {
   margin-right: 0.5rem;
 }
 
-/* Blockquotes */
-.prose-blog blockquote {
-  border-left: 3px solid var(--brand);
-  background: rgba(99, 102, 241, 0.05);
-  border-radius: 0 0.5rem 0.5rem 0;
-  padding: 1rem 1.25rem;
-  margin: 1.5rem 0;
-  color: var(--text-primary);
-  font-style: normal;
-}
-
-/* ─── Selection ──────────────────────────────────────────────────── */
-::selection {
-  background: rgba(99, 102, 241, 0.3);
-  color: var(--text-primary);
-}
-
-/* ─── Focus Ring ─────────────────────────────────────────────────── */
-:focus-visible {
-  outline: 2px solid var(--brand);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-
-/* ─── Grid Pattern Background ────────────────────────────────────── */
-.bg-grid {
-  background-image:
-    linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
-  background-size: 60px 60px;
-}
-
-/* ─── Tag Pill ───────────────────────────────────────────────────── */
-.tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.2rem 0.65rem;
-  border-radius: 9999px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  background: rgba(99, 102, 241, 0.1);
-  border: 1px solid rgba(99, 102, 241, 0.2);
-  color: var(--brand-light);
-  transition: background 0.2s ease, border-color 0.2s ease;
-  text-decoration: none;
-}
-
-.tag:hover {
-  background: rgba(99, 102, 241, 0.2);
-  border-color: rgba(99, 102, 241, 0.4);
-}
-
-/* ─── Prose: decorated headings ─────────────────────────────── */
+/* Decorated headings */
 .prose-blog h2 {
   position: relative;
   padding-left: 1rem;
@@ -288,10 +438,21 @@ body {
   width: 2px;
   border-radius: 2px;
   background: var(--brand-light);
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
-/* ─── Prose: table styling ───────────────────────────────────── */
+/* Blockquotes */
+.prose-blog blockquote {
+  border-left: 3px solid var(--brand);
+  background: rgba(var(--brand-rgb), 0.05);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: 1rem 1.25rem;
+  margin: 1.5rem 0;
+  color: var(--text-primary);
+  font-style: normal;
+}
+
+/* Tables */
 .prose-blog table {
   border-collapse: collapse;
   width: 100%;
@@ -314,10 +475,12 @@ body {
 }
 
 .prose-blog tr:nth-child(even) td {
-  background: rgba(255, 255, 255, 0.015);
+  background: rgba(var(--brand-rgb), 0.03);
 }
 
-/* ─── In-view fade-slide utility ─────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════
+   ANIMATIONS
+   ══════════════════════════════════════════════════════════════ */
 @keyframes fadeSlideUp {
   from {
     opacity: 0;
@@ -334,16 +497,15 @@ body {
   animation: fadeSlideUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* ─── Glow border animation (for premium cards) ─────────────── */
 @keyframes glowPulse {
 
   0%,
   100% {
-    box-shadow: 0 0 20px rgba(99, 102, 241, 0.1);
+    box-shadow: 0 0 20px rgba(var(--brand-rgb), 0.10);
   }
 
   50% {
-    box-shadow: 0 0 40px rgba(99, 102, 241, 0.25);
+    box-shadow: 0 0 40px rgba(var(--brand-rgb), 0.25);
   }
 }
 
@@ -351,7 +513,7 @@ body {
   animation: glowPulse 3s ease-in-out infinite;
 }
 
-/* ─── Noise texture overlay (premium dark mood) ──────────────── */
+/* ─── Noise texture overlay ──────────────────────────────────── */
 .noise-overlay::before {
   content: "";
   position: absolute;
@@ -361,6 +523,6 @@ body {
   background-size: 128px 128px;
   pointer-events: none;
   border-radius: inherit;
-  opacity: 0.5;
+  opacity: 0.4;
   mix-blend-mode: overlay;
 }

@@ -1,198 +1,198 @@
 ---
-title: "Hexagonal Architecture in Python: When to Use It and When It's Overkill"
-description: "A practical breakdown of Ports & Adapters architecture in Python FastAPI services — real patterns, trade-offs, and the honest answer to 'do I actually need this'."
+title: "Arquitectura Hexagonal en Python: Cuándo Usarla y Cuándo Es Excesiva"
+description: "Un análisis práctico de la arquitectura Ports & Adapters en servicios Python FastAPI — patrones reales, trade-offs, y la respuesta honesta a '¿realmente necesito esto?'"
 date: "2026-02-20"
-tags: ["python", "architecture", "fastapi", "clean-architecture", "backend"]
+tags: ["python", "arquitectura", "fastapi", "arquitectura-limpia", "backend"]
 series:
-  name: "Advanced Software Architecture"
+  name: "Arquitectura de Software Avanzada"
   part: 1
 draft: false
 ---
 
-## The Question Nobody Asks Honestly
+## La Pregunta que Nadie Hace con Honestidad
 
-Every architecture talk starts with the happy path. Clean diagrams, perfect separation, no legacy code.
+Toda charla de arquitectura empieza con el camino feliz. Diagramas limpios, separación perfecta, sin código legacy.
 
-Here's the real question: **should you use Hexagonal Architecture for your next FastAPI service?**
+Aquí la pregunta real: **¿deberías usar Arquitectura Hexagonal en tu próximo servicio FastAPI?**
 
-My honest answer: *probably not for your first version, definitely for your second*.
+Mi respuesta honesta: *probablemente no para tu primera versión, definitivamente para la segunda*.
 
-## What Is Hexagonal Architecture?
+## ¿Qué Es la Arquitectura Hexagonal?
 
-Alistair Cockburn named it in 2005. The idea is simple:
+Alistair Cockburn la nombró en 2005. La idea es simple:
 
-> Your application has a core — the business logic. Everything else (HTTP, databases, queues, file systems) connects to that core through well-defined *ports* (interfaces). *Adapters* implement those ports.
+> Tu aplicación tiene un núcleo — la lógica de negocio. Todo lo demás (HTTP, bases de datos, colas, sistemas de archivos) se conecta a ese núcleo a través de *puertos* (interfaces) bien definidos. Los *adaptadores* implementan esos puertos.
 
-The hexagon is just a visual metaphor. What matters is the **dependency rule**: adapters depend on ports, never the other way around.
+El hexágono es solo una metáfora visual. Lo que importa es la **regla de dependencia**: los adaptadores dependen de los puertos, nunca al revés.
 
 ```
            ┌─────────────────────────┐
-HTTP ──────►  Port (Input)           │
+HTTP ──────►  Puerto (Entrada)       │
            │                         │
-           │    Application Core     │
-           │    (Pure Python)        │
+           │    Núcleo de Aplicación │
+           │    (Python Puro)        │
            │                         │
-           │  Port (Output) ◄── DB   │
+           │  Puerto (Salida) ◄── DB │
            └─────────────────────────┘
 ```
 
-## A Real FastAPI Example
+## Un Ejemplo Real con FastAPI
 
-Let's say you're building an invoice service. Here's how it looks in practice.
+Supongamos que estás construyendo un servicio de facturas. Así se ve en la práctica.
 
-### The Port (interface)
+### El Puerto (interfaz)
 
 ```python
-# app/domain/ports/invoice_repository.py
+# app/domain/ports/factura_repository.py
 from abc import ABC, abstractmethod
 from typing import Optional
-from app.domain.entities import Invoice
+from app.domain.entities import Factura
 
-class InvoiceRepository(ABC):
-    """Output port — the core defines what it needs, not how it's done."""
+class FacturaRepository(ABC):
+    """Puerto de salida — el núcleo define lo que necesita, no cómo se hace."""
 
     @abstractmethod
-    async def save(self, invoice: Invoice) -> Invoice:
+    async def guardar(self, factura: Factura) -> Factura:
         ...
 
     @abstractmethod
-    async def find_by_id(self, invoice_id: str) -> Optional[Invoice]:
+    async def buscar_por_id(self, factura_id: str) -> Optional[Factura]:
         ...
 ```
 
-### The Adapter (implementation)
+### El Adaptador (implementación)
 
 ```python
-# app/infrastructure/persistence/postgres_invoice_repository.py
+# app/infrastructure/persistence/postgres_factura_repository.py
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.domain.ports.invoice_repository import InvoiceRepository
-from app.domain.entities import Invoice
-from app.infrastructure.models import InvoiceModel
+from app.domain.ports.factura_repository import FacturaRepository
+from app.domain.entities import Factura
+from app.infrastructure.models import FacturaModel
 
-class PostgresInvoiceRepository(InvoiceRepository):
+class PostgresFacturaRepository(FacturaRepository):
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def save(self, invoice: Invoice) -> Invoice:
-        model = InvoiceModel.from_domain(invoice)
+    async def guardar(self, factura: Factura) -> Factura:
+        model = FacturaModel.from_domain(factura)
         self._session.add(model)
         await self._session.flush()
         return model.to_domain()
 
-    async def find_by_id(self, invoice_id: str) -> Invoice | None:
-        result = await self._session.get(InvoiceModel, invoice_id)
+    async def buscar_por_id(self, factura_id: str) -> Factura | None:
+        result = await self._session.get(FacturaModel, factura_id)
         return result.to_domain() if result else None
 ```
 
-### The Use Case (application core)
+### El Caso de Uso (núcleo de aplicación)
 
 ```python
-# app/application/use_cases/create_invoice.py
+# app/application/use_cases/crear_factura.py
 from dataclasses import dataclass
-from app.domain.ports.invoice_repository import InvoiceRepository
-from app.domain.entities import Invoice
+from app.domain.ports.factura_repository import FacturaRepository
+from app.domain.entities import Factura
 from decimal import Decimal
 
 @dataclass
-class CreateInvoiceCommand:
-    customer_id: str
+class CrearFacturaCommand:
+    cliente_id: str
     total: Decimal
 
-class CreateInvoiceUseCase:
-    def __init__(self, repository: InvoiceRepository) -> None:
+class CrearFacturaUseCase:
+    def __init__(self, repository: FacturaRepository) -> None:
         self._repo = repository
 
-    async def execute(self, cmd: CreateInvoiceCommand) -> Invoice:
-        invoice = Invoice.create(
-            customer_id=cmd.customer_id,
+    async def execute(self, cmd: CrearFacturaCommand) -> Factura:
+        factura = Factura.crear(
+            cliente_id=cmd.cliente_id,
             total=cmd.total,
         )
-        return await self._repo.save(invoice)
+        return await self._repo.guardar(factura)
 ```
 
-### The FastAPI Handler (input adapter)
+### El Handler FastAPI (adaptador de entrada)
 
 ```python
-# app/infrastructure/web/routers/invoices.py
+# app/infrastructure/web/routers/facturas.py
 from fastapi import APIRouter, Depends
-from app.application.use_cases.create_invoice import (
-    CreateInvoiceUseCase,
-    CreateInvoiceCommand,
+from app.application.use_cases.crear_factura import (
+    CrearFacturaUseCase,
+    CrearFacturaCommand,
 )
-from app.infrastructure.dependencies import get_invoice_use_case
+from app.infrastructure.dependencies import get_factura_use_case
 
-router = APIRouter(prefix="/invoices")
+router = APIRouter(prefix="/facturas")
 
 @router.post("/", status_code=201)
-async def create_invoice(
-    body: CreateInvoiceRequest,
-    use_case: CreateInvoiceUseCase = Depends(get_invoice_use_case),
+async def crear_factura(
+    body: CrearFacturaRequest,
+    use_case: CrearFacturaUseCase = Depends(get_factura_use_case),
 ):
-    invoice = await use_case.execute(
-        CreateInvoiceCommand(
-            customer_id=body.customer_id,
+    factura = await use_case.execute(
+        CrearFacturaCommand(
+            cliente_id=body.cliente_id,
             total=body.total,
         )
     )
-    return InvoiceResponse.from_domain(invoice)
+    return FacturaResponse.from_domain(factura)
 ```
 
-## The Real Trade-offs
+## Los Trade-offs Reales
 
-### What you gain
+### Lo que ganas
 
-**Testability without a database.** You can swap `PostgresInvoiceRepository` for an in-memory implementation in tests:
+**Testeabilidad sin base de datos.** Puedes cambiar `PostgresFacturaRepository` por una implementación en memoria en los tests:
 
 ```python
-class InMemoryInvoiceRepository(InvoiceRepository):
+class InMemoryFacturaRepository(FacturaRepository):
     def __init__(self) -> None:
-        self._store: dict[str, Invoice] = {}
+        self._store: dict[str, Factura] = {}
 
-    async def save(self, invoice: Invoice) -> Invoice:
-        self._store[invoice.id] = invoice
-        return invoice
+    async def guardar(self, factura: Factura) -> Factura:
+        self._store[factura.id] = factura
+        return factura
 
-    async def find_by_id(self, invoice_id: str) -> Invoice | None:
-        return self._store.get(invoice_id)
+    async def buscar_por_id(self, factura_id: str) -> Factura | None:
+        return self._store.get(factura_id)
 ```
 
-Your use case tests run in milliseconds with no database dependency.
+Los tests de casos de uso corren en milisegundos sin dependencia de base de datos.
 
-**Swappable infrastructure.** When we moved from a monolith to microservices on Orbis 8, we swapped HTTP adapters for event-driven ones. The core business logic didn't change at all.
+**Infraestructura intercambiable.** Cuando migramos de un monolito a microservicios en Orbis 8, cambiamos los adaptadores HTTP por adaptadores orientados a eventos. La lógica de negocio central no cambió en absoluto.
 
-### What you lose
+### Lo que pierdes
 
-**Speed of initial development.** You're writing 3–5x more files than a simple CRUD FastAPI route. `models.py`, `entities.py`, `repository.py`, `use_case.py`, `router.py`, `schemas.py`, `dependencies.py`. That's a lot of ceremony.
+**Velocidad de desarrollo inicial.** Estás escribiendo 3–5 veces más archivos que una ruta CRUD simple de FastAPI. `models.py`, `entities.py`, `repository.py`, `use_case.py`, `router.py`, `schemas.py`, `dependencies.py`. Es mucha ceremonia.
 
-**Discoverability.** Junior devs struggle to trace the flow from HTTP request → database. "Where is the actual logic?" is a real question you'll answer many times.
+**Descubribilidad.** Los devs juniors tienen dificultades para trazar el flujo desde la petición HTTP → base de datos. "¿Dónde está la lógica real?" es una pregunta que responderás muchas veces.
 
-## When to Actually Use It
+## Cuándo Usarla de Verdad
 
-| Scenario | Use Hexagonal? |
+| Escenario | ¿Usar Hexagonal? |
 |---|---|
-| MVP / prototype | ❌ No — go fast, prove the idea |
-| Internal CRUD tool | ❌ No — simplicity wins |
-| Core business domain (billing, inventory, invoicing) | ✅ Yes |
-| Service that will have multiple adapters (HTTP + CLI + queue) | ✅ Yes |
-| Team of 3+ working on the same domain | ✅ Yes |
-| You need to swap the database later | ✅ Yes |
+| MVP / prototipo | ❌ No — ve rápido, valida la idea |
+| Herramienta CRUD interna | ❌ No — la simplicidad gana |
+| Dominio de negocio central (facturación, inventario) | ✅ Sí |
+| Servicio con múltiples adaptadores (HTTP + CLI + cola) | ✅ Sí |
+| Equipo de 3+ personas trabajando en el mismo dominio | ✅ Sí |
+| Necesitas cambiar la base de datos más adelante | ✅ Sí |
 
-## The Pattern I Actually Use
+## El Patrón que Yo Realmente Uso
 
-In production, I don't go full hexagonal everywhere. I use a **pragmatic hybrid**:
+En producción, no aplico hexagonal en todos lados. Uso un **híbrido pragmático**:
 
-1. **Strict hexagonal** for the core business domain (invoices, inventory, pricing rules)
-2. **Simple FastAPI + SQLAlchemy** for CRUD endpoints with no business logic
-3. **Shared domain entities** — the `Invoice`, `Order`, `Customer` dataclasses are always pure Python
+1. **Hexagonal estricto** para el dominio de negocio central (facturas, inventario, reglas de precios)
+2. **FastAPI + SQLAlchemy simple** para endpoints CRUD sin lógica de negocio
+3. **Entidades de dominio compartidas** — los dataclasses `Factura`, `Orden`, `Cliente` son siempre Python puro
 
-This means the parts that *change* are protected, and the parts that are *stable* stay simple.
+Esto significa que las partes que *cambian* están protegidas, y las partes que son *estables* se mantienen simples.
 
-## Conclusion
+## Conclusión
 
-Hexagonal Architecture is a tool, not a religion. The real discipline is knowing when your code has crossed the threshold where the extra structure pays for itself.
+La Arquitectura Hexagonal es una herramienta, no una religión. La verdadera disciplina está en saber cuándo tu código ha cruzado el umbral donde la estructura extra se paga a sí misma.
 
-For me, the signal is: **"Can I test this use case without a running database?"** If the answer is no, and the logic is non-trivial, it's time to add the boundaries.
+Para mí, la señal es: **"¿Puedo testear este caso de uso sin una base de datos en ejecución?"** Si la respuesta es no, y la lógica no es trivial, es momento de agregar los límites.
 
 ---
 
-*Previously in this series: [Building a Multi-Tenant ERP with Clean Architecture and Next.js](/blog/building-multitenant-erp-clean-architecture)*
+*Anterior en esta serie: [Construyendo un ERP Multi-Tenant con Arquitectura Limpia y Next.js](/blog/building-multitenant-erp-clean-architecture)*

@@ -1,98 +1,98 @@
 ---
-title: "Building a Multi-Tenant ERP with Clean Architecture and Next.js"
-description: "Lessons learned from architecting Orbis 8, a production SaaS ERP for SMBs in El Salvador. Clean Architecture, hexagonal patterns, and AI agents — what worked and what didn't."
+title: "Construyendo un ERP Multi-Tenant con Arquitectura Limpia y Next.js"
+description: "Lecciones aprendidas al diseñar Orbis 8, un ERP SaaS en producción para PYMES en El Salvador. Arquitectura Limpia, patrones hexagonales y agentes de IA — lo que funcionó y lo que no."
 date: "2026-02-27"
-tags: ["architecture", "nextjs", "python", "saas", "clean-architecture"]
+tags: ["arquitectura", "nextjs", "python", "saas", "arquitectura-limpia"]
 series:
-  name: "Advanced Software Architecture"
+  name: "Arquitectura de Software Avanzada"
   part: 2
 draft: false
 ---
 
-## The Problem
+## El Problema
 
-Building an ERP from scratch in 2025 is a bold choice. Most teams reach for existing platforms — and for good reason. But when your market has very specific fiscal compliance requirements (like El Salvador's DTE electronic invoicing system), and you want AI-first workflows from day one, building gives you precision that buying can't.
+Construir un ERP desde cero en 2025 es una decisión audaz. La mayoría de los equipos optan por plataformas existentes — y con razón. Pero cuando tu mercado tiene requisitos de cumplimiento fiscal muy específicos (como el sistema de facturación electrónica DTE de El Salvador), y quieres workflows IA-first desde el día uno, construir te da una precisión que comprar no puede darte.
 
-This is the story of Orbis 8, and what I learned from 6 months of designing its architecture.
+Esta es la historia de Orbis 8, y lo que aprendí de 6 meses diseñando su arquitectura.
 
-## Why Clean Architecture?
+## ¿Por qué Arquitectura Limpia?
 
-I've worked with codebases that started "pragmatic" — direct database calls in controllers, business logic in React components, no clear separation. They work. Until they don't.
+He trabajado en codebases que empezaron siendo "pragmáticos" — llamadas directas a la base de datos en los controladores, lógica de negocio en componentes React, sin separación clara. Funcionan. Hasta que dejan de funcionar.
 
-The moment you need to:
-- Swap your ORM
-- Add a message queue
-- Write a unit test that doesn't require a running database
+El momento en que necesitas:
+- Cambiar tu ORM
+- Agregar una cola de mensajes
+- Escribir un test unitario que no requiera una base de datos en ejecución
 
-...you realize you've painted yourself into a corner.
+...te das cuenta de que te has pintado en una esquina.
 
-Clean Architecture solves this by making **dependencies point inward**. Your business logic knows nothing about FastAPI, SQLAlchemy, or PostgreSQL. It just defines what needs to happen.
+La Arquitectura Limpia resuelve esto haciendo que **las dependencias apunten hacia adentro**. Tu lógica de negocio no sabe nada sobre FastAPI, SQLAlchemy ni PostgreSQL. Solo define lo que necesita hacer.
 
 ```python
-# ✅ Domain entity — pure Python, zero dependencies
+# ✅ Entidad de dominio — Python puro, cero dependencias
 from dataclasses import dataclass
 from decimal import Decimal
 
 @dataclass
-class Invoice:
+class Factura:
     id: str
     total: Decimal
-    tax_rate: Decimal = Decimal("0.13")  # IVA 13% for El Salvador
+    tasa_impuesto: Decimal = Decimal("0.13")  # IVA 13% El Salvador
 
     @property
-    def tax_amount(self) -> Decimal:
-        return (self.total * self.tax_rate).quantize(Decimal("0.0001"))
+    def monto_impuesto(self) -> Decimal:
+        return (self.total * self.tasa_impuesto).quantize(Decimal("0.0001"))
 
     @property
     def subtotal(self) -> Decimal:
-        return self.total - self.tax_amount
+        return self.total - self.monto_impuesto
 ```
 
-## The Repository Pattern in Practice
+## El Patrón Repository en la Práctica
 
-The interface in the domain, the implementation in the infrastructure layer:
+La interfaz en el dominio, la implementación en la capa de infraestructura:
 
 ```python
-# domain/interfaces/invoice_repository.py
+# domain/interfaces/factura_repository.py
 from abc import ABC, abstractmethod
 from typing import Optional
-from domain.entities.invoice import Invoice
+from domain.entities.factura import Factura
 
-class IInvoiceRepository(ABC):
+class IFacturaRepository(ABC):
     @abstractmethod
-    async def find_by_id(self, invoice_id: str) -> Optional[Invoice]:
+    async def buscar_por_id(self, factura_id: str) -> Optional[Factura]:
         pass
 
     @abstractmethod
-    async def save(self, invoice: Invoice) -> Invoice:
+    async def guardar(self, factura: Factura) -> Factura:
         pass
 ```
 
-This means my service layer can be tested **without a database**. I swap the real repository for a mock in tests. This is not theoretical — it saved us multiple times when the database schema was changing rapidly.
+Esto significa que la capa de servicio puede probarse **sin una base de datos**. Intercambio el repositorio real por un mock en los tests. Esto no es teórico — nos salvó varias veces cuando el esquema de la base de datos estaba cambiando rápidamente.
 
-## What I'd Do Differently
+## Lo que Haría Diferente
 
-### 1. Start with the event model
+### 1. Empezar con el modelo de eventos
 
-We added Pub/Sub later. Adding async communication to a synchronous system is much harder than designing for it from the start. Define your domain events on day 1, even if you implement them later.
+Agregamos Pub/Sub más tarde. Añadir comunicación asíncrona a un sistema síncrono es mucho más difícil que diseñarlo desde el principio. Define tus eventos de dominio el día 1, incluso si los implementas después.
 
-### 2. MDX for documentation
+### 2. MDX para la documentación
 
-We use Confluence. We shouldn't. Every architectural decision that lived in Confluence died when the person who wrote it left. Keep decisions close to code, in `.md` files in the repo.
+Usamos Confluence. No deberíamos. Cada decisión arquitectónica que vivió en Confluence murió cuando la persona que la escribió se fue. Mantén las decisiones cerca del código, en archivos `.md` en el repositorio.
 
-### 3. Postgres schemas for multi-tenancy, not separate databases
+### 3. Schemas de Postgres para multi-tenancy, no bases de datos separadas
 
-We use schema-level isolation (`access`, `billing`, `inventory` schemas). It's simpler to manage than database-per-tenant and still provides strong logical isolation.
+Usamos aislamiento a nivel de schema (`access`, `billing`, `inventory` schemas). Es más sencillo de gestionar que base de datos por tenant y aún proporciona un aislamiento lógico fuerte.
 
-## Conclusion
+## Conclusión
 
-Clean Architecture adds upfront investment. The payoff is a codebase where:
-- Senior devs can onboard in hours, not days
-- AI agents (like Claude) can reason about the codebase structure reliably
-- Features can be added without touching unrelated modules
+La Arquitectura Limpia requiere inversión inicial. El retorno es un codebase donde:
+- Los desarrolladores senior se incorporan en horas, no días
+- Los agentes de IA (como Claude) pueden razonar sobre la estructura del codebase de forma fiable
+- Las features pueden añadirse sin tocar módulos no relacionados
 
-The architecture serves the team. When the team grows, the architecture should bend gracefully — not break.
+La arquitectura sirve al equipo. Cuando el equipo crece, la arquitectura debe doblarse con gracia — no romperse.
 
 ---
 
-*Next post: Hexagonal Architecture in Python — when to use it and when it's overkill.*
+*Próximo post: Arquitectura Hexagonal en Python — cuándo usarla y cuándo es excesiva.*

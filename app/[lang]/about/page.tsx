@@ -1,3 +1,4 @@
+import Image from "next/image";
 import type { Metadata } from "next";
 import { siteConfig } from "@/lib/utils";
 import { ArrowRight, Mail, MapPin, Briefcase, Github, Linkedin, Twitter } from "lucide-react";
@@ -160,7 +161,13 @@ export default async function AboutPage({ params }: { params: Promise<{ lang: st
                         <div className="overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--bg-elevated)] p-2 shadow-2xl">
                             <div className="aspect-square relative rounded-2xl bg-gradient-to-br from-[var(--brand)] to-[var(--accent)] overflow-hidden flex items-center justify-center">
                                 <span className="text-5xl font-display font-bold text-white/20">JO</span>
-                                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=600&auto=format&fit=crop')] bg-cover bg-center mix-blend-overlay opacity-60" />
+                                <Image
+                                    src="https://6pxof7rpjdk6gkca.public.blob.vercel-storage.com/foto-perfil-blog.webp"
+                                    alt="Jorge Ochoa"
+                                    fill
+                                    className="object-cover mix-blend-overlay opacity-60"
+                                    sizes="(max-width: 1024px) 100vw, 400px"
+                                />
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                                 <div className="absolute bottom-6 left-6 right-6">
                                     <p className="text-sm font-bold text-white uppercase tracking-widest">Built in SV</p>

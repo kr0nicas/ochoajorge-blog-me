@@ -75,7 +75,7 @@ export function Footer({ lang }: FooterProps) {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 aria-label={label}
-                                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-muted)] transition-all duration-200 hover:border-[var(--border-strong)] hover:text-[var(--text-primary)] hover:shadow-[0_0_12px_rgba(99,102,241,0.2)]"
+                                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-muted)] transition-all duration-200 hover:border-[var(--border-brand)] hover:text-[var(--brand-light)] hover:shadow-[var(--shadow-brand-sm)]"
                             >
                                 <Icon className="h-4 w-4" />
                             </a>
