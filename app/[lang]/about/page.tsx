@@ -189,7 +189,7 @@ export default async function AboutPage({ params }: { params: Promise<{ lang: st
                                     LinkedIn
                                     <ArrowRight className="h-3 w-3 ml-auto opacity-40" />
                                 </a>
-                                <a href={`https://twitter.com/${siteConfig.author.twitter.replace("@", "")}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 rounded-xl border border-[var(--border)] p-3 text-sm text-[var(--text-secondary)] transition-all hover:border-[var(--brand)] hover:text-[var(--text-primary)]">
+                                <a href={`https://x.com/${siteConfig.author.twitter.replace("@", "")}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 rounded-xl border border-[var(--border)] p-3 text-sm text-[var(--text-secondary)] transition-all hover:border-[var(--brand)] hover:text-[var(--text-primary)]">
                                     <Twitter className="h-4 w-4" />
                                     Twitter
                                     <ArrowRight className="h-3 w-3 ml-auto opacity-40" />

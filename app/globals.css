@@ -526,3 +526,93 @@ body {
   opacity: 0.4;
   mix-blend-mode: overlay;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   READER MODE
+   Triggered by .reader-mode class on <body>
+   ══════════════════════════════════════════════════════════════ */
+body.reader-mode {
+  background-color: var(--bg-base);
+}
+
+/* Hide everything except the article */
+body.reader-mode header,
+body.reader-mode footer,
+body.reader-mode aside,
+body.reader-mode [data-reader-hide] {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+  height: 0;
+  overflow: hidden;
+}
+
+/* Remove max-width constraint — let article breathe */
+body.reader-mode main {
+  display: flex;
+  justify-content: center;
+  padding-top: 4rem;
+  padding-bottom: 6rem;
+}
+
+/* Article container — full-width reflow */
+body.reader-mode article {
+  width: 100%;
+  max-width: 72ch;
+  margin: 0 auto;
+}
+
+/* Remove grid, let article span full */
+body.reader-mode .xl\:grid {
+  display: block !important;
+}
+
+/* Bigger, more comfortable prose */
+body.reader-mode .prose-blog {
+  font-size: 1.125rem;
+  line-height: 1.85;
+  --tw-prose-body: var(--text-secondary);
+}
+
+body.reader-mode .prose-blog p {
+  font-size: 1.125rem;
+  line-height: 1.85;
+}
+
+body.reader-mode .prose-blog h2 {
+  font-size: 1.5rem;
+  margin-top: 3rem;
+}
+
+body.reader-mode .prose-blog h3 {
+  font-size: 1.25rem;
+  margin-top: 2.5rem;
+}
+
+/* Reading progress bar stays visible */
+body.reader-mode [data-reading-progress] {
+  opacity: 1 !important;
+  height: 0 !important;
+  overflow: visible !important;
+  pointer-events: auto !important;
+}
+
+/* Reader mode exit hint */
+body.reader-mode::after {
+  content: "ESC para salir";
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  opacity: 0.7;
+  pointer-events: none;
+  font-family: var(--font-mono);
+}

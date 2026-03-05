@@ -8,6 +8,7 @@ import { ReadingProgress } from "@/components/blog/ReadingProgress";
 import { TableOfContents } from "@/components/blog/TableOfContents";
 import { SeriesBanner } from "@/components/blog/SeriesBanner";
 import { RelatedPosts } from "@/components/blog/RelatedPosts";
+import { ReaderMode } from "@/components/blog/ReaderMode";
 import { Comments } from "@/components/blog/Comments";
 import { Github } from "lucide-react";
 
@@ -87,6 +88,11 @@ export default async function PostPage({ params }: PostPageProps) {
 
             {/* Reading progress bar */}
             <ReadingProgress />
+
+            {/* Reader mode toggle — floating top-right */}
+            <div className="fixed right-4 top-20 z-40 hidden xl:block" data-reader-control>
+                <ReaderMode lang={lang} />
+            </div>
 
             <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
                 <div className="xl:grid xl:grid-cols-[1fr_280px] xl:gap-12">

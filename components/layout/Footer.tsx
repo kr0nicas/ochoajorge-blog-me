@@ -22,7 +22,7 @@ export function Footer({ lang }: FooterProps) {
             icon: Linkedin,
         },
         {
-            href: `https://twitter.com/${siteConfig.author.twitter.replace("@", "")}`,
+            href: `https://x.com/${siteConfig.author.twitter.replace("@", "")}`,
             label: "Twitter",
             icon: Twitter,
         },

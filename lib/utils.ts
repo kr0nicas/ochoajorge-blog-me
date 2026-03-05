@@ -33,9 +33,9 @@ export const siteConfig = {
     ogImage: "https://ochoajorge.me/og.png",
     author: {
         name: "Jorge Ochoa",
-        twitter: "@jorgeochoa",
-        github: "https://github.com/jorgeochoa",
-        linkedin: "https://linkedin.com/in/jorgeochoa",
+        twitter: "@kr0nicas",
+        github: "https://github.com/kr0nicas",
+        linkedin: "https://www.linkedin.com/in/jorge-ochoa-rebollo/",
         bluesky: "https://bsky.app/profile/kr0nicas.bsky.social",
     },
     keywords: [
