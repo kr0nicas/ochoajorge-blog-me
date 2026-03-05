@@ -8,8 +8,8 @@ export const dictionaries = {
             search: "Buscar...",
         },
         hero: {
-            title: "Arquitecto de Software & Estratega",
-            subtitle: "Construyendo sistemas de alto rendimiento y compartiendo lecciones sobre arquitectura, usando las tecnologias de vanguardia.",
+            title: "Arquitecto de Plataforma & Entusiasta Tech",
+            subtitle: "Diseñando soluciones en la nube de alto rendimiento. Escribo sobre Kubernetes, Clean Architecture, Go y la integración de Agentes de IA.",
         },
         footer: {
             built_with: "Construido con",
@@ -42,8 +42,8 @@ export const dictionaries = {
             search: "Search...",
         },
         hero: {
-            title: "Software Architect & Strategist",
-            subtitle: "Building high-performance systems and sharing lessons on architecture, Python, and AI.",
+            title: "Technology Architect & Cloud Strategist",
+            subtitle: "Designing high-performance cloud solutions. Writing about Kubernetes, Clean Architecture, Go, and applied AI Agents.",
         },
         footer: {
             built_with: "Built with",

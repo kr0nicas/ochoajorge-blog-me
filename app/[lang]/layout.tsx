@@ -97,6 +97,24 @@ export default async function RootLayout({
 }) {
   const { lang } = await params;
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    name: siteConfig.author.name,
+    url: siteConfig.url,
+    image: siteConfig.ogImage,
+    sameAs: [
+      siteConfig.author.linkedin,
+      siteConfig.author.github,
+      `https://x.com/${siteConfig.author.twitter.replace("@", "")}`,
+    ],
+    jobTitle: "Technology Architect",
+    worksFor: {
+      "@type": "Organization",
+      name: "Equifax LATAM"
+    }
+  };
+
   return (
     <html
       lang={lang}
@@ -105,6 +123,12 @@ export default async function RootLayout({
     >
       <body className="min-h-screen antialiased transition-colors duration-300">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange={false}>
+          {/* JSON-LD Person Schema Global */}
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          />
+
           <div className="relative flex min-h-screen flex-col">
             <Header lang={lang} />
             <main className="flex-1">{children}</main>

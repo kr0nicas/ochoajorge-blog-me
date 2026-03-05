@@ -115,17 +115,17 @@ export default async function HomePage({
                 <div className="mt-4 leading-relaxed text-[var(--text-secondary)]">
                   {lang === 'es' ? (
                     <p>
-                      Arquitecto de software y desarrollador full-stack basado en El Salvador.
-                      Actualmente construyendo <span className="font-medium text-[var(--text-primary)]">Orbis 8</span>,
-                      un ERP SaaS multi-tenant para PYMES, utilizando Python, Go y Next.js.
-                      Apasionado por la arquitectura limpia, ingeniería de IA y herramientas para desarrolladores.
+                      Technical Solutions Architect basado en El Salvador, experto en <strong>Google Cloud</strong> y Kubernetes.
+                      Ayudo a transformar infraestructuras corporativas aplicando patrones de <strong>Arquitectura Limpia</strong>.
+                      Actualmente construyendo software de alto rendimiento con <span className="font-medium text-[var(--text-primary)]">Go</span>,
+                      Python y <span className="font-medium text-[var(--text-primary)]">Agentes IA</span> autónomos.
                     </p>
                   ) : (
                     <p>
-                      Software architect and full-stack developer based in El Salvador.
-                      Currently building <span className="font-medium text-[var(--text-primary)]">Orbis 8</span>,
-                      a multi-tenant ERP SaaS for SMBs, using Python, Go, and Next.js.
-                      Passionate about clean architecture, AI engineering, and developer tooling.
+                      Technical Solutions Architect based in El Salvador, expert in <strong>Google Cloud</strong> and Kubernetes.
+                      I help transform corporate infrastructures by applying <strong>Clean Architecture</strong> patterns.
+                      Currently building high-performance software with <span className="font-medium text-[var(--text-primary)]">Go</span>,
+                      Python, and autonomous <span className="font-medium text-[var(--text-primary)]">AI Agents</span>.
                     </p>
                   )}
                 </div>

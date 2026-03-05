@@ -26,9 +26,9 @@ export function slugify(text: string): string {
  */
 export const siteConfig = {
     name: "Jorge Ochoa",
-    title: "Jorge Ochoa — Software Architect & Developer",
+    title: "Jorge Ochoa — Technology Architect, Cloud & AI",
     description:
-        "Software architect, Python & Next.js developer. Writing about Clean Architecture, AI systems, and building production-grade software.",
+        "Technology Architect and Developer from El Salvador. Writing about Kubernetes, Google Cloud, Go, Clean Architecture, and AI Agents for high-performance systems.",
     url: "https://ochoajorge.me",
     ogImage: "https://ochoajorge.me/og.png",
     author: {
@@ -39,15 +39,20 @@ export const siteConfig = {
         bluesky: "https://bsky.app/profile/kr0nicas.bsky.social",
     },
     keywords: [
-        "software architecture",
+        "technology architecture",
+        "cloud architecture",
+        "google cloud",
+        "gcp",
+        "kubernetes",
+        "docker",
+        "golang",
         "clean architecture",
+        "hexagonal architecture",
+        "ai agents",
         "python",
         "next.js",
-        "fastapi",
-        "langchain",
-        "ai engineering",
-        "erp",
-        "saas",
+        "devops",
+        "automation",
     ],
 };
 
