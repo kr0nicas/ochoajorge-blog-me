@@ -1,0 +1,182 @@
+---
+title: "OpenClaw 2026: A Security Guide for Your Personal AI Agent"
+description: "Learn to set up security controls in OpenClaw 2026 without being a technical expert. Protect your data and automations from day one."
+date: "2026-03-05"
+tags: ["openclaw", "security", "applied-ai", "automation", "guide"]
+lang: "en"
+draft: true
+featured: false
+---
+
+# OpenClaw 2026: A Security Guide for Your Personal AI Agent
+
+You have an AI agent managing your emails, organizing your tasks, and automating parts of your digital life. It's incredibly useful. But have you ever asked yourself — who controls what that agent can actually do? What happens if it receives a malicious instruction? Can it access things it shouldn't?
+
+This guide is for you if you just discovered OpenClaw, or if you've been using it for a while but never really dug into the security side of things. You don't need to be a developer or a systems engineer. You just need to want to do things right from the start.
+
+---
+
+## Why Does Security Matter for an AI Agent?
+
+An AI agent is not just a chatbot. It's a program that can **take real actions on your behalf**: send messages, read files, execute code, interact with external services.
+
+That means if someone — or something — manages to manipulate it, the consequences can be very concrete. We're not talking about science fiction; these are scenarios that already happen:
+
+<Callout type="warning" title="Real-world risk examples">
+  - Someone sends you a message with hidden instructions that your agent executes without your knowledge.
+  - An external service you connected to your agent exposes your data.
+  - Your agent takes an irreversible action (delete, send, publish) without prior confirmation.
+</Callout>
+
+The good news: OpenClaw was designed with this in mind. With the right configuration, you can eliminate most of these risks in a simple way.
+
+---
+
+## The 4 Fundamental Security Controls
+
+### 1. The Principle of Least Privilege: Give it Only What it Needs
+
+This is the most important concept in all of information security, and it applies perfectly to AI agents.
+
+**The idea is simple:** your agent shouldn't be able to do more than what it needs for its specific function.
+
+If you have an agent whose only job is to organize your daily tasks, does it need access to your email? To your financial files? Probably not.
+
+<ComparisonTable
+  headers={["❌ Risky configuration", "✅ Secure configuration"]}
+  highlight={1}
+  rows={[
+    ["Full access to the file system", "Access only to /workspace folder"],
+    ["Can send emails without confirmation", "Requires approval to send"],
+    ["Connected to all available APIs", "Only the APIs it actively uses"],
+    ["No action limit per session", "Configurable action limit"],
+  ]}
+/>
+
+In OpenClaw, this is controlled through the **approval levels** you define for each agent. I'll explain how that works shortly.
+
+---
+
+### 2. Approval Levels: Your Safety Net
+
+OpenClaw implements a three-level system that determines what your agent can do autonomously and what requires your explicit approval.
+
+<Steps>
+  <Step title="Level 1 — Full Autonomy">
+    The agent acts without asking for permission. Ideal for read-only actions and queries.
+
+    **Safe examples:** reading files, browsing the web, checking the calendar, analyzing information.
+
+    **Golden rule:** If the action is reversible and doesn't expose sensitive data, it can be Level 1.
+  </Step>
+  <Step title="Level 2 — Prior Notification">
+    The agent notifies you before acting and waits a reasonable moment. Whether it proceeds if you don't respond depends on your configuration.
+
+    **Examples:** creating files, installing software, committing to repositories, sending notifications.
+  </Step>
+  <Step title="Level 3 — Explicit Approval">
+    The agent stops completely and waits for your active confirmation. Without your OK, there is no action.
+
+    **Always Level 3:** deleting data, publishing content publicly, operations on production servers, sending external emails or messages, any irreversible change.
+  </Step>
+</Steps>
+
+<Callout type="tip" title="Practical recommendation">
+  When you configure a new agent, start with everything at **Level 3** and lower the level only when you trust what it does. It's easier to loosen restrictions than to recover from a mistake.
+</Callout>
+
+---
+
+### 3. Authorized Senders: Control Who Can Give Instructions
+
+An AI agent can receive messages from many sources: you, automated services, webhooks, emails. Not all of them should have the same power to give it instructions.
+
+OpenClaw allows you to define an **authorized senders list**. Any instruction coming from outside that list is ignored or requires additional validation.
+
+<Callout type="danger" title="What is a prompt injection attack?">
+  It's when someone tries to smuggle malicious instructions inside apparently normal content. For example: an email whose body contains invisible text telling your agent to "forward all emails to this address." The authorized senders list is your first line of defense.
+</Callout>
+
+**Recommended setup:**
+- Only you (and trusted people) in the authorized senders list.
+- For groups (Discord, Telegram): define access policy by group, not individual user.
+- Never leave the policy in open mode (`allowAll`) in production.
+
+---
+
+### 4. Destructive Operations: The "Stop and Confirm" Protocol
+
+There's a principle that should be non-negotiable in any automated system:
+
+> **Irreversible operations always require human confirmation.**
+
+It doesn't matter how much trust you have in your agent. It doesn't matter if it's been running perfectly for months. Before deleting, before publishing, before sending — the agent must stop and ask for your confirmation.
+
+In OpenClaw, the `[REQUIRES APPROVAL]` marker on any task is the signal that the agent will wait for your OK before proceeding. Use it without hesitation.
+
+---
+
+## A Use Case: The Secure Personal Assistant
+
+Imagine you configure an agent to help you with your daily tasks. Its function: read your to-dos, remind you of important dates, and help you draft responses.
+
+Here's what the ideal security configuration would look like for that agent:
+
+<FileTree title="Task agent permissions">
+{`
+  Allowed access/
+    Read tasks and calendar  ✅ Level 1
+    Create reminders         ✅ Level 1
+    Draft responses          ✅ Level 1
+  Requires notification/
+    Create new events        ⚠️ Level 2
+    Modify existing tasks    ⚠️ Level 2
+  Requires approval/
+    Send messages            🔴 Level 3
+    Delete records           🔴 Level 3
+    Access external data     🔴 Level 3
+`}
+</FileTree>
+
+With this structure, the agent can be completely useful in its day-to-day work without representing any risk. And if it ever tries to do something outside its permissions, the system blocks it automatically.
+
+---
+
+## Common Mistakes to Avoid
+
+<Callout type="danger" title="❌ Storing credentials directly in code or messages">
+  API keys, tokens, and passwords should never be in plain text in your conversations with the agent or in workspace files. OpenClaw has an environment variable system specifically for this.
+</Callout>
+
+<Callout type="warning" title="⚠️ Connecting all services on day one">
+  The temptation to connect Gmail, Notion, GitHub, Telegram, Twitter and everything else from the start is real. Resist it. Add integrations gradually, one at a time, and verify the behavior before adding the next one.
+</Callout>
+
+<Callout type="note" title="📝 Not documenting your security configuration">
+  When you change permission levels or add authorized senders, document it. In three months you won't remember why you left something at Level 2 and not Level 3. Your future self will thank you.
+</Callout>
+
+---
+
+## Checklist: Secure Configuration from Day One
+
+Before letting your agent operate autonomously, confirm these points:
+
+- [ ] Approval levels defined for each type of action
+- [ ] Authorized senders list configured (not in open mode)
+- [ ] Credentials stored as environment variables, not in plain text
+- [ ] At least delete/send/publish actions are at Level 3
+- [ ] You have a way to quickly deactivate the agent if something goes wrong
+- [ ] The agent only has access to the services it actually needs
+
+---
+
+## Conclusion
+
+Security in AI agents is not a topic only for experts. These are design decisions you make from the beginning that determine how reliable and safe your system is.
+
+The most important principle is also the simplest: **give your agent exactly what it needs for its function, nothing more**. From there, the approval levels do the rest.
+
+In upcoming posts in this series, we'll look at how to apply these controls in more specific scenarios: agents that manage content, development agents, and agents with access to cloud infrastructure.
+
+Have questions about any specific aspect of the configuration? Leave them in the comments — questions from non-technical readers are exactly what this community needs most.
