@@ -1,0 +1,168 @@
+---
+title: "Vibe Coding in Production: What Nobody Tells You"
+description: "AI coding tools feel magical until 3am when your production alert fires. Here's what senior engineers won't post on Twitter about vibe coding at scale."
+date: "2026-03-10"
+tags: ["vibe-coding", "ai-development", "production", "software-architecture"]
+lang: "en"
+draft: true
+featured: false
+---
+
+It's 3:07am. Your phone is buzzing. Production is down.
+
+You open the incident channel and start digging through the stack trace. Forty minutes later, you find it — a subtle off-by-one in a pagination function that breaks when the dataset exceeds 10,000 records. You fix it. You deploy. You write the postmortem.
+
+Then you check git blame.
+
+The author of that function? An AI model. The reviewer who approved it? You — six weeks ago, moving fast, vibing.
+
+Welcome to the real cost of vibe coding.
+
+---
+
+## First, Let's Define What We're Actually Talking About
+
+"Vibe coding" — the term coined by Andrej Karpathy — describes the experience of building software through AI conversation: you describe intent, the AI produces code, you iterate on feeling rather than full comprehension. It's genuinely a different mode of working. Less like crafting, more like directing.
+
+At its best, it's extraordinary. A senior engineer with deep domain knowledge can architect a complex system in hours rather than weeks by delegating implementation to an AI that knows the syntax, the patterns, the boilerplate. The engineer thinks at the level of behavior and contracts; the AI handles the lines.
+
+At its worst, it's liability with a syntax highlighter.
+
+The gap between those two outcomes is almost entirely determined by what happens *after* the AI writes the code — specifically, what happens at review, at test, and at deploy. That's what this post is actually about.
+
+---
+
+## The Problem Nobody Puts in Their LinkedIn Post
+
+The AI coding hype cycle has a predictable arc: developer discovers Copilot/Cursor/Claude, productivity explodes, they post a thread about "10x engineering," and six weeks later they're quietly debugging code they don't fully understand.
+
+I'm not here to tell you AI coding tools are bad. I use them daily. I run a personal setup where AI agents write code, commit to branches, and open PRs — orchestrated by other AI agents. This is not a hot take from someone who is afraid of the technology. It's an observation from someone who has been burned by it.
+
+**The core problem is ownership.**
+
+When you write code yourself, you carry an implicit mental model of it. You know the edge cases you punted on. You remember the assumption you made about input format. When something breaks, you have context.
+
+When an AI writes code and you skim the diff and hit "approve," you inherit the output without the mental model. You have the artifact but not the understanding. That gap between artifact and understanding is invisible technical debt — and it compounds.
+
+<Callout type="warning" title="The invisible debt formula">
+  Speed of AI generation × Quality of your review = Your actual technical debt load.
+  Most teams optimize the left side of that equation and ignore the right.
+</Callout>
+
+---
+
+## What "Vibe Deploying" Actually Looks Like
+
+Let me be specific. These are real failure patterns I've seen (with details changed):
+
+**Pattern 1: The confident wrong answer.** AI models are fluent. They produce code that looks authoritative. A function that handles currency rounding, written by an AI, passed code review because the logic *read* correctly. It wasn't. It silently lost fractions of cents across millions of transactions.
+
+**Pattern 2: The context collapse.** AI has a context window. Your codebase doesn't fit in it. So the model makes reasonable local decisions that are globally wrong — a caching layer that ignores a subtle business rule defined in a module it never saw.
+
+**Pattern 3: The hallucinated dependency.** A junior dev asked an AI to add a feature. The AI used a library method that doesn't exist in the pinned version of the dependency. Tests passed locally (wrong version cached). Staging passed. Production broke. CI didn't catch it because nobody tested the actual artifact.
+
+**Pattern 4: The security blindspot.** AI models have been trained to be helpful. They'll generate SQL queries, file operations, and API calls that work — and that are also subtly vulnerable to injection, path traversal, or SSRF if you don't look carefully. The code doesn't look wrong. That's the problem.
+
+---
+
+## The Architecture of Responsible AI Coding
+
+Here's what actually works. Not theory — practice.
+
+<Steps>
+  <Step title="Own the spec, delegate the implementation">
+    Write the function signature, the expected behavior, and the edge cases yourself. In a comment, in a test, in a docstring — doesn't matter. Make the AI implement against your spec, not generate the spec for you. This forces you to think before you vibe.
+  </Step>
+  <Step title="Review diffs like you wrote zero of it">
+    Standard code review has a bias: reviewers trust the author. When the "author" is an AI that never gets defensive and never pushes back, that bias goes unchecked. Read AI-generated diffs with maximum skepticism. Ask: what input would break this? What assumption is baked in here?
+  </Step>
+  <Step title="Property-based testing over happy-path tests">
+    AI is great at generating happy-path unit tests. That's nearly useless for production robustness. Add property-based tests (pytest-hypothesis, fast-check) that throw random inputs at the logic. This is where AI-generated code falls apart — and where you catch it before production does.
+  </Step>
+  <Step title="Observability before you ship, not after">
+    Every AI-generated function that touches data should have structured logging on its inputs and outputs from day one. Not because you distrust the AI — because you don't have the mental model you'd normally have. Logs are the mental model you didn't build during implementation.
+  </Step>
+  <Step title="Canary deploys are non-negotiable">
+    This was always a best practice. With AI-generated code shipping faster than humans can deeply review, it's a survival mechanism. 5% of traffic to the new version. Watch the error rate. Watch p99 latency. Then graduate.
+  </Step>
+</Steps>
+
+---
+
+## The Counterintuitive Truth About AI-Assisted Architecture
+
+Here's what I've learned running AI agents in my own infrastructure: **the architect's job gets harder, not easier.**
+
+When I'm writing code myself, my skill is the ceiling. My code can't be better than my understanding.
+
+When AI writes code, that ceiling lifts — temporarily. The AI can implement a clean hexagonal architecture, write the adapter interfaces, wire the dependency injection correctly. It knows the patterns.
+
+But someone still has to make the architectural decisions: What are the invariants? What are the boundaries? What does "done" mean for this system? What tradeoffs are acceptable? Those decisions require context the AI doesn't have — your specific business constraints, your team's capabilities, your operational reality at 3am.
+
+<ComparisonTable
+  headers={["Vibe Coding", "Engineered AI-Assisted Development"]}
+  highlight={1}
+  rows={[
+    ["AI writes, human approves", "Human specs, AI implements, human owns"],
+    ["Speed optimized", "Quality-speed balanced"],
+    ["Happy-path tested", "Property + integration tested"],
+    ["Mental model gap at review", "Spec forces mental model upfront"],
+    ["Observability added later (maybe)", "Observability designed in from day 0"],
+    ["Single reviewer bias", "AI-specific review checklist"],
+    ["Fast until it isn't", "Consistently fast, consistently safe"],
+  ]}
+/>
+
+The engineers who are going to win with AI tools aren't the ones who use them most aggressively. They're the ones who build rigorous processes around them — code review checklists that account for AI failure modes, testing strategies that assume the implementation is subtly wrong, deployment pipelines that catch problems before they reach all users.
+
+---
+
+## A Note on Trust, Earned Over Time
+
+I don't want to leave you with the impression that AI-generated code is categorically dangerous. It isn't. I've seen AI write better code than many senior engineers — more consistent, less clever, better documented.
+
+The issue isn't capability. It's calibration.
+
+You need to build a model of when your AI tools are reliable and when they aren't. In my experience:
+
+- **High reliability:** Boilerplate, CRUD operations, well-defined transformations, standard algorithms on standard data structures
+- **Medium reliability:** Business logic with moderate complexity, integrations with well-documented APIs, refactors of isolated functions
+- **Low reliability:** Security-sensitive code, distributed systems edge cases, code that requires deep understanding of your specific data model, anything that touches financial calculations
+
+Calibrate your review depth accordingly. The goal isn't to review AI code more — it's to review it *smarter*. That means investing time upfront to understand which parts of your system are high-risk and ensuring those never ship without deep human comprehension, regardless of who or what wrote them.
+
+---
+
+## The Tooling Gap Nobody Talks About
+
+Current AI coding tools are optimized for generation. They are not optimized for *verification*. That asymmetry matters more than people acknowledge.
+
+When you ask an AI to write a function, you get a function. When you ask the same AI "is this function correct?", you get a confident answer — which may or may not track reality. AI self-review is not reliable. It's the same model with the same biases, now in a different role.
+
+This means the verification burden falls entirely on the human and the automated test suite. The human is often tired, moving fast, and has context collapse from reviewing many AI-generated diffs in sequence. The test suite only catches what someone thought to test.
+
+The practical implication: **your test infrastructure needs to be at least as sophisticated as your generation infrastructure.** Most teams have the reverse. They've invested heavily in AI coding tools and zero in improving their property-based test coverage, their mutation testing score, their contract testing setup.
+
+This is where the debt is actually accumulating — silently, in all the cases that weren't tested because nobody thought of them and the AI didn't either.
+
+<Callout type="tip" title="A useful ratio to track">
+  How many AI-generated functions do you ship per week vs. how many property-based tests do you write per week? If the first number is growing faster than the second, you're taking on uncollateralized risk.
+</Callout>
+
+---
+
+## The Line Worth Drawing
+
+I'll end with the maxim that's been true in my setup:
+
+> **Vibe coding is a feature. Vibe deploying is a bug.**
+
+The creativity, the speed, the "let's see what it produces" energy of AI-assisted development — that's genuinely valuable in the right phase. Exploration, prototyping, generating options, moving fast on low-risk surface area.
+
+But deploying to production is not a vibe. It's an engineering act with consequences. It requires ownership, rigor, and the willingness to be accountable for code you didn't write but chose to ship.
+
+The engineers who figure out that distinction — who build the muscle to switch modes between creative AI collaboration and rigorous production engineering — those are the ones who will actually be 10x. Not the ones who vibed into an outage.
+
+---
+
+*If you're building AI agent infrastructure and want to go deeper on the architecture of making it production-grade, I wrote about [building an open automatable workspace](/en/blog/building-open-automatable-workspace-2026) and the [security controls that make it safe to operate](/en/blog/openclaw-2026-security-controls-guide).*
