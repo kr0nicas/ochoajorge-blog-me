@@ -25,6 +25,23 @@ export function slugify(text: string): string {
 /**
  * Site configuration — single source of truth for metadata.
  */
+export type MetadataOverride = {
+    title?: string;
+    description?: string;
+    ogTitle?: string;
+    ogDescription?: string;
+    ogImage?: string;
+    canonical?: string;
+};
+
+const metadataOverrides: Record<string, MetadataOverride> = {
+    // Example:
+    // "series-overview": {
+    //   title: "Series overview | Jorge Ochoa",
+    //   description: "Custom description for SEO preview.",
+    // },
+};
+
 export const siteConfig = {
     name: "Jorge Ochoa",
     title: "Jorge Ochoa — Technology Architect, Cloud & AI",
@@ -55,26 +72,10 @@ export const siteConfig = {
         "devops",
         "automation",
     ],
-    metadataOverrides: {
-        // Añade overrides por slug si necesitas personalizar metadata para SEO o redes sociales
-        // "custom-series-intro": {
-        //     title: "Override Title",
-        //     description: "Custom description length for SEO.",
-        //     ogImage: "https://example.com/custom-og.png",
-        // },
-    },
+    metadataOverrides,
 };
 
 export type SiteConfig = typeof siteConfig;
-
-export type MetadataOverride = {
-    title?: string;
-    description?: string;
-    ogTitle?: string;
-    ogDescription?: string;
-    ogImage?: string;
-    canonical?: string;
-};
 
 /**
  * Format a date string for display.

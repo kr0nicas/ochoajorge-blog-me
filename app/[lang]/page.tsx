@@ -32,9 +32,10 @@ export default async function HomePage({
   params: Promise<{ lang: string }>;
 }) {
   const { lang } = await params;
-  const dict = getDictionary(lang as Locale);
-  const featuredPosts = getFeaturedPosts(8, lang);
-  const allPosts = getAllPosts(lang);
+  const locale = (lang === "es" ? "es" : "en") as Locale;
+  const dict = getDictionary(locale);
+  const featuredPosts = getFeaturedPosts(8, locale);
+  const allPosts = getAllPosts(locale);
   const tagCounts = allPosts.reduce<Record<string, number>>((acc, post) => {
     post.tags.forEach((tag) => {
       const normalized = tag.toLowerCase();
@@ -46,7 +47,7 @@ export default async function HomePage({
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 6);
-  const seriesStats = getAllSeries(lang)
+    const seriesStats = getAllSeries(locale)
     .map((name) => ({
       name,
       count: getPostsBySeries(name, lang).length,
@@ -58,7 +59,7 @@ export default async function HomePage({
   return (
     <>
       {/* ── Hero (Client — Framer Motion) ─────────────────────── */}
-      <Hero
+    <Hero
         githubUrl={siteConfig.author.github}
         linkedinUrl={siteConfig.author.linkedin}
         blueskyUrl={siteConfig.author.bluesky}
@@ -68,7 +69,7 @@ export default async function HomePage({
 
       {/* ── Topic Highlights ────────────────────────────────────── */}
       <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
-        <TopicHighlights lang={lang} tags={topTags} series={seriesStats} />
+        <TopicHighlights lang={locale} tags={topTags} series={seriesStats} />
       </section>
 
       {/* ── Featured Posts ─────────────────────────────────────── */}

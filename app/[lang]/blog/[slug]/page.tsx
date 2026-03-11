@@ -40,7 +40,9 @@ export async function generateMetadata({
     return {
         title: metadataTitle,
         description: metadataDescription,
-        canonical: metadataCanonical,
+        alternates: {
+            canonical: metadataCanonical,
+        },
         openGraph: {
             title: ogTitle,
             description: ogDescription,
