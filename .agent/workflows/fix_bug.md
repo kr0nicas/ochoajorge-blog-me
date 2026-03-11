@@ -1,211 +1,38 @@
 ---
-description: Proceso estandarizado para corregir bugs siguiendo mejores prácticas de debugging y testing.
+description: Flujo estándar para corregir bugs en la aplicación Next.js/TypeScript del blog.
 ---
 
 # Bug Fix Workflow
 
-Este workflow es obligatorio para todas las correcciones de bugs en el ERP.
+Este workflow es obligatorio siempre que se corrija un bug en la interfaz, los datos de contenido o el flujo de publicación. El objetivo es reproducir localmente, entender la causa raíz, aplicar el mínimo cambio necesario y verificar con linters y build.
 
-## 1. Reproducción y Diagnóstico
+## 1. Reproducción y diagnóstico
 
-### 1.1 Reproducir el Bug
-- Crear un caso de prueba mínimo que reproduzca el bug
-- Documentar pasos exactos para reproducir
-- Capturar logs, screenshots, o errores relevantes
+- **Levanta el entorno local**: `npm run dev` y navega a la ruta afectada (`app/[lang]/...`). Usa el log de la consola y el inspector del navegador para capturar errores de runtime o datos faltantes.
+- **Identifica el origen**: revisa `app/`, `components/`, `lib/`, `content/` según corresponda. Confirma si el problema viene de datos (frontmatter), rutas (App Router), componentes MDX o utilidades compartidas (`lib/utils.ts`, `lib/posts.ts`, `lib/mdx.tsx`).
+- **Registra pasos**: anota los pasos exactos, entradas y datos que exponen el bug, incluyendo idioma (`es` / `en`), series, etiquetas o filtros relevantes.
 
-### 1.2 Identificar Root Cause
-- Usar debugging tools (pdb para Python, delve para Go)
-- Revisar logs de aplicación
-- Verificar assumptions sobre el estado del sistema
-- Identificar la capa afectada (Repository, Service, Handler)
+## 2. Implementación del fix
 
-## 2. Implementación del Fix
+- **Crea branch descriptivo**: `git checkout -b fix/descripcion-breve`.
+- **Haz el cambio mínimo necesario**: modifica sólo `app/`, `components/`, `lib/` o `scripts/` afectados. Evita refactors amplios a menos que sean parte del fix.
+- **Actualiza tests-docs relacionados** (si aplica): archivos MDX, workflows o scripts que describan el comportamiento corregido (por ejemplo `.agent/workflows/*.md` si la doc cambió con el fix).
 
-### 2.1 Crear Branch
-```bash
-git checkout -b fix/descripcion-corta-del-bug
-```
+## 3. Verificación
 
-### 2.2 Aplicar Fix Siguiendo DDD
-**Repository Layer:**
-- Solo si el bug está en queries SQL/GORM
-- Verificar que no rompa otras queries
+- **Lint y type-check**: `npm run lint` y `npm run type-check`.
+- **Build completo**: `npm run build` para garantizar que `next` y MDX compilan sin errores.
+- **Chequeo específico** (según bug): `npm run seo:audit` si el problema estaba en metadata/frontmatter; o abre `npm run dev` y reproduce manualmente el flujo (switch idioma, series, tags).
+- **Pruebas manuales adicionales**: navega a `[lang]/blog`, `[lang]/tags/[tag]`, `[lang]/series/[slug]`, y páginas del layout para confirmar que no aparecen regresiones visibles.
 
-**Service Layer:**
-- Mayoría de bugs de lógica de negocio
-- Agregar validaciones faltantes
-- Corregir cálculos incorrectos
+## 4. Commit y deploy
 
-**Handler Layer:**
-- Bugs de validación de input
-- Errores de serialización/deserialización
-- Headers faltantes (ej. X-Tenant-ID)
+- **Mensaje convencional**: `fix(blog): descripción corta` o `fix(layout): ...` según la capa.
+- **Describe el fix**: en el cuerpo del commit menciona el síntoma original, la causa raíz y cómo se verificó.
+- **Documentación**: actualiza `.agent/workflows/` o `README.md` sólo si el bug reveló una laguna documental.
+- **Push**: `git push origin fix/...` y crea PR. Vercel desplegará automáticamente al mergear a `main`.
 
-### 2.3 Escribir Test que Falle Primero
-```python
-# Python example
-def test_bug_fix_for_issue_123():
-    """Test that reproduces bug #123 before fix."""
-    # Arrange
-    partner = create_partner(credit_limit=1000)
-    
-    # Act
-    result = calculate_available_credit(partner, used=500)
-    
-    # Assert
-    assert result == 500  # This should fail before fix
-```
+## 5. Post-merge
 
-```go
-// Go example
-func TestBugFix_Issue123(t *testing.T) {
-    // Arrange
-    item := &InventoryItem{StockQuantity: 10}
-    
-    // Act
-    err := item.Reserve(15)
-    
-    // Assert
-    assert.Error(t, err) // Should fail before fix
-}
-```
-
-### 2.4 Aplicar Fix
-- Hacer el cambio mínimo necesario
-- Seguir principio KISS (Keep It Simple, Stupid)
-- No refactorizar código no relacionado
-
-### 2.5 Verificar que Test Pasa
-```bash
-# Python
-pytest path/to/test_file.py::test_bug_fix_for_issue_123
-
-# Go
-go test ./path/to/package -run TestBugFix_Issue123
-```
-
-## 3. Verificación Completa
-
-### 3.1 Run All Tests
-```bash
-# Python
-pytest
-
-# Go
-go test ./...
-
-# Frontend
-npm test
-```
-
-### 3.2 Verificación Manual
-- Reproducir el bug original → debe estar corregido
-- Verificar casos edge relacionados
-- Verificar que no se rompió funcionalidad existente
-
-### 3.3 Verificar Linting
-```bash
-# Python
-ruff check .
-mypy .
-
-# Go
-golangci-lint run
-
-# TypeScript
-npm run lint
-```
-
-## 4. Documentación
-
-### 4.1 Actualizar Common Pitfalls (si aplica)
-Si el bug es un patrón común, agregarlo a `.cursor/rules/common_pitfalls.md`
-
-### 4.2 Commit Message
-Usar Conventional Commits:
-```bash
-git commit -m "fix(module): descripción corta del fix
-
-- Detalle del problema
-- Detalle de la solución
-- Casos edge considerados
-
-Fixes #123"
-```
-
-### 4.3 Actualizar Walkthrough
-Agregar entrada en `walkthrough.md` si es un bug significativo:
-```markdown
-## Bug Fix: [Descripción]
-
-**Issue:** #123  
-**Root Cause:** [Explicación]  
-**Solution:** [Qué se cambió]  
-**Testing:** [Cómo se verificó]
-```
-
-## 5. Code Review
-
-### 5.1 Crear Pull Request
-- Título claro: "Fix: [descripción]"
-- Descripción con:
-  - Problema original
-  - Root cause
-  - Solución implementada
-  - Tests agregados
-  - Screenshots (si aplica)
-
-### 5.2 Self-Review Checklist
-- [ ] Test que reproduce el bug agregado
-- [ ] Fix aplicado en la capa correcta (Repository/Service/Handler)
-- [ ] Todos los tests pasan
-- [ ] Linting pasa
-- [ ] No hay cambios no relacionados
-- [ ] Commit message sigue Conventional Commits
-- [ ] Documentación actualizada (si aplica)
-
-## 6. Deployment
-
-### 6.1 Merge
-```bash
-git checkout main
-git merge fix/descripcion-corta-del-bug
-git push origin main
-```
-
-### 6.2 Verificar en Staging/Production
-- Reproducir el bug original → debe estar corregido
-- Monitorear logs por 24 horas
-- Verificar métricas de error rate
-
-## Common Bug Patterns
-
-### Pattern 1: Infinite Loops en React Hooks
-**Síntoma:** Llamadas API infinitas  
-**Root Cause:** Dependencias incorrectas en useCallback/useEffect  
-**Fix:** Remover estado interno de dependencias
-
-### Pattern 2: Multi-Tenant Filtering
-**Síntoma:** Datos de otros tenants visibles  
-**Root Cause:** Usar JWT company_id en lugar de X-Tenant-ID header  
-**Fix:** Usar X-Tenant-ID header como source of truth
-
-### Pattern 3: Race Conditions en Stock Updates
-**Síntoma:** Stock negativo o inconsistente  
-**Root Cause:** No usar transacciones  
-**Fix:** Usar database transactions con row locking
-
-## Escalation
-
-Si el bug es:
-- **Crítico** (afecta producción): Notificar inmediatamente, fix en < 4 horas
-- **Alto** (afecta funcionalidad core): Fix en < 24 horas
-- **Medio** (afecta UX): Fix en < 1 semana
-- **Bajo** (cosmético): Fix en próximo sprint
-
----
-
-**Referencias:**
-- Common Pitfalls: `.cursor/rules/common_pitfalls.md`
-- Testing Standard: `.cursor/rules/testing_standard.md`
-- Git Workflow: `.cursor/rules/git_workflow.md`
+- Verifica el fix en la preview/deploy de Vercel (si aplica) navegando a la ruta afectada y consultando Vercel Analytics si se trata de performance o metadata.
+- Si el bug estaba en la metadata SEO, confirma con `https://validator.schema.org/` y la vista previa en `opengraph.xyz`.

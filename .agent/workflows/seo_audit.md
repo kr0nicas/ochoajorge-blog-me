@@ -8,27 +8,27 @@ Ejecutar antes de cambiar `draft: false` en cualquier post, y periódicamente en
 
 ## 1. Metadata Check
 
-Verificar en `app/blog/[slug]/page.tsx` que `generateMetadata()` retorna:
+Verificar en `app/[lang]/blog/[slug]/page.tsx` que `generateMetadata()` retorna los valores reales del post (nada estático) y usa `siteConfig` para el dominio:
 
 ```typescript
-// ✅ Correcto
-{
-  title: "Post Title | Jorge Ochoa",   // 50-60 chars max
-  description: "...",                   // 150-160 chars exact
+return {
+  title: post.title,
+  description: post.description,
   openGraph: {
-    title: "Post Title",
-    description: "...",
+    title: post.title,
+    description: post.description,
     type: "article",
-    publishedTime: "2025-01-15",
-    authors: ["Jorge Ochoa"],
-    tags: ["tag1", "tag2"],
+    publishedTime: post.date,
+    authors: [siteConfig.author.name],
+    tags: post.tags,
+    url: `${siteConfig.url}/${lang}/blog/${post.slug}`,
   },
   twitter: {
     card: "summary_large_image",
-    title: "Post Title",
-    description: "...",
-  }
-}
+    title: post.title,
+    description: post.description,
+  },
+};
 ```
 
 ## 2. Structured Data (JSON-LD)
@@ -44,9 +44,9 @@ const jsonLd = {
   datePublished: post.date,
   author: {
     '@type': 'Person',
-    name: 'Jorge Ochoa',
-    url: 'https://jorgeochoa.dev'
-  }
+    name: siteConfig.author.name,
+    url: siteConfig.url,
+  },
 }
 ```
 
@@ -80,6 +80,8 @@ grep -r "<img " app/ components/
 - **Core Web Vitals**: Vercel Analytics dashboard post-deploy
 
 ## 6. Pre-publicación Final
+
+La herramienta `npm run seo:audit` valida que `description` tenga entre 130 y 170 caracteres y lanza una advertencia si se sale de ese rango, pero la guía recomienda apuntar a 150-160 para el mejor resultado SEO.
 
 ```bash
 # Cambiar draft status
