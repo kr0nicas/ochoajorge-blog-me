@@ -52,6 +52,14 @@ export function getPostBySlug(slug: string, locale: string = "es"): PostWithCont
             name: data.series.name,
             part: data.series.part
         } : undefined,
+        resources: Array.isArray(data.resources)
+            ? data.resources
+                  .map((item) => ({
+                      label: String(item.label ?? ""),
+                      url: String(item.url ?? ""),
+                  }))
+                  .filter((item) => item.label && item.url)
+            : undefined,
         canonical: data.canonical,
         ogTitle: data.ogTitle,
         ogDescription: data.ogDescription,

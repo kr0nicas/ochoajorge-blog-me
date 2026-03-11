@@ -29,6 +29,26 @@ Posts live in language folders:
 
 Each post is served at `/{lang}/blog/{slug}`.
 
+## Referencias rápidas
+
+Cada `post` ahora puede incluir una sección `resources` en el frontmatter:
+
+```yaml
+resources:
+  - label: "Documentación oficial de Turbopack"
+    url: "https://nextjs.org/docs/messages/turbopack"
+```
+
+Ese bloque se refleja en la UI del artículo, donde se repiten las etiquetas, la serie y los recursos extra para que un lector o editor vea rápidamente qué enlaza el contenido.
+
+## API de resumen
+
+Para alimentar widgets o agentes, el endpoint `GET /api/posts/summary` devuelve los posts por idioma con `slug`, `title`, `description`, `tags`, `readingTime` y `featured`. Los agentes pueden consultarlo antes de generar prompts o dashboards.
+
+## Pruebas end-to-end
+
+El comando `npm run test:e2e` arranca `npm run dev` en `localhost:3000`, espera a la home, lee `/api/posts/summary` y valida las rutas `/es`, `/es/blog` y la primera entrada. Se puede añadir a pipelines ligeros antes del deploy.
+
 ## Create a New Post
 
 Use the scaffold script:

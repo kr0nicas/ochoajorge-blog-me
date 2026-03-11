@@ -10,7 +10,9 @@ import { SeriesBanner } from "@/components/blog/SeriesBanner";
 import { RelatedPosts } from "@/components/blog/RelatedPosts";
 import { ReaderMode } from "@/components/blog/ReaderMode";
 import { Comments } from "@/components/blog/Comments";
+import { ReferencePanel } from "@/components/blog/ReferencePanel";
 import { Github } from "lucide-react";
+import { slugify } from "@/lib/utils";
 
 interface PostPageProps {
     params: Promise<{ slug: string; lang: string }>;
@@ -74,6 +76,7 @@ export default async function PostPage({ params }: PostPageProps) {
     if (!post) notFound();
 
     const { content } = await compileMDXContent(post.content);
+    const seriesSlug = post.series ? slugify(post.series.name) : undefined;
 
     // JSON-LD structured data
     const jsonLd = {
@@ -134,7 +137,15 @@ export default async function PostPage({ params }: PostPageProps) {
                                 )}
 
                                 {content}
-                            </div>
+                           </div>
+
+                            <ReferencePanel
+                                lang={lang as "es" | "en"}
+                                tags={post.tags}
+                                seriesName={post.series?.name}
+                                seriesSlug={seriesSlug}
+                                resources={post.resources}
+                            />
 
                             {/* Related Posts */}
                             <RelatedPosts currentPost={post} lang={lang} />

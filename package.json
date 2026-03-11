@@ -10,6 +10,7 @@
     "type-check": "tsc --noEmit",
     "post:new": "node scripts/new-post.mjs",
     "seo:audit": "node scripts/seo-audit.mjs",
+    "test:e2e": "node scripts/e2e-check.mjs",
     "prepare": "husky"
   },
   "lint-staged": {

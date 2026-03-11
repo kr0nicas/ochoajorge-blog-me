@@ -44,6 +44,9 @@ featured: false
 series:
   name: "Arquitectura de Software Avanzada"  # solo si aplica
   part: 1
+resources:
+  - label: "Documentación oficial"
+    url: "https://nextjs.org/docs"
 ---
 ```
 

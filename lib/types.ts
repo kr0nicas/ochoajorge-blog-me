@@ -17,6 +17,10 @@ export interface Post {
     ogTitle?: string;
     ogDescription?: string;
     ogImage?: string;
+    resources?: Array<{
+        label: string;
+        url: string;
+    }>;
 }
 
 export interface PostWithContent extends Post {
