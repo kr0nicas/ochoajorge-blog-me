@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Layers } from "lucide-react";
 import type { Post } from "@/lib/types";
 import { getAllPosts, getPostsBySeries } from "@/lib/posts";
-import { formatDate, slugify } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import { Tag } from "@/components/shared/Tag";
 
 interface RelatedPostsProps {
@@ -28,11 +28,13 @@ function getRelatedPosts(currentPost: Post, lang: string): Post[] {
     }
 
     // Priority 2: shared tags — scored by overlap
+    // Guard against undefined tags on either currentPost or other posts
+    const currentTags = (currentPost.tags ?? []).map((ct) => ct.toLowerCase());
     const scored = allPosts
         .map((post) => {
-            const overlap = post.tags.filter((t) =>
-                currentPost.tags.map((ct) => ct.toLowerCase()).includes(t.toLowerCase())
-            ).length;
+            const overlap = (post.tags ?? [])
+                .filter((t) => currentTags.includes(t.toLowerCase()))
+                .length;
             return { post, overlap };
         })
         .filter(({ overlap }) => overlap > 0)
@@ -81,9 +83,9 @@ export function RelatedPosts({ currentPost, lang }: RelatedPostsProps) {
                         )}
 
                         {/* Tags */}
-                        {post.tags.slice(0, 2).length > 0 && (
+                        {(post.tags ?? []).slice(0, 2).length > 0 && (
                             <div className="mb-3 flex flex-wrap gap-1.5">
-                                {post.tags.slice(0, 2).map((tag) => (
+                                {(post.tags ?? []).slice(0, 2).map((tag) => (
                                     <Tag key={tag} name={tag} linkable={false} lang={lang} />
                                 ))}
                             </div>

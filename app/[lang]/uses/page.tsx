@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import {
-    Code2, Terminal, Cpu, Globe, Layers, Wrench,
-    MonitorSmartphone, Package, Cloud, Brain
+    Code2, Globe, Layers, Wrench,
+    MonitorSmartphone, Cloud, Brain
 } from "lucide-react";
 import { siteConfig } from "@/lib/utils";
 

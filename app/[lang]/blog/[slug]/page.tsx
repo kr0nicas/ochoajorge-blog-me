@@ -72,7 +72,7 @@ export default async function PostPage({ params }: PostPageProps) {
             "@type": "Person",
             name: siteConfig.author.name,
         },
-        keywords: post.tags.join(", "),
+        keywords: (post.tags ?? []).join(", "),
         url: `${siteConfig.url}/${lang}/blog/${post.slug}`,
     };
 

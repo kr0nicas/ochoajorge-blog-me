@@ -33,10 +33,6 @@ export function Header({ lang }: HeaderProps) {
         return () => window.removeEventListener("scroll", handleScroll);
     }, []);
 
-    useEffect(() => {
-        setMobileOpen(false);
-    }, [pathname]);
-
     return (
         <header
             className={cn(
@@ -125,6 +121,7 @@ export function Header({ lang }: HeaderProps) {
                         <div className="flex items-center gap-1 rounded-lg border border-[var(--border)] p-0.5 bg-[var(--bg-elevated)]/30">
                             <Link
                                 href={pathname.replace(`/${lang}`, "/es")}
+                                onClick={() => setMobileOpen(false)}
                                 className={cn(
                                     "px-1.5 py-1 text-[10px] font-bold uppercase rounded-md",
                                     lang === "es" ? "bg-[var(--brand)] text-white" : "text-[var(--text-muted)]"
@@ -134,6 +131,7 @@ export function Header({ lang }: HeaderProps) {
                             </Link>
                             <Link
                                 href={pathname.replace(`/${lang}`, "/en")}
+                                onClick={() => setMobileOpen(false)}
                                 className={cn(
                                     "px-1.5 py-1 text-[10px] font-bold uppercase rounded-md",
                                     lang === "en" ? "bg-[var(--brand)] text-white" : "text-[var(--text-muted)]"
@@ -187,6 +185,7 @@ export function Header({ lang }: HeaderProps) {
                                 >
                                     <Link
                                         href={href}
+                                        onClick={() => setMobileOpen(false)}
                                         className={cn(
                                             "block rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
                                             pathname === href || (href !== `/${lang}` && pathname.startsWith(href))

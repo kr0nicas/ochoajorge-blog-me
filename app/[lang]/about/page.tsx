@@ -1,8 +1,6 @@
 import Image from "next/image";
-import type { Metadata } from "next";
 import { siteConfig } from "@/lib/utils";
 import { ArrowRight, Mail, MapPin, Briefcase, Github, Linkedin, Twitter } from "lucide-react";
-import Link from "next/link";
 
 export function generateMetadata() {
     return {

@@ -2,7 +2,6 @@
 
 import Giscus from "@giscus/react";
 import { useTheme } from "next-themes";
-import { siteConfig } from "@/lib/utils";
 
 /**
  * Comments component using Giscus (GitHub Discussions-based).
