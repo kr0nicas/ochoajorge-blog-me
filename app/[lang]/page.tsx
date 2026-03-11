@@ -1,13 +1,19 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import type { Metadata } from "next";
-import { getFeaturedPosts } from "@/lib/posts";
+import {
+  getAllPosts,
+  getAllSeries,
+  getFeaturedPosts,
+  getPostsBySeries,
+} from "@/lib/posts";
 import { PostCard } from "@/components/blog/PostCard";
 import { Hero } from "@/components/layout/Hero";
 import { AnimatedSection } from "@/components/shared/AnimatedSection";
 import { NewsletterForm } from "@/components/shared/NewsletterForm";
 import { siteConfig } from "@/lib/utils";
 import { getDictionary, Locale } from "@/lib/dictionary";
+import { TopicHighlights } from "@/components/blog/TopicHighlights";
 
 export const metadata: Metadata = {
   title: siteConfig.title,
@@ -27,7 +33,27 @@ export default async function HomePage({
 }) {
   const { lang } = await params;
   const dict = getDictionary(lang as Locale);
-  const featuredPosts = getFeaturedPosts(4, lang);
+  const featuredPosts = getFeaturedPosts(8, lang);
+  const allPosts = getAllPosts(lang);
+  const tagCounts = allPosts.reduce<Record<string, number>>((acc, post) => {
+    post.tags.forEach((tag) => {
+      const normalized = tag.toLowerCase();
+      acc[normalized] = (acc[normalized] ?? 0) + 1;
+    });
+    return acc;
+  }, {});
+  const topTags = Object.entries(tagCounts)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 6);
+  const seriesStats = getAllSeries(lang)
+    .map((name) => ({
+      name,
+      count: getPostsBySeries(name, lang).length,
+    }))
+    .filter((item) => item.count > 0)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 4);
 
   return (
     <>
@@ -39,6 +65,11 @@ export default async function HomePage({
         lang={lang}
         dict={dict.hero}
       />
+
+      {/* ── Topic Highlights ────────────────────────────────────── */}
+      <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
+        <TopicHighlights lang={lang} tags={topTags} series={seriesStats} />
+      </section>
 
       {/* ── Featured Posts ─────────────────────────────────────── */}
       {featuredPosts.length > 0 && (
