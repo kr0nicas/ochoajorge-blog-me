@@ -51,7 +51,11 @@ export function getPostBySlug(slug: string, locale: string = "es"): PostWithCont
         series: data.series ? {
             name: data.series.name,
             part: data.series.part
-        } : undefined
+        } : undefined,
+        canonical: data.canonical,
+        ogTitle: data.ogTitle,
+        ogDescription: data.ogDescription,
+        ogImage: data.ogImage ?? data.coverImage,
     };
 }
 

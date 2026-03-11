@@ -13,6 +13,10 @@ export interface Post {
     };
     featured?: boolean;
     lang?: "es" | "en";
+    canonical?: string;
+    ogTitle?: string;
+    ogDescription?: string;
+    ogImage?: string;
 }
 
 export interface PostWithContent extends Post {
