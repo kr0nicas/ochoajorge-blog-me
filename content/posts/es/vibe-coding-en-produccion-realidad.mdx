@@ -1,0 +1,166 @@
+---
+title: "Vibe Coding en Producción: Lo Que Nadie Te Dice"
+description: "Las herramientas de IA para código se sienten mágicas hasta que a las 3am salta una alerta. Lo que los seniors no publican sobre vibe coding."
+date: "2026-03-10"
+tags: ["vibe-coding", "ia-aplicada", "producción", "arquitectura-software"]
+lang: "es"
+draft: false
+featured: false
+---
+
+Son las 3:07am. Tu teléfono vibra. Producción está caída.
+
+Abres el canal de incidencias y empiezas a buscar en el stack trace. Cuarenta minutos después lo encuentras — un off-by-one sutil en una función de paginación que falla cuando el dataset supera los 10,000 registros. Lo corriges. Despliegas. Escribes el postmortem.
+
+Luego revisas el git blame.
+
+¿El autor de esa función? Un modelo de IA. ¿El revisor que la aprobó? Tú — hace seis semanas, moviéndote rápido, vibeando.
+
+Bienvenido al costo real del vibe coding.
+
+---
+
+## Primero, Definamos de Qué Estamos Hablando
+
+"Vibe coding" — el término acuñado por Andrej Karpathy — describe la experiencia de construir software mediante conversación con IA: describes la intención, la IA produce código, iteras por sensación más que por comprensión total. Es genuinamente un modo diferente de trabajar. Menos como artesanía, más como dirección.
+
+En su mejor versión, es extraordinario. Un ingeniero senior con conocimiento profundo del dominio puede arquitectar un sistema complejo en horas en lugar de semanas, delegando la implementación a una IA que conoce la sintaxis, los patrones, el boilerplate. El ingeniero piensa a nivel de comportamiento y contratos; la IA maneja las líneas.
+
+En su peor versión, es deuda técnica con syntax highlighting.
+
+La brecha entre esos dos resultados está casi enteramente determinada por lo que sucede *después* de que la IA escribe el código — específicamente, qué pasa en el review, en el testing y en el deploy. De eso trata realmente este post.
+
+---
+
+## El Problema Que Nadie Publica en LinkedIn
+
+El ciclo de hype del coding con IA tiene un arco predecible: el developer descubre Copilot/Cursor/Claude, la productividad explota, publica un thread sobre "ingeniería 10x", y seis semanas después está debuggeando silenciosamente código que no entiende del todo.
+
+No estoy aquí para decirte que las herramientas de IA son malas. Las uso a diario. Tengo un setup personal donde agentes de IA escriben código, hacen commits en ramas y abren PRs — orquestados por otros agentes de IA. Esto no es un hot take de alguien que le teme a la tecnología. Es una observación de alguien que se ha quemado con ella.
+
+**El problema central es el ownership.**
+
+Cuando escribes código tú mismo, cargas un modelo mental implícito de él. Sabes los edge cases que postergaste. Recuerdas el supuesto que hiciste sobre el formato del input. Cuando algo rompe, tienes contexto.
+
+Cuando una IA escribe código y tú revisas el diff rápidamente y le das "aprobar", heredas el output sin el modelo mental. Tienes el artefacto pero no la comprensión. Esa brecha entre artefacto y comprensión es deuda técnica invisible — y se acumula.
+
+<Callout type="warning" title="La fórmula de la deuda invisible">
+  Velocidad de generación IA × Calidad de tu revisión = Tu carga real de deuda técnica.
+  La mayoría de equipos optimiza el lado izquierdo de esa ecuación e ignora el derecho.
+</Callout>
+
+---
+
+## Cómo Se Ve el "Vibe Deploying" en la Práctica
+
+Seré específico. Estos son patrones de fallo reales que he visto (con detalles modificados):
+
+**Patrón 1: La respuesta correctamente incorrecta.** Los modelos de IA son fluidos. Producen código que se ve autoritativo. Una función que maneja redondeo de moneda, escrita por IA, pasó el code review porque la lógica se *leía* correctamente. No lo era. Silenciosamente perdía fracciones de centavos en millones de transacciones.
+
+**Patrón 2: El colapso de contexto.** La IA tiene una ventana de contexto. Tu codebase no cabe en ella. Así que el modelo toma decisiones localmente razonables que son globalmente incorrectas — una capa de caché que ignora una regla de negocio sutil definida en un módulo que nunca vio.
+
+**Patrón 3: La dependencia alucinada.** Un dev junior le pidió a una IA agregar una feature. La IA usó un método de librería que no existe en la versión pinneada de la dependencia. Los tests pasaron en local (versión incorrecta en caché). Staging pasó. Producción rompió. El CI no lo detectó porque nadie testeó el artefacto real.
+
+**Patrón 4: El blindspot de seguridad.** Los modelos de IA han sido entrenados para ser útiles. Generarán queries SQL, operaciones de archivo y llamadas a API que funcionan — y que también son sutilmente vulnerables a injection, path traversal o SSRF si no miras con cuidado. El código no parece incorrecto. Ese es el problema.
+
+---
+
+## La Arquitectura del Coding con IA Responsable
+
+Esto es lo que realmente funciona. No teoría — práctica.
+
+<Steps>
+  <Step title="Sé dueño del spec, delega la implementación">
+    Escribe la firma de la función, el comportamiento esperado y los edge cases tú mismo. En un comentario, en un test, en un docstring — no importa. Haz que la IA implemente contra tu spec, no que genere el spec por ti. Esto te obliga a pensar antes de vibear.
+  </Step>
+  <Step title="Revisa los diffs como si no hubieras escrito nada">
+    El code review estándar tiene un sesgo: los revisores confían en el autor. Cuando el "autor" es una IA que nunca se pone defensiva y nunca cuestiona, ese sesgo queda sin control. Lee los diffs generados por IA con máximo escepticismo. Pregúntate: ¿qué input rompería esto? ¿Qué supuesto está implícito aquí?
+  </Step>
+  <Step title="Property-based testing sobre happy-path tests">
+    La IA es excelente generando tests de happy-path unitarios. Eso es casi inútil para robustez en producción. Agrega tests basados en propiedades (pytest-hypothesis, fast-check) que lancen inputs aleatorios contra la lógica. Aquí es donde el código generado por IA se desmorona — y donde lo atraparás antes de que lo haga producción.
+  </Step>
+  <Step title="Observabilidad antes de hacer el deploy, no después">
+    Toda función generada por IA que toque datos debe tener logging estructurado de inputs y outputs desde el día uno. No porque desconfíes de la IA — sino porque no tienes el modelo mental que normalmente habrías construido durante la implementación. Los logs son el modelo mental que no construiste.
+  </Step>
+  <Step title="Los canary deploys no son negociables">
+    Siempre fue una best practice. Con código generado por IA llegando más rápido de lo que los humanos pueden revisar profundamente, es un mecanismo de supervivencia. 5% del tráfico a la nueva versión. Monitorea el error rate. Monitorea la latencia p99. Luego gradúa.
+  </Step>
+</Steps>
+
+---
+
+## La Brecha de Tooling Que Nadie Menciona
+
+Las herramientas actuales de coding con IA están optimizadas para la generación. No están optimizadas para la *verificación*. Esa asimetría importa más de lo que la gente reconoce.
+
+Cuando le pides a una IA que escriba una función, obtienes una función. Cuando le preguntas al mismo modelo "¿es correcta esta función?", obtienes una respuesta confiada — que puede o no coincidir con la realidad. El auto-review de IA no es confiable. Es el mismo modelo con los mismos sesgos, ahora en un rol diferente.
+
+Esto significa que la carga de verificación cae completamente sobre el humano y el test suite automatizado. El humano suele estar cansado, moviéndose rápido, y con colapso de contexto de revisar muchos diffs generados por IA en secuencia. El test suite solo atrapa lo que alguien pensó en testear.
+
+La implicación práctica: **tu infraestructura de testing necesita ser al menos tan sofisticada como tu infraestructura de generación.** La mayoría de equipos tiene lo inverso. Han invertido mucho en herramientas de IA para coding y cero en mejorar su cobertura de property-based tests, su mutation testing score o su contract testing.
+
+<Callout type="tip" title="Un ratio útil para monitorear">
+  ¿Cuántas funciones generadas por IA haces ship por semana vs. cuántos property-based tests escribes por semana? Si el primer número crece más rápido que el segundo, estás tomando riesgo sin colateral.
+</Callout>
+
+---
+
+## La Verdad Contraintuitiva de la Arquitectura Asistida por IA
+
+Aquí lo que he aprendido corriendo agentes de IA en mi propia infraestructura: **el trabajo del arquitecto se vuelve más difícil, no más fácil.**
+
+Cuando escribo código yo mismo, mi habilidad es el techo. Mi código no puede ser mejor que mi comprensión.
+
+Cuando la IA escribe código, ese techo sube — temporalmente. La IA puede implementar una arquitectura hexagonal limpia, escribir las interfaces de adaptadores, cablear la inyección de dependencias correctamente. Conoce los patrones.
+
+Pero alguien sigue teniendo que tomar las decisiones arquitectónicas: ¿Cuáles son los invariantes? ¿Cuáles son los límites? ¿Qué significa "done" para este sistema? ¿Qué trade-offs son aceptables? Esas decisiones requieren contexto que la IA no tiene — tus restricciones de negocio específicas, las capacidades de tu equipo, tu realidad operacional a las 3am.
+
+<ComparisonTable
+  headers={["Vibe Coding", "Desarrollo Asistido por IA con Ingeniería"]}
+  highlight={1}
+  rows={[
+    ["IA escribe, humano aprueba", "Humano especifica, IA implementa, humano es dueño"],
+    ["Optimizado para velocidad", "Balance calidad-velocidad"],
+    ["Testeado en happy-path", "Property + integration testing"],
+    ["Brecha de modelo mental en review", "El spec fuerza el modelo mental de antemano"],
+    ["Observabilidad agregada después (quizás)", "Observabilidad diseñada desde el día 0"],
+    ["Sesgo de revisor único", "Checklist de review específico para IA"],
+    ["Rápido hasta que deja de serlo", "Consistentemente rápido, consistentemente seguro"],
+  ]}
+/>
+
+Los ingenieros que van a ganar con herramientas de IA no son los que las usan más agresivamente. Son los que construyen procesos rigurosos alrededor de ellas — checklists de code review que contemplan los modos de fallo de la IA, estrategias de testing que asumen que la implementación está sutilmente incorrecta, pipelines de deployment que detectan problemas antes de que lleguen a todos los usuarios.
+
+---
+
+## Una Nota Sobre la Confianza, Ganada con el Tiempo
+
+No quiero dejarte con la impresión de que el código generado por IA es categóricamente peligroso. No lo es. He visto IA escribir mejor código que muchos ingenieros senior — más consistente, menos "clever", mejor documentado.
+
+El problema no es la capacidad. Es la calibración.
+
+Necesitas construir un modelo de cuándo tus herramientas de IA son confiables y cuándo no. En mi experiencia:
+
+- **Alta confiabilidad:** Boilerplate, operaciones CRUD, transformaciones bien definidas, algoritmos estándar sobre estructuras de datos estándar
+- **Confiabilidad media:** Lógica de negocio de complejidad moderada, integraciones con APIs bien documentadas, refactors de funciones aisladas
+- **Baja confiabilidad:** Código sensible a seguridad, edge cases de sistemas distribuidos, código que requiere comprensión profunda de tu modelo de datos específico, cualquier cosa que toque cálculos financieros
+
+Calibra la profundidad de tu revisión en consecuencia. El objetivo no es revisar más el código de IA — es revisarlo de forma *más inteligente*. Eso significa invertir tiempo de antemano en entender qué partes de tu sistema son de alto riesgo y asegurarte de que nunca hagan ship sin comprensión humana profunda, independientemente de quién o qué lo escribió.
+
+---
+
+## La Línea Que Vale la Pena Trazar
+
+Termino con el maxim que ha sido verdad en mi setup:
+
+> **Vibe coding es una feature. Vibe deploying es un bug.**
+
+La creatividad, la velocidad, la energía de "veamos qué produce" del desarrollo asistido por IA — eso es genuinamente valioso en la fase correcta. Exploración, prototipado, generar opciones, moverse rápido en superficie de bajo riesgo.
+
+Pero desplegar a producción no es un vibe. Es un acto de ingeniería con consecuencias. Requiere ownership, rigor, y la voluntad de ser responsable por código que no escribiste pero elegiste hacer ship.
+
+Los ingenieros que descubran esa distinción — que construyan el músculo para cambiar de modo entre colaboración creativa con IA e ingeniería rigurosa de producción — esos son los que realmente serán 10x. No los que vibearon hasta un incidente.
+
+---
+
+*Si estás construyendo infraestructura de agentes de IA y quieres profundizar en la arquitectura para hacerla production-grade, escribí sobre [cómo construir un workspace automatizable](/es/blog/building-open-automatable-workspace-2026) y los [controles de seguridad que lo hacen seguro de operar](/es/blog/guia-openclaw-2026-controles-seguridad).*
