@@ -1,0 +1,160 @@
+---
+title: "El Orden Que Me Salvó: De Código Caótico a Arquitectura Gobernable"
+description: "La IA sin restricciones genera entropía. La solución no es mejor prompting — es gobernanza arquitectónica. Así convertí el caos generativo en un sistema que cualquier desarrollador puede leer."
+date: "2026-03-12"
+tags: ["ia", "agentes", "arquitectura", "gobernanza", "software-engineering", "mantenibilidad", "devex"]
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Construyendo con IA: Lo que nadie te dice"
+  part: 2
+coverImage: "/og/construyendo-con-ia-parte-2-el-orden-que-me-salvo.jpg"
+resources:
+  - label: "Architecture Decision Records — Thoughtworks Tech Radar"
+    url: "https://www.thoughtworks.com/radar/techniques/lightweight-architecture-decision-records"
+  - label: "Governance as Code — Martin Fowler"
+    url: "https://martinfowler.com/articles/governance-as-code.html"
+---
+
+En el [post anterior](/blog/construyendo-con-ia-parte-1-caja-negra-black-box-problem) hablé del black box problem: cómo la IA genera código que funciona pero que nadie entiende a nivel de sistema. Código que pasa tests y rompe arquitecturas.
+
+Este post es sobre lo que hice después de identificar el problema. No es una solución elegante. Es una solución pragmática — nacida del dolor de rastrear bugs fantasma durante semanas.
+
+## El Momento de Quiebre
+
+Había un módulo que llevaba tres sesiones de generación. Cada sesión producía código funcional. Cada sesión ignoraba las decisiones de las anteriores. El resultado era un Frankenstein: tres patrones de error handling distintos, dos formas de acceder a la capa de persistencia, y una convención de naming que parecía generada por tres personas que nunca se hablaron.
+
+Porque eso era exactamente lo que había pasado — tres sesiones de un agente sin memoria compartida.
+
+El bug que detonó todo fue silencioso. Un servicio llamaba a la capa de datos directamente, saltándose el port que habíamos definido como boundary. Funcionaba. Los tests pasaban. Pero rompía la dirección de dependencias de toda la arquitectura hexagonal. Lo descubrí tres semanas después, cuando un cambio en la capa de infraestructura cascadeó en un lugar donde no debería haber tenido impacto.
+
+Ese fue el momento donde entendí que el problema no era el agente. El problema era que el agente no tenía acceso a las reglas del juego.
+
+## La Gobernanza: Darle Memoria a la Arquitectura
+
+La solución fue crear un archivo de gobernanza del proyecto: un documento vivo donde están documentadas no solo las reglas técnicas, sino el razonamiento detrás de cada decisión. Las reglas de bloqueo. Los patrones obligatorios. Las excepciones permitidas y por qué.
+
+No hablo de un `CONTRIBUTING.md` genérico con convenciones de formato. Hablo de un **contrato arquitectónico ejecutable** — un documento que codifica las decisiones que un equipo humano tarda meses en internalizar.
+
+### Qué Contiene el Archivo de Gobernanza
+
+En la práctica, el documento tiene secciones como estas:
+
+**Boundaries inviolables:**
+- Qué módulos pueden importar de qué otros módulos
+- Qué capas pueden conocer a qué otras capas
+- Dónde vive la lógica de dominio vs. la infraestructura
+
+**Patrones obligatorios:**
+- Error handling: un solo patrón, documentado con ejemplos
+- Naming conventions: no solo para variables — para servicios, ports, adapters
+- Dependency injection: cómo y por qué se inyecta de esa forma
+
+**Decisiones con contexto:**
+- "Usamos Repository pattern en lugar de Active Record **porque** necesitamos testability sin base de datos real"
+- "Los DTOs viven en la capa de aplicación **porque** el dominio no debe conocer el formato de transporte"
+- "Excepciones permitidas: el módulo de auth puede acceder directamente a la base de datos **porque** el overhead del repository no justifica el beneficio en este bounded context"
+
+El razonamiento es tan importante como la regla. Un agente que sabe *qué* hacer pero no *por qué* va a romper la regla en cuanto el contexto cambie ligeramente. Un agente que entiende el *por qué* puede extrapolar a situaciones nuevas.
+
+### El Efecto en el Agente
+
+Cuando el agente lee ese documento antes de trabajar, no es el mismo agente. Es un agente con contexto de arquitectura. La diferencia en la calidad del output es notable.
+
+Sin gobernanza, el agente genera código que resuelve el prompt. Con gobernanza, genera código que resuelve el prompt **dentro de las restricciones del sistema**. La diferencia parece sutil en una sesión. A lo largo de 50 sesiones, es la diferencia entre un codebase coherente y un desastre entrópico.
+
+<Callout type="info" title="No es prompting — es contexto estructural">
+  El archivo de gobernanza no es un "system prompt" sofisticado. Es la representación explícita de las decisiones arquitectónicas que un desarrollador senior tarda meses en absorber por ósmosis. Estás comprimiendo onboarding en contexto.
+</Callout>
+
+## Qué Cambió Después de Establecer el Orden
+
+No desaparecieron los errores. Pero cambiaron de naturaleza.
+
+**Antes:** errores estructurales silenciosos que se descubrían semanas después cuando algo explotaba sin razón aparente. Bugs que no eran bugs — eran inconsistencias arquitectónicas acumuladas que eventualmente colisionaban. El tipo de problema donde el stack trace no te dice nada útil porque la causa raíz está a tres capas de distancia del síntoma.
+
+**Después:** errores visibles, detectables, que el propio agente señala antes de comprometer código. Errores de implementación, no de diseño. Errores que puedes arreglar en el PR review en lugar de descubrirlos en producción un martes a las 3am.
+
+La velocidad de desarrollo no bajó. En realidad subió, porque dejé de perder tiempo rastreando de dónde venía cada problema. El debugging de errores estructurales es exponencialmente más costoso que el debugging de errores funcionales — y la gobernanza eliminó la primera categoría casi por completo.
+
+Y lo más valioso: el proyecto empezó a tener una coherencia que cualquier desarrollador puede leer. Las capas están donde deben estar. Las responsabilidades están donde deben estar. El agente puede cambiar de sesión y el siguiente retoma sin arqueología.
+
+Eso es lo que busco. No código que funcione hoy. **Código que pueda cambiar mañana.**
+
+## Implementación Práctica: Cómo Estructuro la Gobernanza
+
+Para los que quieran aplicar esto, estas son las piezas concretas:
+
+### 1. Un Archivo, Un Lugar, Siempre Actualizado
+
+El archivo de gobernanza vive en la raíz del repo. No en un wiki. No en Confluence. En el repo, versionado con git, sujeto a code review como cualquier otro cambio.
+
+Cada vez que el equipo toma una decisión arquitectónica, se actualiza el archivo. Si la decisión no está en el archivo, no existe para el agente. Es así de simple.
+
+### 2. Formato Que el Agente Puede Consumir
+
+Markdown estructurado con headers claros y ejemplos de código. No prosa narrativa — el agente necesita reglas parseables, no ensayos.
+
+```markdown
+## Error Handling
+
+### Regla
+Todos los errores de dominio extienden `DomainError`.
+Los errores de infraestructura se transforman en `DomainError` en el adapter.
+
+### Por qué
+Porque la capa de aplicación no debe conocer detalles de infraestructura.
+Un error de PostgreSQL no debe propagarse hasta el controller.
+
+### Ejemplo correcto
+// adapter
+try:
+    result = await db.query(...)
+except DatabaseError as e:
+    raise PaymentNotFoundError(payment_id) from e
+
+### Ejemplo incorrecto
+// controller llamando directamente a db — viola boundary
+result = await db.query(...)
+```
+
+### 3. Inclusión Automática en el Contexto del Agente
+
+El archivo se pasa como contexto en cada sesión de generación. No como sugerencia — como **prerrequisito**. Si tu tooling de agentes permite context files, el archivo de gobernanza es el primero de la lista.
+
+En mi setup, el agente lo lee antes de tocar cualquier archivo del proyecto. Es el equivalente a que un nuevo developer lea el onboarding doc antes de hacer su primer commit.
+
+### 4. Evolución Controlada
+
+El documento no es estático. Las decisiones cambian. Pero cada cambio requiere justificación explícita — igual que un cambio en la API pública. Si cambias una regla de gobernanza, documentas *por qué* la regla anterior ya no aplica y *qué* la reemplaza.
+
+Esto evita el drift más peligroso de todos: el drift de las reglas mismas.
+
+## El Patrón Que Emerge
+
+Lo que descubrí es que la gobernanza para agentes de IA sigue el mismo principio que la gobernanza para equipos humanos distribuidos: **las decisiones implícitas son decisiones perdidas**.
+
+En un equipo humano, un senior puede transmitir contexto en un code review, en una conversación de pasillo, en un pair programming session. El conocimiento tácito fluye por ósmosis social.
+
+Un agente de IA no tiene pasillos. No tiene osmosis. Solo tiene lo que le das explícitamente. Y si no le das el *por qué* detrás de las decisiones, va a inventar el suyo. Su *por qué* será razonable — pero no será el tuyo. Y esa divergencia se acumula.
+
+La gobernanza explícita es el mecanismo que cierra ese gap. No es overhead — es el costo de usar herramientas de ejecución rápida sin perder coherencia sistémica.
+
+## Checklist: ¿Tu Proyecto Tiene Gobernanza Para IA?
+
+- [ ] ¿Existe un archivo de gobernanza versionado en el repo?
+- [ ] ¿Documenta no solo las reglas, sino el razonamiento detrás de cada decisión?
+- [ ] ¿Incluye boundaries explícitos entre módulos/capas?
+- [ ] ¿Tiene ejemplos concretos de código correcto e incorrecto?
+- [ ] ¿El agente lo consume automáticamente antes de cada sesión?
+- [ ] ¿Los cambios al archivo pasan por code review?
+- [ ] ¿Documenta las excepciones permitidas y por qué existen?
+
+Si marcaste menos de 4, tu agente está improvisando. Y un agente que improvisa a la velocidad de la IA genera entropía a la velocidad de la IA.
+
+---
+
+*Próxima entrega: **Cuando el agente rompe todo** — un caso real, qué pasó y qué aprendí.*
+
+*¿Tienes reglas de arquitectura documentadas para tus agentes, o dejas que improvisen? Me interesa saber cómo lo están manejando otros equipos.*
