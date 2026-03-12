@@ -35,7 +35,9 @@ export async function generateMetadata({
     const metadataDescription = override?.description ?? post.description;
     const metadataCanonical =
         override?.canonical ?? `${siteConfig.url}/${lang}/blog/${post.slug}`;
-    const ogImage = override?.ogImage ?? post.ogImage ?? siteConfig.ogImage;
+
+    // Prefer explicit override, then post coverImage (frontmatter), then legacy post.ogImage, then site default.
+    const ogImage = override?.ogImage ?? post.coverImage ?? post.ogImage ?? siteConfig.ogImage;
     const ogTitle = override?.ogTitle ?? metadataTitle;
     const ogDescription = override?.ogDescription ?? metadataDescription;
 
@@ -53,12 +55,16 @@ export async function generateMetadata({
             authors: [siteConfig.author.name],
             tags: post.tags,
             url: metadataCanonical,
-            images: [
-                {
-                    url: ogImage,
-                    alt: metadataTitle,
-                },
-            ],
+            images: ogImage
+                ? [
+                      {
+                          url: ogImage,
+                          width: 1200,
+                          height: 630,
+                          alt: metadataTitle,
+                      },
+                  ]
+                : [],
         },
         twitter: {
             card: "summary_large_image",
