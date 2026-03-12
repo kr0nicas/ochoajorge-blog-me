@@ -1,0 +1,132 @@
+---
+title: "La Caja Negra: Cuando la IA Acelera Tu Deuda Estructural"
+description: "El black box problem no es que la IA genere código malo: es que genera código que solo entiende el contexto de la sesión. Así acelera tu deuda estructural."
+date: "2026-03-11"
+tags: ["ia", "agentes", "arquitectura", "deuda-tecnica", "mantenibilidad", "software-engineering"]
+lang: "es"
+draft: false
+featured: false
+series:
+  name: "Construyendo con IA: Lo que nadie te dice"
+  part: 1
+resources:
+  - label: "The Black Box Problem — Towards Data Science"
+    url: "https://towardsdatascience.com/the-black-box-problem-why-ai-generated-code-stops-being-maintainable/"
+---
+
+{/* TODO: Imagen OG — Jorge generará en Midjourney. Ruta esperada: subir a Vercel Blob via /es/admin/upload y referenciar aquí */}
+
+Generas un módulo entero en 45 segundos. Los tests pasan. El PR se mergea. Dos sprints después, nadie en el equipo puede explicar por qué ese servicio estructura los datos así.
+
+No es un bug. Es algo peor: es código que funciona pero que **nadie entiende**.
+
+## El Black Box Problem No Es Lo Que Crees
+
+Cuando se habla de [black box problem](https://towardsdatascience.com/the-black-box-problem-why-ai-generated-code-stops-being-maintainable/) en IA generativa, la conversación suele girar en torno a modelos opacos y decisiones inexplicables. Pero hay una variante más insidiosa que afecta directamente a los equipos de ingeniería: **el código generado por IA es una caja negra para tu arquitectura**.
+
+El modelo no tiene contexto de tu dominio completo. No sabe por qué elegiste event sourcing en lugar de CRUD. No conoce la convención de nombrado que tu equipo adoptó hace seis meses. Genera código que resuelve el prompt — y nada más.
+
+Ese "nada más" es donde vive la deuda estructural.
+
+## Cómo La IA Acelera Tu Deuda Técnica
+
+La deuda técnica tradicional se acumula gradualmente. Un atajo aquí, una abstracción rota allá. Alguien toma un shortcut bajo presión de deadline, lo documenta con un `// TODO: refactor`, y el equipo lo absorbe en el siguiente ciclo de mantenimiento.
+
+La IA cambia esa dinámica de formas que aún no estamos midiendo bien.
+
+### Velocidad Sin Memoria
+
+Un agente de IA puede generar 500 líneas en una sesión. Código funcional, con tests, bien formateado. Pero cada sesión empieza desde cero. No recuerda que en la sesión anterior decidiste migrar de REST a gRPC. No sabe que el `UserService` ya tiene un método que hace exactamente lo que está recreando. No tiene acceso al historial de ADRs donde el equipo decidió usar el patrón Repository en lugar de Active Record.
+
+El resultado: **duplicación estructural a escala**. No duplicación de líneas — esa la detecta cualquier linter. Duplicación de *conceptos*, de *responsabilidades*, de *decisiones arquitectónicas* que ya se tomaron pero que el modelo desconoce.
+
+He visto esto en mi propio stack. Un agente generó un módulo de validación completo para un endpoint cuando ya existía un middleware de validación centralizado. Ambos funcionaban. Ambos pasaban tests. Pero ahora había dos fuentes de verdad para las reglas de validación del dominio — y la próxima persona que tocara ese código no sabría cuál era la canónica.
+
+### Coherencia Local, Incoherencia Global
+
+El código generado suele ser **localmente correcto** — pasa linters, sigue patrones razonables, los tests pasan. Si lo miras en aislamiento, es código de calidad. El problema aparece cuando lo ves a nivel de sistema:
+
+- Tres formas distintas de manejar errores en el mismo bounded context
+- DTOs que duplican la lógica de entidades de dominio
+- Módulos que deberían compartir abstracciones pero implementan las suyas
+- Convenciones de naming que varían entre sesiones de generación
+- Patrones de inyección de dependencias inconsistentes
+
+Cada pieza individual es razonable. El conjunto es un Frankenstein arquitectónico.
+
+### El Efecto Compounding
+
+Lo verdaderamente peligroso es que este tipo de deuda se acumula de forma exponencial. Cada inconsistencia hace más probable la siguiente: el próximo prompt del agente tomará como referencia código que ya es inconsistente, amplificando el drift. A esto le llamo el **efecto compounding de la deuda generativa** — y es significativamente más rápido que la acumulación orgánica de deuda técnica humana.
+
+<Callout type="warning" title="La trampa de la velocidad">
+  Cuanto más rápido generas código, más rápido acumulas inconsistencias que ningún linter detecta. La deuda estructural no falla tests — falla equipos.
+</Callout>
+
+## Lo Que Estoy Haciendo Al Respecto
+
+Después de meses usando agentes de IA para desarrollo, estas son las restricciones que me están funcionando:
+
+### 1. Contexto Arquitectónico Como Input Obligatorio
+
+Antes de que un agente toque código, le paso un documento de contexto explícito: las decisiones arquitectónicas vigentes (ADRs), las convenciones del proyecto, los boundaries del dominio, y los patrones que el equipo ya adoptó.
+
+Esto no es un prompt "creativo" — es un **contrato**. Un archivo `ARCHITECTURE.md` o equivalente que vive en el repo y se incluye como contexto en cada sesión de generación. Si el agente no tiene acceso a las decisiones del equipo, va a tomar las suyas. Y sus decisiones no consideran tu contexto.
+
+En la práctica, esto incluye: qué patrones de error handling usar, cómo se nombran los servicios, qué abstracciones ya existen y cuándo reutilizarlas, y qué boundaries de dominio son inviolables.
+
+### 2. Revisión Estructural, No Solo Funcional
+
+El code review de código generado por IA necesita un lente diferente al review tradicional. No basta con "¿funciona?" y "¿pasan los tests?". Las preguntas que importan son:
+
+- ¿Respeta los boundaries existentes entre módulos?
+- ¿Introduce abstracciones que ya existen en el codebase?
+- ¿El naming es consistente con el resto del proyecto?
+- ¿Las dependencias van en la dirección correcta según la arquitectura?
+- ¿Está duplicando responsabilidades de otro módulo?
+
+Este tipo de review toma más tiempo que el review funcional. Pero es el único que detecta el drift arquitectónico antes de que se acumule. Lo automatizo parcialmente con reglas de linting arquitectónico, pero la revisión humana del diseño sigue siendo insustituible.
+
+### 3. Sesiones Cortas y Atómicas
+
+En lugar de sesiones largas donde el agente genera un feature completo de principio a fin, descompongo el trabajo en **tareas atómicas con contexto explícito**. Cada tarea tiene un scope claro, referencias a los archivos relevantes, y restricciones específicas.
+
+¿La diferencia? En una sesión larga, el modelo acumula contexto implícito que no puedes auditar. En sesiones atómicas, cada pieza generada es verificable de forma independiente. Más control, menos drift arquitectónico, y diffs más legibles en el PR.
+
+### 4. Restricciones Explícitas en el Prompt
+
+La diferencia entre un prompt que genera deuda y uno que genera código mantenible está en las restricciones.
+
+No: *"genera un servicio de pagos"*.
+
+Sí: *"genera un servicio de pagos que implemente el port `PaymentProcessor` del módulo `billing`, use el error handling de `shared/errors`, y siga el patrón de los servicios existentes en `src/billing/infrastructure/`"*.
+
+El prompt restrictivo es más largo. También es el que no te despierta a las 3am dos meses después. Las restricciones son el mecanismo por el cual transfieres las decisiones de tu equipo al agente — sin ellas, el agente toma sus propias decisiones, y esas decisiones no tienen contexto.
+
+## Checklist: ¿Tu Equipo Está Generando Cajas Negras?
+
+Escanea esto antes de tu próximo sprint:
+
+- [ ] ¿Tienen un documento de decisiones arquitectónicas (ADR) que alimenta a los agentes de IA?
+- [ ] ¿El code review distingue entre "funciona" y "es consistente con la arquitectura"?
+- [ ] ¿Las sesiones de generación incluyen contexto explícito del dominio?
+- [ ] ¿Miden deuda técnica de forma diferenciada entre código humano y generado?
+- [ ] ¿Hay restricciones explícitas de boundaries en los prompts?
+- [ ] ¿Revisan duplicación estructural (no solo duplicación de código)?
+
+Si marcaste menos de 3, la IA está acelerando tu deuda y probablemente aún no lo ves en las métricas.
+
+## La Caja Negra Es Un Problema de Arquitectura
+
+El **black box problem** no se resuelve con mejores modelos. No se resuelve con context windows más grandes ni con RAG más sofisticado. Se resuelve con **mejores restricciones** — con una arquitectura que actúe como sistema inmunológico contra la entropía que la velocidad de generación introduce.
+
+La IA es una herramienta de ejecución extraordinaria. Pero sin una arquitectura que la contenga, es un acelerador de entropía. Cada línea generada sin contexto arquitectónico es una línea que alguien tendrá que entender, mantener o reescribir — sin el contexto original que la produjo.
+
+El código que nadie entiende eventualmente se convierte en código que nadie puede mantener. Y el código que nadie puede mantener se convierte en el incidente de las 3am que mencioné al principio.
+
+La solución no es dejar de usar IA. Es tratarla como lo que es: un ejecutor extraordinariamente rápido que necesita contexto explícito, boundaries claros y revisión arquitectónica constante. La caja negra no es el modelo — es el gap entre lo que el modelo sabe y lo que tu arquitectura necesita.
+
+---
+
+*Este es el primer post de la serie "Construyendo con IA: Lo que nadie te dice". En las próximas entregas: cómo diseño las restricciones de mis agentes, el costo real de la orquestación multi-agente, y por qué la memoria persistente es el problema más subestimado de la IA aplicada.*
+
+*¿Ya te topaste con la caja negra en tu equipo? Cuéntamelo en los comentarios.*
