@@ -1,0 +1,126 @@
+---
+title: "Cuando el Agente Rompe Todo: Un Caso Real y Lo Que Aprendí"
+description: "Un sábado por la mañana, el flujo principal del sistema falló. El agente había generado código que pasaba todos los tests — y aun así rompió todo. Esta es la historia, los modelos que uso, y por qué TDD no es negociable."
+date: "2026-03-13"
+tags: ["ia", "agentes", "testing", "tdd", "debugging", "modelos-ia", "software-engineering", "devex"]
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Construyendo con IA: Lo que nadie te dice"
+  part: 3
+coverImage: "/og/construyendo-con-ia-parte-3-cuando-el-agente-rompe-todo.jpg"
+resources:
+  - label: "Test-Driven Development — Martin Fowler"
+    url: "https://martinfowler.com/bliki/TestDrivenDevelopment.html"
+  - label: "The Practical Test Pyramid — Ham Vocke"
+    url: "https://martinfowler.com/articles/practical-test-pyramid.html"
+---
+
+En la [Parte 1](/blog/construyendo-con-ia-parte-1-caja-negra-black-box-problem) hablé del black box problem — cómo la IA genera código que solo entiende su propia sesión. En la [Parte 2](/blog/construyendo-con-ia-parte-2-el-orden-que-me-salvo) mostré cómo la gobernanza arquitectónica le da contexto al agente para que deje de improvisar.
+
+Este post es sobre lo que pasa cuando, a pesar de todo eso, las cosas explotan.
+
+## Un Sábado por la Mañana
+
+Era sábado. Café recién hecho. Abro el dashboard y el flujo principal del sistema está rojo. No parcialmente rojo — completamente rojo. El orquestador de la saga había dejado de funcionar.
+
+La noche anterior, el agente había implementado un cambio que parecía trivial: ajustar el manejo de un evento en el flujo de procesamiento. El código era limpio. Seguía las convenciones del archivo de gobernanza. Pasaba los tests unitarios.
+
+Pero había un problema que ningún test unitario estaba diseñado para detectar: el cambio alteraba el orden de ejecución de los pasos de la saga. Y el orden importaba — porque el paso 3 dependía del side effect del paso 2. Un acoplamiento temporal que no estaba documentado en ningún contrato explícito.
+
+El agente no tenía forma de saberlo. No había un test de integración que validara la secuencia completa. No había un documento de gobernanza que dijera "estos pasos deben ejecutarse en este orden porque X". Era conocimiento implícito — el tipo de conocimiento que un senior del equipo tiene en la cabeza y que nunca llega a un archivo.
+
+Y cuando el conocimiento es implícito, para el agente no existe.
+
+## La Autopsia
+
+El debugging tomó horas. No porque el bug fuera complejo — sino porque el stack trace apuntaba al paso 3 fallando, no al paso 2 que había cambiado de orden. La causa raíz estaba a una capa de distancia del síntoma.
+
+Lo que encontré:
+
+1. **El cambio era técnicamente correcto** — en aislamiento, cada paso funcionaba perfectamente
+2. **El acoplamiento temporal no estaba testeado** — ningún test validaba el orden de la saga completa
+3. **La gobernanza no cubría dependencias temporales** — documentaba boundaries estáticos, no secuencias dinámicas
+
+Cada uno de estos puntos era un gap en mi sistema. No del agente. Mío.
+
+## Los Modelos Que Uso y Para Qué
+
+Este incidente me llevó a repensar no solo cómo testeo, sino cómo asigno trabajo al agente. Porque no todos los modelos son iguales — y no todas las tareas necesitan el mismo tipo de razonamiento.
+
+En mi setup actual uso varios modelos, y cada uno tiene su lugar:
+
+**Claude Sonnet / Opus** — para razonamiento arquitectónico, decisiones complejas de diseño, y cuando necesito que el agente entienda contexto amplio sin perderse. Es mi primera opción cuando el task requiere pensar antes de escribir.
+
+**GLM** — sólido para tareas bien definidas, sorprendentemente bueno en código estructurado. Cuando la spec es clara y el scope es acotado, rinde excelente.
+
+**Codex** — cuando el task es puramente de generación de código con spec clara. No le pido que diseñe — le pido que ejecute.
+
+**Gemini** — fuerte en integración con ecosistema Google, útil en ciertos contextos de infraestructura y documentación.
+
+**Qwen / Kimi** — buenos complementos para tareas específicas. Vale la pena tenerlos en el toolkit para diversificar capacidades.
+
+La realidad es que no existe un modelo que gane en todo. Lo que existe es conocer las fortalezas de cada uno y asignar el task correcto al modelo correcto. Igual que en un equipo de desarrollo: no le pides al especialista de frontend que haga el capacity planning de tu base de datos.
+
+El incidente del sábado fue un task de orquestación asignado sin el contexto suficiente. El modelo no era el problema. El problema era que yo no le había dado las herramientas para detectar el riesgo.
+
+## Protip: TDD No Es Negociable
+
+Si construyes con agentes y no haces Test-Driven Development, estás generando código sin red de seguridad.
+
+El agente no sabe que su cambio rompió algo. **El test sí.**
+
+Primero el test que falla. Después el código mínimo para que pase. Después el refactor. Ese orden no es burocracia. Es el mecanismo que te permite confiar en lo que el agente genera.
+
+Sin TDD, cada sesión es un acto de fe. Con TDD, cada sesión tiene una verdad objetiva contra la cual validarse.
+
+Cuando un sábado por la mañana el flujo principal falla, los tests te dicen exactamente dónde. Sin tests, pasas cuatro horas adivinando — que es exactamente lo que me pasó. Cuatro horas de un sábado que no vuelven, rastreando un síntoma que estaba a una capa de distancia de la causa.
+
+Después de ese incidente, lo primero que hice fue escribir tests de integración para la saga completa. Tests que validan no solo que cada paso funciona, sino que la secuencia se ejecuta en el orden correcto y que los side effects se propagan como deben.
+
+<Callout type="warning" title="TDD con agentes: el orden importa más que nunca">
+  Cuando un humano escribe código, tiene intuición sobre qué puede romper. Un agente no tiene intuición — tiene contexto. Si tu contexto no incluye tests que definan el comportamiento esperado, el agente va a optimizar para lo que sí puede ver: que el código compile y que los tests existentes pasen. Lo que no está testeado, no existe.
+</Callout>
+
+### Lo Que Cambió Después del TDD
+
+El ciclo de trabajo con el agente se transformó:
+
+1. **Yo escribo el test** que define el comportamiento esperado
+2. **El agente escribe el código** que hace pasar el test
+3. **Yo reviso** que la solución respete la arquitectura
+4. **El agente refactoriza** dentro de las restricciones
+
+Ese loop es simple, pero poderoso. El test es el contrato. El agente ejecuta contra el contrato. Yo valido que la ejecución no viole los principios del sistema.
+
+La cantidad de bugs que llegan a staging se redujo dramáticamente. No porque el agente sea mejor — sino porque el sistema de validación es más riguroso. El agente sigue cometiendo errores. Pero ahora los errores se detectan en el ciclo de desarrollo, no un sábado por la mañana.
+
+## Lo Que Estos Momentos Me Enseñaron
+
+Que construir con IA no es delegar. Es colaborar con una entidad increíblemente capaz pero sin memoria, sin visión sistémica y sin consecuencias propias de sus errores.
+
+Tú tienes todo eso. Por eso eres el arquitecto.
+
+El agente ejecuta rápido. Tú decides bien. Esa división de roles, cuando la respetas, es cuando realmente aceleras sin perder el control.
+
+El sábado por la mañana me enseñó que la velocidad del agente es un multiplicador — y los multiplicadores amplifican tanto lo bueno como lo malo. Si tu sistema de gobernanza y testing es sólido, la velocidad te da una ventaja brutal. Si tu sistema tiene gaps, la velocidad te lleva al desastre más rápido.
+
+No culpes al agente cuando las cosas explotan. Audita tu sistema. Audita tus tests. Audita tu gobernanza. El agente hizo exactamente lo que le pediste — el problema fue lo que no le pediste.
+
+## Checklist Post-Incidente Para Desarrollo con IA
+
+- [ ] ¿El comportamiento que falló estaba cubierto por un test?
+- [ ] ¿Las dependencias temporales están documentadas en la gobernanza?
+- [ ] ¿El agente tenía contexto suficiente para detectar el riesgo?
+- [ ] ¿Hay tests de integración que validen flujos completos, no solo unidades?
+- [ ] ¿El modelo asignado era el adecuado para la complejidad del task?
+- [ ] ¿El conocimiento implícito que causó el fallo ahora es explícito?
+
+Si algún incidente te deja un gap en esta lista, conviértelo en un test y una regla de gobernanza. Cada fallo es una oportunidad para hacer el sistema más resiliente — no solo el código, sino el proceso completo de desarrollo con IA.
+
+---
+
+*→ Próxima entrega — la final: **Lo que cambia cuando construyes con IA en serio.** Velocidad, control, y lo que esto significa para los desarrolladores de Latinoamérica.*
+
+*¿Cuál ha sido tu momento "sábado por la mañana" con IA? El que te costó horas que no tenías. Cuéntame abajo.*
