@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getPostBySlug, getPostSlugs } from "@/lib/posts";
 import { compileMDXContent } from "@/lib/mdx";
-import { siteConfig } from "@/lib/utils";
+import { siteConfig, type MetadataOverride } from "@/lib/utils";
 import { PostHeader } from "@/components/blog/PostHeader";
 import { ReadingProgress } from "@/components/blog/ReadingProgress";
 import { TableOfContents } from "@/components/blog/TableOfContents";
@@ -10,7 +10,9 @@ import { SeriesBanner } from "@/components/blog/SeriesBanner";
 import { RelatedPosts } from "@/components/blog/RelatedPosts";
 import { ReaderMode } from "@/components/blog/ReaderMode";
 import { Comments } from "@/components/blog/Comments";
+import { ReferencePanel } from "@/components/blog/ReferencePanel";
 import { Github } from "lucide-react";
+import { slugify } from "@/lib/utils";
 
 interface PostPageProps {
     params: Promise<{ slug: string; lang: string }>;
@@ -28,33 +30,47 @@ export async function generateMetadata({
     const post = getPostBySlug(slug, lang);
     if (!post) return {};
 
-    const ogImage = post.coverImage ?? siteConfig.ogImage;
+    const override: MetadataOverride | undefined = siteConfig.metadataOverrides?.[post.slug];
+    const metadataTitle = override?.title ?? post.title;
+    const metadataDescription = override?.description ?? post.description;
+    const metadataCanonical =
+        override?.canonical ?? `${siteConfig.url}/${lang}/blog/${post.slug}`;
+
+    // Prefer explicit override, then post coverImage (frontmatter), then legacy post.ogImage, then site default.
+    const ogImage = override?.ogImage ?? post.coverImage ?? post.ogImage ?? siteConfig.ogImage;
+    const ogTitle = override?.ogTitle ?? metadataTitle;
+    const ogDescription = override?.ogDescription ?? metadataDescription;
 
     return {
-        title: post.title,
-        description: post.description,
+        title: metadataTitle,
+        description: metadataDescription,
+        alternates: {
+            canonical: metadataCanonical,
+        },
         openGraph: {
-            title: post.title,
-            description: post.description,
+            title: ogTitle,
+            description: ogDescription,
             type: "article",
             publishedTime: post.date,
             authors: [siteConfig.author.name],
             tags: post.tags,
-            url: `${siteConfig.url}/${lang}/blog/${post.slug}`,
-            images: [
-                {
-                    url: ogImage,
-                    width: 1200,
-                    height: 630,
-                    alt: post.title,
-                },
-            ],
+            url: metadataCanonical,
+            images: ogImage
+                ? [
+                      {
+                          url: ogImage,
+                          width: 1200,
+                          height: 630,
+                          alt: metadataTitle,
+                      },
+                  ]
+                : [],
         },
         twitter: {
             card: "summary_large_image",
-            title: post.title,
-            description: post.description,
-            images: [ogImage],
+            title: ogTitle,
+            description: ogDescription,
+            images: ogImage ? [ogImage] : [],
         },
     };
 }
@@ -66,6 +82,7 @@ export default async function PostPage({ params }: PostPageProps) {
     if (!post) notFound();
 
     const { content } = await compileMDXContent(post.content);
+    const seriesSlug = post.series ? slugify(post.series.name) : undefined;
 
     // JSON-LD structured data
     const jsonLd = {
@@ -126,7 +143,15 @@ export default async function PostPage({ params }: PostPageProps) {
                                 )}
 
                                 {content}
-                            </div>
+                           </div>
+
+                            <ReferencePanel
+                                lang={lang as "es" | "en"}
+                                tags={post.tags}
+                                seriesName={post.series?.name}
+                                seriesSlug={seriesSlug}
+                                resources={post.resources}
+                            />
 
                             {/* Related Posts */}
                             <RelatedPosts currentPost={post} lang={lang} />

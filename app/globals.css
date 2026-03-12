@@ -17,6 +17,10 @@
 
 /* ─── Primitive Design Tokens (always available) ─────────────── */
 :root {
+  --font-inter: "Inter", system-ui, sans-serif;
+  --font-outfit: "Outfit", system-ui, sans-serif;
+  --font-jetbrains-mono: "JetBrains Mono", ui-monospace, monospace;
+
   /* Typeface */
   --font-sans: var(--font-inter), system-ui, sans-serif;
   --font-display: var(--font-outfit), system-ui, sans-serif;

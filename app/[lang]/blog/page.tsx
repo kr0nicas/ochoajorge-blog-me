@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getAllPosts, getAllTags } from "@/lib/posts";
-import { PostCard } from "@/components/blog/PostCard";
 import { Tag } from "@/components/shared/Tag";
+import { PostGrid } from "@/components/blog/PostGrid";
 
 export const metadata: Metadata = {
     title: "Blog",
@@ -60,13 +60,7 @@ export default async function BlogPage({
                     </p>
                 </div>
             ) : (
-                <ul className="grid gap-5 sm:grid-cols-2" role="list">
-                    {posts.map((post) => (
-                        <li key={post.slug}>
-                            <PostCard post={post} lang={lang} />
-                        </li>
-                    ))}
-                </ul>
+                <PostGrid posts={posts} lang={lang} initialCount={8} loadStep={6} />
             )}
         </div>
     );

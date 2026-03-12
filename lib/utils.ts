@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import siteMetadata from "@/config/site-metadata.json";
 
 /**
  * Utility to merge Tailwind CSS classes safely.
@@ -24,15 +25,32 @@ export function slugify(text: string): string {
 /**
  * Site configuration — single source of truth for metadata.
  */
+export type MetadataOverride = {
+    title?: string;
+    description?: string;
+    ogTitle?: string;
+    ogDescription?: string;
+    ogImage?: string;
+    canonical?: string;
+};
+
+const metadataOverrides: Record<string, MetadataOverride> = {
+    // Example:
+    // "series-overview": {
+    //   title: "Series overview | Jorge Ochoa",
+    //   description: "Custom description for SEO preview.",
+    // },
+};
+
 export const siteConfig = {
     name: "Jorge Ochoa",
     title: "Jorge Ochoa — Technology Architect, Cloud & AI",
     description:
         "Technology Architect and Developer from El Salvador. Writing about Kubernetes, Google Cloud, Go, Clean Architecture, and AI Agents for high-performance systems.",
-    url: "https://ochoajorge.me",
-    ogImage: "https://ochoajorge.me/og.png",
+    url: siteMetadata.url,
+    ogImage: siteMetadata.ogImage,
     author: {
-        name: "Jorge Ochoa",
+        name: siteMetadata.authorName,
         twitter: "@kr0nicas",
         github: "https://github.com/kr0nicas",
         linkedin: "https://www.linkedin.com/in/jorge-ochoa-rebollo/",
@@ -54,6 +72,7 @@ export const siteConfig = {
         "devops",
         "automation",
     ],
+    metadataOverrides,
 };
 
 export type SiteConfig = typeof siteConfig;
