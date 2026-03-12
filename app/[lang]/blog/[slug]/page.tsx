@@ -28,6 +28,8 @@ export async function generateMetadata({
     const post = getPostBySlug(slug, lang);
     if (!post) return {};
 
+    const ogImage = post.coverImage ?? siteConfig.ogImage;
+
     return {
         title: post.title,
         description: post.description,
@@ -39,11 +41,20 @@ export async function generateMetadata({
             authors: [siteConfig.author.name],
             tags: post.tags,
             url: `${siteConfig.url}/${lang}/blog/${post.slug}`,
+            images: [
+                {
+                    url: ogImage,
+                    width: 1200,
+                    height: 630,
+                    alt: post.title,
+                },
+            ],
         },
         twitter: {
             card: "summary_large_image",
             title: post.title,
             description: post.description,
+            images: [ogImage],
         },
     };
 }
