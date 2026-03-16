@@ -38,6 +38,10 @@ export async function generateMetadata({
 
     // Prefer explicit override, then post coverImage (frontmatter), then legacy post.ogImage, then site default.
     const ogImage = override?.ogImage ?? post.coverImage ?? post.ogImage ?? siteConfig.ogImage;
+    const normalizedOgImage =
+        ogImage && !ogImage.startsWith("http")
+            ? new URL(ogImage.startsWith("/") ? ogImage : `/${ogImage}`, siteConfig.url).toString()
+            : ogImage;
     const ogTitle = override?.ogTitle ?? metadataTitle;
     const ogDescription = override?.ogDescription ?? metadataDescription;
 
@@ -55,10 +59,10 @@ export async function generateMetadata({
             authors: [siteConfig.author.name],
             tags: post.tags,
             url: metadataCanonical,
-            images: ogImage
+            images: normalizedOgImage
                 ? [
                       {
-                          url: ogImage,
+                          url: normalizedOgImage,
                           width: 1200,
                           height: 630,
                           alt: metadataTitle,
@@ -70,7 +74,7 @@ export async function generateMetadata({
             card: "summary_large_image",
             title: ogTitle,
             description: ogDescription,
-            images: ogImage ? [ogImage] : [],
+            images: normalizedOgImage ? [normalizedOgImage] : [],
         },
     };
 }
