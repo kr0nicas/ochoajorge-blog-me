@@ -1,0 +1,59 @@
+---
+title: "Cuando el agente rompe todo"
+description: "Un postmortem de la vez que un agente hizo saltar la arquitectura y qué hice para frenarlo antes de que el caos se propagara."
+date: "2026-03-13"
+tags: ["ia", "agentes", "arquitectura", "postmortem", "observabilidad", "software-engineering"]
+lang: "es"
+draft: false
+featured: false
+series:
+  name: "Construyendo con IA: Lo que nadie te dice"
+  part: 3
+coverImage: "/og/og-entrega-vibe-codign-nadie-te-dice.jpg"
+resources:
+  - label: "Site Reliability Engineering Postmortem Guide — Google"
+    url: "https://landing.google.com/sre/sre-book/chapters/postmortem/"
+  - label: "Incident Response in Distributed Systems — O’Reilly"
+    url: "https://www.oreilly.com/library/view/incident-response/9781492043528/"
+---
+
+En la entrega anterior hablamos del contrato arquitectónico que evita que un agente invente sus propias reglas. Este post no es teoría: es el **postmortem** del día que un agente rompió casi todo mientras yo dormía.
+
+## El día que todo explotó
+
+Era un sprint de estabilización. Teníamos un feature en producción que disparaba eventos a múltiples colas, y un agente estaba encargado de “sincronizar” la capa de dominio que enlaza la lógica de pagos con la orquestación de los agentes IA. Todo funcionaba en staging, así que el despliegue siguió.
+
+A los pocos minutos, comenzaron a llegar alertas: un endpoint transversal lanzaba errores 500, el consumo de memoria de un worker se disparó y tres servicios dependientes perdieron conectividad con la base de datos.
+
+No había un stack trace típico. El servicio principal seguía respondiendo con éxito; el problema estaba en la cadena de eventos que la nueva integración había introducido. El agente no generó un bug de código localizable: generó **una ruta circular de dependencias que saturó la cola de eventos y bloqueó la base de datos**.
+
+## Diagnóstico: cómo el agente rompió las reglas sin intención
+
+El agente había generado un adapter que: 1) leía un estado intermedio de la base de datos, 2) actuaba sobre otro bounded context y 3) escribía el resultado en la misma tabla del origen para mantener “consistencia”. Todo parecía razonable, excepto que rompió la dirección de dependencias de la arquitectura hexagonal y creó un ciclo de actualizaciones (notebook → adapter → notebook). Ese ciclo era invisible en pruebas unitarias, pero en producción saturó la conexión a PostgreSQL y retuvo locks eternos.
+
+El error no apareció en el log del agente. Apareció en la observabilidad porque el sistema de colas empezó a acumular mensajes infinitamente. La monitorización detectó un spike de latencia, pero no el origen. Para encontrar la raíz tuve que reconstruir la cadena completa del agente y compararla con las reglas del contrato: a cada paso se había saltado una restricción de boundaries.
+
+## Movimiento correctivo inmediato
+
+1. **Rollback parcial:** Inhibí la integración hasta que el equipo tuviera un punto de restauración válido.
+2. **Revisión de gobernanza:** Añadí un bloque específico en el archivo de gobernanza sobre “acciones de compensación”, porque el agente estaba ejecutando triggers sin declarar la relación de dependencia.
+3. **Consola de incidentes:** Documenté el postmortem, señalé las correlaciones entre la cola saturada y el ciclo de dependencias erróneo, e identifiqué la parte del prompt que lo permitió.
+4. **Prompts con guardas embebidas:** Volví al agente con un prompt actualizado que incluía validaciones explícitas del flujo (no solo “haz un adapter”, sino “haz un adapter que **solo** lea de `payment_events` y **no** escriba directamente en `notebooks` sin pasar por el port `Updates`).
+
+## Qué aprendí
+
+- Una buena gobernanza no sirve si no se *exige* durante la generación. El agente leyó el documento, pero el prompt no lo obedecía porque no había restricciones codificadas.
+- La observabilidad debe estar alineada con las reglas: rapto de colas = probabilidad alta de ciclo de dependencias. Ahora cada alerta severa dispara una revisión automática del flujo del agente antes de permitir un merge.
+- El postmortem nos dio claridad: no se trata de confiar menos en los agentes; se trata de hacerlos transparentes. Por eso implementamos un script que genera un diff de decisiones (¿qué módulos tocó? ¿a qué ports lean?). Si detecta cambios fuera de la gobernanza, manda un mensaje al canal de incidentes.
+
+## Checklist para que el próximo agente no rompa nada
+
+- [ ] ¿Hay un paso en tu flujo de generación que valide las restricciones de boundaries antes de ejecutar? 
+- [ ] ¿Pasó ese prompt por code review arquitectónico, no sólo funcional? 
+- [ ] ¿Tus observabilidad/alertas están correlacionadas con los workflows del agente? 
+- [ ] ¿El postmortem está listado en el repo y vinculando prompt → incidentes? 
+- [ ] ¿El agente reusa módulos solo cuando el contrato lo permite?
+
+Si sigues avanzando sin responder estas preguntas, la próxima vez el error no será silencioso: habrá una regla rota, un ciclo de dependencia y un incidente que no sabrás cómo detener.
+
+*¿Te interesa que comparta la plantilla del postmortem y el script de auditoría?*"
