@@ -1,0 +1,44 @@
+---
+title: "The Black Box Debt: When Generative AI Explodes Your Architecture"
+description: "Models can deliver working code, but without architectural awareness they leave behind invisible structural debt."
+date: "2026-03-11"
+tags: ["ai", "agents", "architecture", "technical-debt", "maintainability"]
+lang: "en"
+draft: false
+featured: false
+series:
+  name: "Building with AI: What No One Tells You"
+  part: 1
+coverImage: "/og/og-entrega-vibe-codign-nadie-te-dice.jpg"
+resources:
+  - label: "The Black Box Problem — Towards Data Science"
+    url: "https://towardsdatascience.com/the-black-box-problem-why-ai-generated-code-stops-being-maintainable/"
+---
+
+Generating a fully functioning module in under a minute feels magical—until the next sprint, when the rest of the team has no idea why that module behaves the way it does.
+
+This isn’t a typical bug. It’s structural debt. You end up with working code, but no shared mental model of how the system is meant to behave, because the AI model never saw the full context of decisions you've already made.
+
+## The Shadow Architecture
+
+When the prompt is all about "write a payments service," the agent reimagines everything from scratch. It doesn’t know about your ADRs, your dependency directions, or why you routed through a repository instead of letting a controller talk to the database. The generated code ships and passes tests, but you now have another architectural fragment that no engineer understands.
+
+That’s what I call the structural black box: logically complete chunks that leak architectural intent.
+
+## Speed Versus Memory
+
+AI bursts out hundreds of lines, but each session starts from a blank slate. One prompt produces a service, the next produces another implementation of the same responsibility with different naming conventions, error handling, and dependency wiring. The result is duplication of concepts, not just code.
+
+Within minutes, you’ve got parallel paths for validation, conflicting DI patterns, and DTOs that shuffle domain logic around. Next time an engineer touches the system, they need to decide which variant is the single source of truth. That decision is invisible until the inconsistencies collide.
+
+## The Compounded Risk
+
+Every session compounds the drift. The agent references previously generated snippets it finds in the repo, so if those snippets already violate your architecture, it just amplifies the problem. Like interest on debt, the cost explodes faster than you can measure with your standard metrics.
+
+To combat it:
+
+- Feed every session a living architecture contract.
+- Turn the contract into part of the review: ask “does this honor the core boundaries?” instead of just “does it work?”
+- Limit session scope and document constraints explicitly.
+
+The result is not slower delivery—it’s code you can confidently change tomorrow.

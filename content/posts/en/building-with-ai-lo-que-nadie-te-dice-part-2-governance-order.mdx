@@ -1,0 +1,46 @@
+---
+title: "Governance Over Chaos: How I Made AI Respect the Architecture"
+description: "After letting an AI agent run free, I realized the missing piece was governance, not better prompting."
+date: "2026-03-12"
+tags: ["ai", "agents", "architecture", "governance", "maintainability"]
+lang: "en"
+draft: false
+featured: false
+series:
+  name: "Building with AI: What No One Tells You"
+  part: 2
+coverImage: "/og/og-entrega-vibe-codign-nadie-te-dice.jpg"
+resources:
+  - label: "Architecture Decision Records — Thoughtworks Tech Radar"
+    url: "https://www.thoughtworks.com/radar/techniques/lightweight-architecture-decision-records"
+  - label: "Governance as Code — Martin Fowler"
+    url: "https://martinfowler.com/articles/governance-as-code.html"
+---
+
+The post before this one diagnosed the structural black box. This entry explains the counterattack: governance that gives the AI a memory of the rules.
+
+## The Moment I Lost Control
+
+An agent was iterating on a module. Every session produced functional code, but each ignored the previous assumptions. After three runs, the service had its own error handling style, multiple persistence paths, and a different naming scheme than the rest of the system. Production behaved fine until a change in infrastructure suddenly cascaded into areas that should have been isolated.
+
+The problem wasn’t the agent itself—it was that the agent didn’t know the rules you already agreed upon.
+
+## Building a Governance Document
+
+I created a living document inside the repo that captured:
+
+- **Boundaries** that strict FAQ which modules or layers can touch which dependencies.
+- **Mandatory patterns** for error handling, naming, dependency injection, and ports/adapters.
+- **Contextual reasoning** explaining _why_ each rule exists so the AI can extrapolate instead of inventing new logic.
+
+It’s not just a CONTRIBUTING.md; it’s the architecture contract the agent must read before touching the code. The contract lives in Git, versioned, and reviewed just like code.
+
+## The Impact
+
+With the contract: 
+
+- Agents know what to reuse and what to avoid.
+- Reviews focus on architectural consistency instead of only functionality.
+- Errors become predictable, not silent structural debts.
+
+The governance file gets updated only with explicit reasoning whenever rules change. That prevents the greatest drift of all—the drift of the rules themselves.

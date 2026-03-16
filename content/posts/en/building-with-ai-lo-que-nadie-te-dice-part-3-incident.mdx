@@ -1,0 +1,55 @@
+---
+title: "When the Agent Breaks Everything: A Postmortem"
+description: "Real incident where an AI agent introduced a circular dependency and how we regained control."
+date: "2026-03-13"
+tags: ["ai", "agents", "architecture", "postmortem", "observability"]
+lang: "en"
+draft: false
+featured: false
+series:
+  name: "Building with AI: What No One Tells You"
+  part: 3
+coverImage: "/og/og-entrega-vibe-codign-nadie-te-dice.jpg"
+resources:
+  - label: "Site Reliability Engineering Postmortem Guide — Google"
+    url: "https://landing.google.com/sre/sre-book/chapters/postmortem/"
+  - label: "Incident Response in Distributed Systems — O’Reilly"
+    url: "https://www.oreilly.com/library/view/incident-response/9781492043528/"
+---
+
+This is the incident report from the day an agent quietly created a circular dependency that nearly took down the production queue.
+
+## The Incident
+
+The agent was tasked with syncing domain logic between payment orchestration and background agents. It worked fine on staging, so the deployment happened. Minutes later, alerts fired: a transversal endpoint started failing with 500 errors, memory usage on a worker spiked, and three listening services lost database connectivity.
+
+There was no traditional stack trace. The agent had introduced a cycle: it read an interim state from the database, wrote back into the same table it had read from, and triggered another bounded context to react. Production queues filled with messages that never completed, holding PostgreSQL locks indefinitely.
+
+## Diagnosis
+
+I mapped the agent’s execution path and compared it against the governance document. Step by step it had skipped a boundary: it should have used the `Updates` port, but instead it wrote directly to `notebooks` while also issuing compensation triggers. That created the circular dependency.
+
+The observability signals were subtle—spikes in queue lengths and latency. Only once we correlated those signals with the agent’s actions did the root cause surface.
+
+## Immediate Remediation
+
+1. Rollback the sync until the chain of updates was safe.
+2. Added a governance clause about compensation actions and forced agents to declare their dependency graph before acting.
+3. Logged the postmortem, linked it to the precise prompt fragment that opened the hole, and created a script to diff future agent decisions.
+4. Updated the prompt so the agent could only read `payment_events` and had to honor the `Updates` port when writing back.
+
+## Lessons
+
+- Governance must be enforced, not just documented. The agent read the doc but the prompt didn’t make it obey the constraints.
+- Observability should correlate queue anomalies with agent workflows. Now each production severity alert triggers an automated review of the agent’s decision log.
+- Transparency is the antidote to silent debt. We now produce a diff of architectural decisions per generation; if anything falls outside the contract, the system notifies the incident channel before merging.
+
+**Checklist:**
+
+- [ ] Does every prompt validate the boundary constraints before execution?
+- [ ] Has a reviewer checked the prompt for architectural implications, not just functionality?
+- [ ] Does observability trace agent actions end-to-end?
+- [ ] Is the postmortem linked to the prompt that caused the incident?
+- [ ] Does the agent reuse modules only when the governance contract permits it?
+
+If the next incident looks different, it will still be caused by a broken rule—not a bug.
