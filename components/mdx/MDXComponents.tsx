@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
    </Callout>
    ══════════════════════════════════════════════════════════════ */
 
-type CalloutType = "note" | "tip" | "warning" | "danger" | "success";
+type CalloutType = "note" | "tip" | "warning" | "danger" | "success" | "info";
 
 const calloutConfig: Record<CalloutType, { icon: string; label: string; bg: string; border: string; text: string }> = {
     note: {
@@ -23,6 +23,13 @@ const calloutConfig: Record<CalloutType, { icon: string; label: string; bg: stri
         bg: "rgba(var(--brand-rgb), 0.07)",
         border: "rgba(var(--brand-rgb), 0.25)",
         text: "var(--brand-light)",
+    },
+    info: {
+        icon: "ℹ️",
+        label: "Información",
+        bg: "rgba(59, 130, 246, 0.07)",
+        border: "rgba(59, 130, 246, 0.25)",
+        text: "#3b82f6",
     },
     tip: {
         icon: "✨",
