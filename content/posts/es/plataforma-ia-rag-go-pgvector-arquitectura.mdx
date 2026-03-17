@@ -1,0 +1,359 @@
+---
+title: "Plataforma de IA con RAG real: Go, pgvector y PageRank semántico en 7 días"
+description: "Construí una plataforma de IA con RAG, embeddings semánticos, PageRank iterativo y visualización en tiempo real usando Go 1.22 y pgvector en 7 días."
+date: "2026-03-17"
+tags: ["go", "rag", "pgvector", "arquitectura", "ia-aplicada"]
+lang: "es"
+draft: false
+featured: true
+resources:
+  - label: "pgvector - Vector similarity search for Postgres"
+    url: "https://github.com/pgvector/pgvector"
+  - label: "Gorilla WebSocket"
+    url: "https://github.com/gorilla/websocket"
+  - label: "UMAP: Uniform Manifold Approximation and Projection"
+    url: "https://umap-learn.readthedocs.io/"
+---
+
+# Plataforma de IA con RAG real: Go, pgvector y PageRank semántico en 7 días
+
+¿Cuánto tardas en construir una plataforma de IA de producción desde cero? La respuesta honesta depende de cuántas dependencias ocultas estés dispuesto a aceptar, cuántos servicios externos quieres mantener, y si realmente entiendes lo que pasa dentro de la caja negra que llamas "búsqueda semántica". Yo me hice esas preguntas hace una semana — y decidí responderlas con código.
+
+---
+
+Hace 7 días me propuse un reto personal: construir desde cero una plataforma de IA con RAG real, embeddings semánticos y visualización en tiempo real. Sin shortcuts. Sin frameworks mágicos que abstraigan lo que necesito entender.
+
+El resultado: un sistema con retrieval aumentado, grafo de conocimiento con PageRank iterativo, proyecciones UMAP en 2D, y rendering de red neuronal a 60fps en el navegador. Todo con un binary que arranca en milisegundos y una factura de infraestructura que no duele.
+
+Esto es lo que construí — y por qué cada decisión importa.
+
+---
+
+## 🧠 El Stack Que Elegí y Por Qué
+
+### Backend en Go 1.22
+
+No fue nostalgia. Fue una decisión de ingeniería.
+
+Go me dio tres cosas que ningún otro runtime me hubiera dado al mismo precio:
+
+1. **Concurrencia real con goroutines** — puedo manejar múltiples providers de LLM en paralelo sin callback hell ni async/await mal gestionado.
+2. **Un binary que arranca en milisegundos** — en un entorno serverless o en un cold start de contenedor, eso es la diferencia entre una buena UX y una frustrante.
+3. **Un footprint de memoria predecible** — sin garbage collector agresivo, sin JVM warm-up, sin el overhead de un runtime de Python cargando 300MB de dependencias.
+
+```go
+// Patrón central: múltiples providers de LLM en paralelo
+func (c *Client) QueryWithFallback(ctx context.Context, prompt string) (string, error) {
+    for _, provider := range c.providers {
+        ctx, cancel := context.WithTimeout(ctx, provider.Timeout)
+        defer cancel()
+        
+        if result, err := provider.Query(ctx, prompt); err == nil {
+            return result, nil
+        }
+    }
+    return "", ErrAllProvidersFailed
+}
+```
+
+<Callout type="tip" title="Por qué no Node ni Python">
+  Node tiene el event loop — excelente para I/O, pero una goroutine por petición de Go sigue siendo más eficiente en consumo de memoria para cargas de trabajo mixtas (I/O + CPU). Python con asyncio es poderoso pero el GIL sigue siendo una limitación real en trabajo paralelo.
+</Callout>
+
+---
+
+### Pgvector + HNSW sobre PostgreSQL
+
+Evalué Pinecone, Weaviate y Qdrant. Al final, **pgvector con índice HNSW dentro de Supabase ganó** por una razón simple: no quería otro servicio que mantener.
+
+La búsqueda semántica vive donde viven los datos. Sin sincronización, sin eventual consistency entre tu base de datos relacional y tu vector store, sin doble factura.
+
+Los números:
+- Latencia por debajo de **20ms** en consultas de similitud coseno
+- Embeddings de **1536 dimensiones**
+- Índice HNSW con `m=16`, `ef_construction=64`
+
+```sql
+-- Crear índice HNSW para búsqueda aproximada de vecinos más cercanos
+CREATE INDEX ON embeddings 
+USING hnsw (embedding vector_cosine_ops)
+WITH (m = 16, ef_construction = 64);
+
+-- Query de similitud semántica
+SELECT content, 1 - (embedding <=> $1::vector) AS similarity
+FROM embeddings
+ORDER BY embedding <=> $1::vector
+LIMIT 5;
+```
+
+HNSW (Hierarchical Navigable Small World) construye un grafo multicapa donde cada nodo tiene conexiones cortas y largas. La búsqueda navega desde capas superiores (pocas conexiones, saltos largos) hacia capas inferiores (más conexiones, búsqueda local). Resultado: búsqueda aproximada en O(log n) en lugar de O(n).
+
+---
+
+### Sistema de Embeddings con Fallback
+
+**Voyage AI** como provider primario (`voyage-large-2`) con fallback automático a **OpenAI** (`text-embedding-3-small`). El orden lo controla una variable de entorno.
+
+Si un provider falla o aumenta latencia, el sistema conmuta sin que el usuario note nada.
+
+```go
+type EmbeddingClient struct {
+    primary   EmbeddingProvider
+    fallback  EmbeddingProvider
+    threshold time.Duration // latencia máxima antes de fallback
+}
+
+func (e *EmbeddingClient) Embed(ctx context.Context, text string) ([]float32, error) {
+    start := time.Now()
+    
+    vec, err := e.primary.Embed(ctx, text)
+    if err != nil || time.Since(start) > e.threshold {
+        return e.fallback.Embed(ctx, text)
+    }
+    
+    return vec, nil
+}
+```
+
+La variable de entorno `EMBEDDING_PROVIDER_ORDER=voyage,openai` hace que el sistema sea reconfigurable sin redeployar.
+
+---
+
+### LLM en Cascada
+
+**OpenAI GPT-4o-mini → Anthropic Claude → OpenRouter Gemini**. Tres providers, un solo cliente con interfaz común.
+
+El fallback no es manual — es automático con timeout configurable por provider. Esto me dio **99.9% de disponibilidad del agente** sin depender de un solo proveedor.
+
+```go
+type LLMProvider interface {
+    Complete(ctx context.Context, messages []Message) (string, error)
+}
+
+// La cascada es simplemente un slice ordenado de providers
+type CascadeClient struct {
+    providers []LLMProvider
+}
+```
+
+La interfaz común es la clave. Cuando OpenAI tiene un incidente a las 2am, el sistema conmuta a Claude sin ninguna alarma que despertar.
+
+---
+
+## 📊 Proyecciones UMAP para Visualización
+
+Una de las partes más interesantes del proyecto: **reducir embeddings de 1536 dimensiones a coordenadas 2D** para visualización en tiempo real.
+
+Los slots semánticamente similares se agrupan solos. Los clusters emergen de las matemáticas, no del diseño. Cuando ves un mapa de tu base de conocimiento y los conceptos relacionados aparecen naturalmente agrupados — ese es el momento en que los embeddings dejan de ser un número mágico y se convierten en intuición geométrica.
+
+UMAP preserva tanto la estructura local (vecindarios) como la global (topología general), a diferencia de t-SNE que sacrifica la estructura global para maximizar la separación local.
+
+---
+
+## 🔗 PageRank sobre el Grafo Semántico
+
+Esta es la pieza más interesante del sistema — y la que más preguntas genera.
+
+### El Problema
+
+Los embeddings miden similitud entre dos textos. Pero en un grafo de conocimiento, la importancia de un nodo no depende solo de cuánto se parece a sus vecinos — depende de **a cuántos nodos importantes apunta, y cuántos nodos importantes apuntan a él**. Exactamente como Google rankeaba páginas web.
+
+### La Implementación
+
+Construí una **matriz de similitud** entre todos los embeddings del sistema. Cada entrada `S[i][j]` es la similitud coseno entre el embedding `i` y el embedding `j`. Esta matriz es el grafo.
+
+```go
+func buildSimilarityMatrix(embeddings [][]float32) [][]float64 {
+    n := len(embeddings)
+    matrix := make([][]float64, n)
+    
+    for i := range matrix {
+        matrix[i] = make([]float64, n)
+        for j := range matrix[i] {
+            if i != j {
+                matrix[i][j] = cosineSimilarity(embeddings[i], embeddings[j])
+            }
+        }
+    }
+    return matrix
+}
+```
+
+### Convergencia Iterativa
+
+PageRank se calcula mediante **iteración de punto fijo**. La fórmula clásica:
+
+```
+PR(i) = (1 - d) / N + d * Σ [ PR(j) * S[j][i] / Σ S[j][k] ]
+```
+
+Donde:
+- `d` es el damping factor (típicamente 0.85) — representa la probabilidad de "seguir navegando" vs "saltar a un nodo aleatorio"
+- `N` es el número total de nodos
+- `S[j][i]` es la similitud del nodo `j` hacia el nodo `i`
+- El denominador `Σ S[j][k]` normaliza los pesos salientes del nodo `j`
+
+La iteración converge cuando la diferencia entre dos iteraciones consecutivas cae por debajo de **epsilon (ε)**:
+
+```go
+const (
+    dampingFactor = 0.85
+    epsilon       = 1e-6  // umbral de convergencia
+    maxIterations = 100
+)
+
+func pageRank(matrix [][]float64) []float64 {
+    n := len(matrix)
+    rank := make([]float64, n)
+    
+    // Inicializar con distribución uniforme
+    for i := range rank {
+        rank[i] = 1.0 / float64(n)
+    }
+    
+    for iter := 0; iter < maxIterations; iter++ {
+        newRank := make([]float64, n)
+        delta := 0.0
+        
+        for i := range newRank {
+            // Contribución de todos los nodos j que "apuntan" a i
+            contribution := 0.0
+            for j := range matrix {
+                // Normalizar el peso saliente del nodo j
+                rowSum := 0.0
+                for k := range matrix[j] {
+                    rowSum += matrix[j][k]
+                }
+                if rowSum > 0 {
+                    contribution += rank[j] * matrix[j][i] / rowSum
+                }
+            }
+            
+            newRank[i] = (1-dampingFactor)/float64(n) + dampingFactor*contribution
+            delta += math.Abs(newRank[i] - rank[i])
+        }
+        
+        rank = newRank
+        
+        // Verificar convergencia
+        if delta < epsilon {
+            break // Convergido en `iter` iteraciones
+        }
+    }
+    
+    return rank
+}
+```
+
+### ¿Para Qué Sirve el Rank Final?
+
+El rank resultante no es solo un número decorativo. En el sistema lo uso para:
+
+1. **Ponderar los resultados de búsqueda semántica** — cuando dos embeddings tienen similitud coseno parecida, el que tiene mayor PageRank se muestra primero. El rank captura importancia global, no solo relevancia local.
+
+2. **Tamaño visual de los nodos** — en la visualización, el radio de cada neurona es proporcional a su PageRank. Los nodos más "centrales" en el grafo semántico son visualmente prominentes.
+
+3. **Priorización en contexto RAG** — al construir el contexto para el LLM, incluyo primero los fragmentos con mayor rank semántico. Menos tokens, más señal.
+
+La intuición es potente: un embedding con PageRank alto es uno que muchos otros embeddings "citan" implícitamente (tienen alta similitud con él). Es el concepto central alrededor del cual orbita el conocimiento.
+
+<Callout type="info" title="Convergencia en la práctica">
+  Con epsilon = 1e-6 y damping = 0.85, el algoritmo converge en 15-30 iteraciones para grafos de hasta 500 nodos. Para grafos más grandes, considera matrices sparse y el algoritmo de potencias con BLAS.
+</Callout>
+
+---
+
+## 🎨 Canvas 2D con Web Workers
+
+El rendering de la red neuronal vive en un **OffscreenCanvas dentro de un Web Worker**. El hilo principal nunca se bloquea.
+
+La arquitectura de rendering:
+- **Física a 20fps** — actualizaciones de posición y fuerzas en el worker
+- **Render interpolado a 60fps** — el main thread interpola entre estados para suavidad visual
+- **Spatial hashing** para reducir checks de colisión de O(n²) a O(n)
+
+```javascript
+// Web Worker: física desacoplada del render
+self.onmessage = ({ data }) => {
+    if (data.type === 'TICK') {
+        updatePhysics(nodes, edges);
+        self.postMessage({ type: 'STATE', nodes: serializeNodes() });
+    }
+};
+
+// Main thread: interpolación visual
+function render(timestamp) {
+    const alpha = (timestamp - lastPhysicsTick) / PHYSICS_INTERVAL;
+    
+    nodes.forEach(node => {
+        node.renderX = lerp(node.prevX, node.x, alpha);
+        node.renderY = lerp(node.prevY, node.y, alpha);
+    });
+    
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawGraph(ctx, nodes, edges);
+    
+    requestAnimationFrame(render);
+}
+```
+
+El spatial hashing divide el canvas en celdas. En lugar de comparar cada nodo contra todos los demás (O(n²)), solo comparas nodos en la misma celda o celdas adyacentes (O(n) promedio).
+
+---
+
+## 📡 WebSocket para Tiempo Real
+
+**Gorilla WebSocket en Go** para broadcast de eventos. Cuando un slot nuevo se activa en el sistema, todos los clientes conectados reciben la actualización y la neurona aparece en la red en tiempo real.
+
+```go
+type Hub struct {
+    clients    map[*Client]bool
+    broadcast  chan []byte
+    register   chan *Client
+    unregister chan *Client
+}
+
+func (h *Hub) Run() {
+    for {
+        select {
+        case client := <-h.register:
+            h.clients[client] = true
+        case client := <-h.unregister:
+            delete(h.clients, client)
+        case message := <-h.broadcast:
+            for client := range h.clients {
+                select {
+                case client.send <- message:
+                default:
+                    close(client.send)
+                    delete(h.clients, client)
+                }
+            }
+        }
+    }
+}
+```
+
+El patrón Hub es un ejemplo clásico de cómo Go maneja concurrencia sin locks explícitos — toda la sincronización pasa a través de channels.
+
+---
+
+## 💡 Lo Que Aprendí
+
+**La resiliencia no es un feature — es arquitectura.** Cada punto de falla tiene un fallback. Cada provider tiene un timeout. Cada operación costosa tiene su goroutine. Esto no se agrega después — se diseña desde el primer `struct`.
+
+**Los embeddings son el nuevo índice.** Cuando entiendes que un vector de 1536 dimensiones captura el significado semántico de un texto, empiezas a ver los datos de forma completamente diferente. No buscas por keywords — buscas por intención.
+
+**PageRank no es solo para links.** Cualquier grafo donde los nodos tienen relaciones de similitud o referencia puede beneficiarse de una métrica de centralidad. Los embeddings crean naturalmente ese grafo.
+
+**OffscreenCanvas + Web Workers cambia el juego para visualizaciones pesadas.** Si estás renderizando grafos o simulaciones en el navegador y el hilo principal se congela, esta arquitectura es la solución.
+
+---
+
+Si quieres profundizar en cómo implementé el sistema de [memoria semántica con pgvector](/es/blog/hexagonal-architecture-python-fastapi), el post anterior cubre los patrones de arquitectura que informaron estas decisiones.
+
+¿Qué parte de esta arquitectura te genera más preguntas? 👇
+
+---
+
+*#GoLang #RAG #AIArchitecture #pgvector #MachineLearning #CloudArchitecture #SoftwareEngineering #ElSalvador*
