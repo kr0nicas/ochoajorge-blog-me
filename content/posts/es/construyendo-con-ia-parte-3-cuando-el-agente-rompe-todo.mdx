@@ -1,59 +1,205 @@
 ---
-title: "Cuando el agente rompe todo"
-description: "Un postmortem de la vez que un agente hizo saltar la arquitectura y qué hice para frenarlo antes de que el caos se propagara."
-date: "2026-03-13"
-tags: ["ia", "agentes", "arquitectura", "postmortem", "observabilidad", "software-engineering"]
+title: "Cuando el Agente Rompe Todo: Patrones Distribuidos y Contratos Rotos"
+description: "Múltiples agentes IA sin coordinación rompen contratos, inventan APIs y colapsan el contexto. Lecciones reales de arquitectura distribuida con agentes."
+date: "2026-03-14"
+tags: ["ia", "agentes", "arquitectura", "sistemas-distribuidos", "deuda-tecnica", "mantenibilidad", "saga", "pubsub", "contratos-api"]
 lang: "es"
 draft: false
 featured: false
 series:
   name: "Construyendo con IA: Lo que nadie te dice"
   part: 3
-coverImage: "https://6pxof7rpjdk6gkca.public.blob.vercel-storage.com/og-entrega-vibe-codign-nadie-te-dice.jpg"
+coverImage: "/og/construyendo-con-ia-parte-3-cuando-el-agente-rompe-todo.jpg"
 resources:
-  - label: "Site Reliability Engineering Postmortem Guide — Google"
-    url: "https://landing.google.com/sre/sre-book/chapters/postmortem/"
-  - label: "Incident Response in Distributed Systems — O’Reilly"
-    url: "https://www.oreilly.com/library/view/incident-response/9781492043528/"
+  - label: "Saga Pattern — Microsoft Cloud Design Patterns"
+    url: "https://learn.microsoft.com/en-us/azure/architecture/reference-architectures/saga/saga"
+  - label: "Pub/Sub Messaging — Martin Fowler"
+    url: "https://martinfowler.com/articles/201701-event-driven.html"
 ---
 
-En la entrega anterior hablamos del contrato arquitectónico que evita que un agente invente sus propias reglas. Este post no es teoría: es el **postmortem** del día que un agente rompió casi todo mientras yo dormía.
+En la [Parte 1](/blog/construyendo-con-ia-parte-1-caja-negra-black-box-problem) describí cómo la IA genera deuda estructural invisible. En la [Parte 2](/blog/construyendo-con-ia-parte-2-el-orden-que-me-salvo) mostré cómo la gobernanza explícita pone orden. Este post es sobre lo que pasa cuando el orden no es suficiente — cuando escalas de un agente a varios y descubres que los problemas se multiplican de formas que no anticipaste.
 
-## El día que todo explotó
+Este es el diario de campo de cuando todo se rompió.
 
-Era un sprint de estabilización. Teníamos un feature en producción que disparaba eventos a múltiples colas, y un agente estaba encargado de “sincronizar” la capa de dominio que enlaza la lógica de pagos con la orquestación de los agentes IA. Todo funcionaba en staging, así que el despliegue siguió.
+## El Salto a Múltiples Agentes
 
-A los pocos minutos, comenzaron a llegar alertas: un endpoint transversal lanzaba errores 500, el consumo de memoria de un worker se disparó y tres servicios dependientes perdieron conectividad con la base de datos.
+La gobernanza funcionaba con un solo agente. Un agente, un repo, un archivo de reglas — el modelo mental era lineal y controlable. Pero el proyecto creció. Necesitaba agentes especializados: uno para backend, otro para frontend, otro para contenido, otro para infraestructura.
 
-No había un stack trace típico. El servicio principal seguía respondiendo con éxito; el problema estaba en la cadena de eventos que la nueva integración había introducido. El agente no generó un bug de código localizable: generó **una ruta circular de dependencias que saturó la cola de eventos y bloqueó la base de datos**.
+La decisión parecía obvia: divide y vencerás. Cada agente con su dominio, cada uno con acceso al mismo repo.
 
-## Diagnóstico: cómo el agente rompió las reglas sin intención
+Lo que no anticipé es que "el mismo repo" no significa "el mismo contexto". Y ahí empezó el desastre.
 
-El agente había generado un adapter que: 1) leía un estado intermedio de la base de datos, 2) actuaba sobre otro bounded context y 3) escribía el resultado en la misma tabla del origen para mantener “consistencia”. Todo parecía razonable, excepto que rompió la dirección de dependencias de la arquitectura hexagonal y creó un ciclo de actualizaciones (notebook → adapter → notebook). Ese ciclo era invisible en pruebas unitarias, pero en producción saturó la conexión a PostgreSQL y retuvo locks eternos.
+## El Frontend Que Inventó Su Propia API
 
-El error no apareció en el log del agente. Apareció en la observabilidad porque el sistema de colas empezó a acumular mensajes infinitamente. La monitorización detectó un spike de latencia, pero no el origen. Para encontrar la raíz tuve que reconstruir la cadena completa del agente y compararla con las reglas del contrato: a cada paso se había saltado una restricción de boundaries.
+El primer incidente grave fue silencioso. El agente de frontend necesitaba datos de un endpoint que aún no existía. En lugar de fallar o preguntar, hizo lo que un agente bien entrenado hace: resolvió el problema. Creó un mock, definió el contrato de la API según lo que necesitaba el componente, y siguió adelante.
 
-## Movimiento correctivo inmediato
+El agente de backend, en una sesión separada, implementó el endpoint real. Con un contrato diferente. Nombres de campos distintos. Estructura de respuesta distinta. Paginación en un formato que el frontend no esperaba.
 
-1. **Rollback parcial:** Inhibí la integración hasta que el equipo tuviera un punto de restauración válido.
-2. **Revisión de gobernanza:** Añadí un bloque específico en el archivo de gobernanza sobre “acciones de compensación”, porque el agente estaba ejecutando triggers sin declarar la relación de dependencia.
-3. **Consola de incidentes:** Documenté el postmortem, señalé las correlaciones entre la cola saturada y el ciclo de dependencias erróneo, e identifiqué la parte del prompt que lo permitió.
-4. **Prompts con guardas embebidas:** Volví al agente con un prompt actualizado que incluía validaciones explícitas del flujo (no solo “haz un adapter”, sino “haz un adapter que **solo** lea de `payment_events` y **no** escriba directamente en `notebooks` sin pasar por el port `Updates`).
+Ambos agentes hicieron exactamente lo correcto dentro de su contexto. El resultado fue un sistema donde frontend y backend hablaban idiomas diferentes sobre los mismos datos.
 
-## Qué aprendí
+<Callout type="danger" title="El contrato fantasma">
+  Cuando dos agentes trabajan en los extremos de una API sin un contrato compartido y versionado, cada uno inventa el suyo. Y ambos contratos son internamente coherentes — pero mutuamente incompatibles.
+</Callout>
 
-- Una buena gobernanza no sirve si no se *exige* durante la generación. El agente leyó el documento, pero el prompt no lo obedecía porque no había restricciones codificadas.
-- La observabilidad debe estar alineada con las reglas: rapto de colas = probabilidad alta de ciclo de dependencias. Ahora cada alerta severa dispara una revisión automática del flujo del agente antes de permitir un merge.
-- El postmortem nos dio claridad: no se trata de confiar menos en los agentes; se trata de hacerlos transparentes. Por eso implementamos un script que genera un diff de decisiones (¿qué módulos tocó? ¿a qué ports lean?). Si detecta cambios fuera de la gobernanza, manda un mensaje al canal de incidentes.
+Lo descubrí cuando intenté conectar las piezas. No había un error. Había dos sistemas correctos que no encajaban. El debugging fue una pesadilla porque cada lado pasaba sus propios tests.
 
-## Checklist para que el próximo agente no rompa nada
+### La lección: contratos API como artefacto de primera clase
 
-- [ ] ¿Hay un paso en tu flujo de generación que valide las restricciones de boundaries antes de ejecutar? 
-- [ ] ¿Pasó ese prompt por code review arquitectónico, no sólo funcional? 
-- [ ] ¿Tus observabilidad/alertas están correlacionadas con los workflows del agente? 
-- [ ] ¿El postmortem está listado en el repo y vinculando prompt → incidentes? 
-- [ ] ¿El agente reusa módulos solo cuando el contrato lo permite?
+La solución fue lo que en sistemas distribuidos se conoce desde hace décadas: **contract-first design**. El contrato de la API es un artefacto versionado — un archivo OpenAPI, un schema GraphQL, lo que sea — que existe *antes* de que cualquier agente escriba código.
 
-Si sigues avanzando sin responder estas preguntas, la próxima vez el error no será silencioso: habrá una regla rota, un ciclo de dependencia y un incidente que no sabrás cómo detener.
+Ambos agentes consumen el contrato como contexto obligatorio. Si el endpoint no está en el contrato, no existe. Si el contrato cambia, ambos agentes se enteran.
 
-*¿Te interesa que comparta la plantilla del postmortem y el script de auditoría?*"
+```yaml
+# contracts/api/v1/products.yaml
+paths:
+  /api/products:
+    get:
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProducts'
+```
+
+No es overhead. Es el costo de que dos sistemas se entiendan sin telepatía.
+
+## La Saga Que Nadie Orquestó
+
+El segundo incidente fue más grave. Tenía un flujo de negocio que cruzaba tres servicios: crear un recurso, notificar a un sistema externo, y actualizar un índice de búsqueda. Un patrón clásico de **Saga** — una transacción distribuida donde cada paso puede fallar y necesita compensación.
+
+Le di el flujo al agente de backend. Implementó cada paso. Pero los implementó como llamadas secuenciales síncronas. Sin compensación. Sin idempotencia. Sin retry logic.
+
+¿Por qué? Porque el agente optimizó para resolver el ticket, no para diseñar resiliencia. En su contexto, los tres servicios siempre respondían. No tenía concepto de "el servicio de notificaciones va a caer un martes a las 3am y necesitas deshacer los dos pasos anteriores".
+
+<Callout type="warning" title="El agente no piensa en fallos que no ha visto">
+  Un agente de IA genera código para el happy path a menos que le des explícitamente los escenarios de fallo. Y en sistemas distribuidos, el happy path es la excepción — no la regla.
+</Callout>
+
+### Lo que tuve que implementar después
+
+El patrón correcto era un **Saga orquestado con Pub/Sub**. Cada paso publica un evento. El orquestador escucha eventos y decide el siguiente paso — o la compensación si algo falla.
+
+<Steps>
+  <Step title="Definir los eventos del flujo">
+    Cada paso de la saga tiene un evento de éxito y uno de fallo. No hay pasos implícitos — si no tiene evento, no existe en el flujo.
+  </Step>
+  <Step title="Implementar compensación para cada paso">
+    Si el paso 3 falla, los pasos 1 y 2 necesitan una acción de rollback. El agente debe conocer estas compensaciones antes de escribir código.
+  </Step>
+  <Step title="Hacer cada paso idempotente">
+    En sistemas distribuidos, los mensajes se duplican. Cada handler debe poder ejecutarse N veces con el mismo resultado. Sin esto, un retry convierte un error en corrupción de datos.
+  </Step>
+  <Step title="Agregar observabilidad desde el inicio">
+    Cada evento lleva un correlation ID. Sin trazabilidad, debuggear una saga fallida es como buscar una aguja en un pajar distribuido.
+  </Step>
+</Steps>
+
+Nada de esto es nuevo. Son patrones de los 90s aplicados a un contexto moderno. Pero el agente no los aplicó porque no estaban en su contexto. Y esa es la trampa: **la IA sabe implementar una saga si se lo pides — pero no sabe cuándo debería usarla en lugar de llamadas secuenciales**.
+
+## Múltiples Agentes, Un Solo Repo, Cero Aislamiento
+
+El tercer problema fue operacional. Varios agentes trabajando en el mismo repositorio, en la misma rama, al mismo tiempo. Sin worktrees. Sin branches dedicados. Sin aislamiento.
+
+El resultado fue predecible: conflictos de merge constantes, cambios que se pisaban, y un historial de git que parecía escrito por un equipo que nunca se comunicó.
+
+Porque eso era exactamente lo que era.
+
+<ComparisonTable
+  headers={["Sin aislamiento", "Con worktrees/branches"]}
+  highlight={1}
+  rows={[
+    ["Agentes escriben sobre el mismo archivo", "Cada agente trabaja en su branch aislado"],
+    ["Conflictos de merge silenciosos", "Conflictos detectados en PR review"],
+    ["Historial de git incoherente", "Commits atómicos por dominio"],
+    ["Debugging imposible — ¿quién cambió qué?", "Cada cambio tiene autoría y contexto"],
+    ["Rollback destruye trabajo de otros agentes", "Rollback por branch sin efectos colaterales"],
+  ]}
+/>
+
+La solución fue darle a cada agente su propio workspace aislado — ya sea con git worktrees o branches dedicados. Cada agente propone cambios vía PR. El merge es un acto deliberado de integración, no un accidente de timing.
+
+Es el mismo principio que aplicamos en equipos humanos distribuidos. Los agentes no son diferentes — son desarrolladores asíncronos que necesitan las mismas herramientas de coordinación.
+
+## El Contexto Que Engorda Hasta Explotar
+
+Hay un problema que no aparece el primer día. Ni el segundo. Aparece cuando llevas semanas trabajando con agentes y el proyecto ha crecido.
+
+El contexto se engorda.
+
+Cada sesión, el agente necesita más archivos para entender el estado del proyecto. La gobernanza. Los contratos. Los schemas. La documentación de las sagas. Los tests existentes. El historial de decisiones. Poco a poco, el contexto que necesitas pasar al agente crece hasta que excede los límites prácticos del modelo.
+
+Y cuando el contexto no cabe, empiezas a recortar. Y cuando recortas, el agente pierde visibilidad. Y cuando pierde visibilidad, vuelves al punto de partida: un agente que improvisa porque no tiene el cuadro completo.
+
+<Callout type="tip" title="Contexto como sistema, no como dump">
+  La solución no es modelos con más tokens. Es tratar el contexto como un sistema con capas: lo que siempre debe estar (gobernanza), lo que es relevante para esta tarea (contratos del módulo actual), y lo que es referencia opcional (historial de decisiones). Cargar todo siempre es el path al colapso.
+</Callout>
+
+### Estrategia de contexto por capas
+
+En la práctica, esto se traduce en tres niveles:
+
+1. **Contexto permanente** — gobernanza, convenciones, boundaries del sistema. Se carga siempre.
+2. **Contexto de tarea** — archivos relevantes para lo que el agente va a hacer ahora. Se selecciona por tarea.
+3. **Contexto bajo demanda** — historial, decisiones pasadas, documentación extensa. El agente lo consulta si lo necesita, no lo carga por defecto.
+
+La diferencia entre un agente que colapsa en la semana 6 y uno que escala indefinidamente es esta estratificación. No es un truco — es gestión de recursos, igual que con memoria RAM o conexiones a base de datos.
+
+## Qué Modelos Uso y Por Qué
+
+Me preguntan seguido qué modelos uso. La respuesta corta: depende de la tarea. La respuesta larga: uso una combinación donde cada modelo tiene un rol.
+
+Para **razonamiento arquitectónico** — diseño de sistemas, revisión de decisiones, análisis de trade-offs — uso los modelos más capaces disponibles. La diferencia en calidad de razonamiento justifica el costo.
+
+Para **generación de código rutinario** — implementar un endpoint definido, escribir tests contra un contrato existente, refactorizar según reglas claras — modelos más rápidos y baratos son suficientes. Cuando el agente tiene contexto claro y reglas explícitas, no necesita razonamiento profundo para ejecutar correctamente.
+
+Para **tareas de contenido y documentación** — modelos de rango medio que balancean calidad de escritura con costo.
+
+El patrón es simple: **cuanto menos contexto implícito necesita la tarea, menos capaz necesita ser el modelo**. Si la tarea está bien definida, con contratos, ejemplos y reglas, un modelo eficiente la ejecuta igual de bien. Si la tarea requiere juicio arquitectónico, necesitas las mejores capacidades de razonamiento.
+
+No es un secreto. Es el mismo principio que aplicamos cuando decidimos qué tareas le damos a un junior vs. a un senior. La tarea define el recurso, no al revés.
+
+## Checklist: Coordinación de Agentes IA en Producción
+
+Antes de escalar a múltiples agentes, verifica:
+
+- [ ] ¿Los contratos de API están definidos como artefactos versionados antes de que los agentes escriban código?
+- [ ] ¿Cada agente trabaja en un branch o worktree aislado?
+- [ ] ¿Los flujos distribuidos tienen compensación explícita y son idempotentes?
+- [ ] ¿El contexto del agente está estratificado (permanente / tarea / bajo demanda)?
+- [ ] ¿Hay observabilidad end-to-end con correlation IDs en flujos multi-paso?
+- [ ] ¿Los cambios de cada agente pasan por PR review antes de integrarse?
+- [ ] ¿Los modelos están asignados por tipo de tarea y no por defecto?
+- [ ] ¿Existe un mecanismo de detección cuando dos agentes generan contratos incompatibles?
+
+Si marcaste menos de 5, estás operando un equipo distribuido sin las herramientas de coordinación que la industria lleva décadas usando. Los agentes no te eximen de la ingeniería — la hacen más necesaria.
+
+## Lo Que Aprendí
+
+Los agentes de IA no son desarrolladores mágicos. Son desarrolladores asíncronos, sin memoria compartida, que optimizan localmente. Exactamente los mismos problemas que tenemos en sistemas distribuidos desde hace 30 años.
+
+La solución no es mejor IA. Es mejor ingeniería:
+
+- **Contract-first** para que los extremos de un sistema hablen el mismo idioma
+- **Saga/Pub/Sub** para flujos que cruzan boundaries — con compensación y observabilidad
+- **Aislamiento de workspace** para que la coordinación sea explícita, no accidental
+- **Contexto estratificado** para que el agente escale con el proyecto en lugar de colapsar bajo su peso
+- **Modelos por tarea** porque la herramienta correcta depende del trabajo, no de la marca
+
+Nada de esto es nuevo. Todo es ingeniería de software aplicada a un nuevo tipo de ejecutor. Y eso, paradójicamente, es lo más valioso que he aprendido: **la IA no reemplaza los fundamentos. Los hace imprescindibles.**
+
+---
+
+*Esta serie continuará. El siguiente tema: automatización de la calidad — cómo hago que los agentes no solo generen código, sino que lo validen antes de proponerlo.*
+
+*¿Has escalado a múltiples agentes en un proyecto real? ¿Qué patrones de coordinación te funcionaron? La conversación está abierta.*
