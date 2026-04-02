@@ -1,0 +1,283 @@
+---
+title: "Observabilidad para Sistemas de IA: Trazas, Spans y el Problema del No-Determinismo"
+description: "OpenTelemetry aplicado a agentes LLM: cómo trazas y spans resuelven el no-determinismo y por qué los dashboards clásicos no son suficientes para IA."
+date: "2026-04-05"
+tags: ["observabilidad", "ia-aplicada", "opentelemetry", "agentes", "sre", "software-engineering"]
+lang: "es"
+draft: false
+featured: false
+canonical: "https://ochoajorge.me/es/blog/observabilidad-sistemas-ia-trazas-opentelemetry"
+resources:
+  - label: "OpenTelemetry para LLMs — Semantic Conventions"
+    url: "https://opentelemetry.io/docs/specs/semconv/gen-ai/"
+  - label: "LangSmith — Observability for LLM Applications"
+    url: "https://smith.langchain.com"
+  - label: "Arize Phoenix — AI Observability Platform"
+    url: "https://phoenix.arize.com"
+---
+
+El día que el sistema multi-agente del blog falló en producción, mi primer instinto fue abrir los logs. Había cientos de líneas. El agente orchestrator aparecía como "completado con éxito". El worker de redacción también. Pero el post que llegó al frontend era incoherente — párrafos duplicados, secciones faltantes, frontmatter malformado.
+
+El problema no estaba en un error. Estaba en una decisión que el modelo tomó de forma silenciosa en el paso 3 de 7, y que nadie había instrumentado para observar.
+
+Esa experiencia cambió cómo pienso sobre la observabilidad en sistemas de IA. Los dashboards de métricas tradicionales — latencia, error rate, throughput — son necesarios pero insuficientes. El estado de un sistema de agentes no se captura con números; se captura con trazas de razonamiento.
+
+## Por Qué los Sistemas de IA Rompen la Observabilidad Clásica
+
+En software tradicional, un bug tiene una causa determinista. El mismo input siempre produce el mismo output (o error). Los logs muestran el stack trace, identificas la línea, corriges.
+
+En sistemas de IA hay dos propiedades que rompen esa lógica:
+
+**No-determinismo.** El mismo prompt, ejecutado dos veces, puede producir decisiones diferentes. Un bug intermitente puede no reproducirse. Un error de razonamiento puede no dejar rastro en los logs de la aplicación.
+
+**Causalidad implícita.** En una cadena de agentes, el output del paso 3 depende de cómo el modelo interpretó el output del paso 2, que a su vez dependía del contexto que se acumuló desde el paso 1. Esa cadena de interpretaciones no aparece en logs convencionales.
+
+<Callout type="warning" title="La trampa del log de éxito">
+  Un sistema de agentes puede loggar "completado con éxito" en cada paso y aun así producir un resultado incorrecto. El éxito en IA no es "no hubo excepción" — es "el razonamiento fue correcto y el output cumple los criterios". Son cosas distintas y requieren instrumentación distinta.
+</Callout>
+
+## El Modelo Mental: Trazas de Razonamiento
+
+En lugar de pensar en logs de eventos, piensa en **trazas de razonamiento**: la secuencia completa de decisiones que un agente tomó para llegar a su output.
+
+OpenTelemetry, el estándar de observabilidad distribuida, ya tiene un modelo que encaja perfectamente: **traces** y **spans**.
+
+- Un **trace** representa la ejecución completa de una tarea de alto nivel (ej: "generar post sobre MCP").
+- Un **span** representa una unidad de trabajo dentro de ese trace (ej: "llamada al modelo", "invocación de tool", "síntesis final").
+- Los spans pueden tener **atributos** (el prompt usado, el modelo, los tokens consumidos) y **eventos** (cuándo se invocó una tool, qué devolvió).
+
+```
+Trace: generar_post(topic="MCP")
+├── Span: orchestrator.plan          [200ms]
+│   └── attr: plan=[research, draft, seo]
+├── Span: worker.research            [3200ms]
+│   ├── Span: tool.search_web        [800ms]
+│   └── attr: sources=3, tokens=1240
+├── Span: worker.draft               [4100ms]
+│   └── attr: tokens=2800, model=claude-opus-4-6
+└── Span: worker.seo_review          [900ms]
+    └── attr: issues=2, score=87
+```
+
+Con este árbol de spans, cuando el output es incorrecto puedo ir directo al span sospechoso, ver exactamente qué prompt recibió el modelo y qué devolvió, y reproducir el problema de forma aislada.
+
+## Implementación con OpenTelemetry
+
+OpenTelemetry tiene convenciones semánticas específicas para GenAI desde 2024. Estas convenciones estandarizan los nombres de atributos para que las plataformas de observabilidad puedan procesarlos correctamente.
+
+<Steps>
+  <Step title="Instalar e inicializar el SDK">
+    ```bash
+    npm install @opentelemetry/sdk-node @opentelemetry/api \
+      @opentelemetry/exporter-otlp-http
+    ```
+
+    ```typescript
+    import { NodeSDK } from "@opentelemetry/sdk-node";
+    import { OTLPTraceExporter } from "@opentelemetry/exporter-otlp-http";
+
+    const sdk = new NodeSDK({
+      traceExporter: new OTLPTraceExporter({
+        url: process.env.OTLP_ENDPOINT ?? "http://localhost:4318/v1/traces",
+      }),
+    });
+
+    sdk.start();
+    ```
+  </Step>
+
+  <Step title="Instrumentar las llamadas al modelo">
+    Crea una función wrapper que añade spans alrededor de cada llamada LLM con los atributos GenAI estándar.
+
+    ```typescript
+    import { trace, SpanStatusCode } from "@opentelemetry/api";
+
+    const tracer = trace.getTracer("blog-agent", "1.0.0");
+
+    async function tracedLLMCall(params: {
+      model: string;
+      prompt: string;
+      systemPrompt?: string;
+      spanName: string;
+    }) {
+      return tracer.startActiveSpan(params.spanName, async (span) => {
+        span.setAttributes({
+          "gen_ai.system": "anthropic",
+          "gen_ai.request.model": params.model,
+          "gen_ai.request.max_tokens": 4096,
+          // El prompt NO debe loggearse en producción si contiene PII
+          "gen_ai.prompt.length": params.prompt.length,
+        });
+
+        try {
+          const response = await anthropic.messages.create({
+            model: params.model,
+            messages: [{ role: "user", content: params.prompt }],
+          });
+
+          span.setAttributes({
+            "gen_ai.usage.input_tokens": response.usage.input_tokens,
+            "gen_ai.usage.output_tokens": response.usage.output_tokens,
+            "gen_ai.response.finish_reason": response.stop_reason ?? "unknown",
+          });
+
+          span.setStatus({ code: SpanStatusCode.OK });
+          return response;
+        } catch (err) {
+          span.setStatus({ code: SpanStatusCode.ERROR, message: String(err) });
+          throw err;
+        } finally {
+          span.end();
+        }
+      });
+    }
+    ```
+  </Step>
+
+  <Step title="Instrumentar invocaciones de tools">
+    Las llamadas a tools son los puntos de mayor riesgo en un sistema de agentes — son donde el agente interactúa con el mundo exterior.
+
+    ```typescript
+    async function tracedToolCall<T>(
+      toolName: string,
+      args: Record<string, unknown>,
+      fn: () => Promise<T>
+    ): Promise<T> {
+      return tracer.startActiveSpan(`tool.${toolName}`, async (span) => {
+        span.setAttributes({
+          "gen_ai.tool.name": toolName,
+          "gen_ai.tool.args": JSON.stringify(args),
+        });
+
+        const result = await fn();
+
+        span.setAttributes({
+          "gen_ai.tool.result.length":
+            typeof result === "string" ? result.length : JSON.stringify(result).length,
+        });
+
+        span.end();
+        return result;
+      });
+    }
+
+    // Uso:
+    const searchResult = await tracedToolCall("search_posts", { query }, () =>
+      searchPosts(query)
+    );
+    ```
+  </Step>
+
+  <Step title="Crear el trace raíz en el orchestrator">
+    El trace completo de una tarea debe iniciarse en el punto de entrada del orchestrator y propagarse automáticamente a todos los spans hijos.
+
+    ```typescript
+    async function orchestrate(goal: string) {
+      return tracer.startActiveSpan("orchestrate", async (rootSpan) => {
+        rootSpan.setAttributes({
+          "agent.goal": goal,
+          "agent.type": "orchestrator",
+        });
+
+        try {
+          const result = await runOrchestration(goal);
+          rootSpan.setStatus({ code: SpanStatusCode.OK });
+          return result;
+        } catch (err) {
+          rootSpan.setStatus({ code: SpanStatusCode.ERROR, message: String(err) });
+          throw err;
+        } finally {
+          rootSpan.end();
+        }
+      });
+    }
+    ```
+  </Step>
+</Steps>
+
+## Qué Medir Más Allá de la Latencia
+
+La latencia y el error rate son el punto de partida, no el destino. Estos son los indicadores que realmente importan en sistemas de agentes:
+
+<ComparisonTable
+  headers={["Métrica tradicional", "Métrica para sistemas IA"]}
+  highlight={1}
+  rows={[
+    ["Latencia p99 del endpoint", "Latencia por fase (plan / research / draft / review)"],
+    ["Error rate HTTP 5xx", "Tasa de output inválido (esquema roto, criterio fallido)"],
+    ["Throughput (req/s)", "Tokens consumidos por tarea completada"],
+    ["Disponibilidad del servicio", "Tasa de éxito de razonamiento (evaluada, no inferida)"],
+    ["Número de reintentos", "Loops de corrección (cuántas iteraciones hasta output válido)"],
+  ]}
+/>
+
+## El Problema del Output Incorrecto sin Error
+
+El escenario más difícil de detectar: el agente completó sin excepciones pero el resultado es incorrecto semánticamente. Para esto necesitas **evaluadores automáticos** que corran como spans dentro del trace.
+
+```typescript
+async function evaluateOutput(output: string, criteria: string[]): Promise<EvalResult> {
+  return tracer.startActiveSpan("eval.output_quality", async (span) => {
+    // Puedes usar un modelo "juez" para evaluar el output del agente principal
+    const evalResponse = await anthropic.messages.create({
+      model: "claude-haiku-4-5-20251001", // modelo más rápido y barato para eval
+      system: "Evalúa si el output cumple los criterios. Responde con JSON: {pass: boolean, issues: string[]}",
+      messages: [{ role: "user", content: `Output: ${output}\n\nCriterios: ${criteria.join(", ")}` }],
+    });
+
+    const result = JSON.parse(extractText(evalResponse));
+
+    span.setAttributes({
+      "eval.passed": result.pass,
+      "eval.issues_count": result.issues.length,
+      "eval.issues": result.issues.join("; "),
+    });
+
+    span.end();
+    return result;
+  });
+}
+```
+
+## Alertas que Realmente Ayudan
+
+Con los spans correctos, puedes crear alertas accionables en lugar de alertas ruidosas:
+
+```
+ALERTA: Tasa de eval.passed < 80% en ventana 1h
+→ Acción: Revisar los últimos 10 traces con eval.passed=false
+
+ALERTA: gen_ai.usage.input_tokens > 8000 en worker.research
+→ Acción: El contexto se está saturando — revisar lógica de truncado
+
+ALERTA: loops_de_corrección > 3 en orquestación
+→ Acción: El orchestrator está atascado — revisar criterio de salida
+```
+
+<Callout type="tip" title="Regla práctica de instrumentación">
+  Instrumenta primero los puntos de decisión, no los puntos de ejecución. Una llamada HTTP tiene instrumentación automática. Lo que necesitas observar es qué decidió el modelo y por qué — eso es lo que debes añadir manualmente.
+</Callout>
+
+## Plataformas de Observabilidad para LLMs
+
+No necesitas construir todo desde cero. Estas plataformas consumen spans de OpenTelemetry y añaden visualizaciones específicas para LLMs:
+
+**Arize Phoenix** (open source): excelente para experimentación local y equipos pequeños. Visualiza traces de agentes, permite hacer eval interactivo y comparar runs.
+
+**LangSmith** (LangChain): si ya usas el ecosistema LangChain, es la integración más directa. Tiene evaluadores automáticos y gestión de datasets.
+
+**Langfuse** (open source, self-hosteable): mi preferido para proyectos donde no quiero dependencia de vendor. API compatible con OpenTelemetry, buenas capacidades de scoring y evaluación.
+
+## Lecciones Aprendidas
+
+Después del incidente que abrió este post, instrumenté el sistema completo con OpenTelemetry. Lo que descubrí al revisar los traces históricos fue sorprendente: el agente "fallaba" semánticamente en aproximadamente el 8% de las ejecuciones, pero como no lanzaba excepciones, ese 8% nunca apareció en ninguna alerta.
+
+La observabilidad no es un problema a resolver después de que el sistema funcione. Es parte de la definición de "funciona". Un sistema de agentes sin trazas de razonamiento es un sistema que no sabes si está funcionando — solo sabes que no está explotando.
+
+## Conclusión
+
+La observabilidad en sistemas de IA requiere un cambio de mentalidad: de monitorizar errores a monitorizar decisiones. Las trazas de razonamiento con OpenTelemetry son el puente entre el mundo distribuido que ya conocemos y el mundo no-determinista donde los agentes operan.
+
+En el siguiente post cierro este ciclo con algo más concreto: una evaluación honesta de las herramientas de coding asistido por IA que los equipos de ingeniería están usando hoy — Cursor, GitHub Copilot y Claude Code — desde la perspectiva de alguien que ha estado en producción con todas ellas.
+
+¿Ya estás instrumentando tus sistemas de agentes? Me interesa saber qué stack de observabilidad estás usando.

@@ -1,0 +1,241 @@
+---
+title: "Orchestrator-Worker: el Patrón Multi-Agente que Escala en Producción"
+description: "Del agente único al sistema multi-agente: implementa el patrón Orchestrator-Worker con ejemplos reales de arquitectura distribuida y código en producción."
+date: "2026-04-03"
+tags: ["agentes", "arquitectura", "ia-aplicada", "software-engineering", "patrones"]
+lang: "es"
+draft: false
+featured: false
+canonical: "https://ochoajorge.me/es/blog/orchestrator-worker-multi-agente-produccion"
+resources:
+  - label: "Building Effective Agents — Anthropic"
+    url: "https://www.anthropic.com/research/building-effective-agents"
+  - label: "Multi-Agent Frameworks — LangGraph"
+    url: "https://langchain-ai.github.io/langgraph/"
+---
+
+La primera vez que un agente resolvió solo un problema que normalmente me llevaba dos horas, sentí que el trabajo de software estaba a punto de cambiar radicalmente. La segunda vez que un agente se quedó en un loop infinito intentando hacer demasiadas cosas a la vez, entendí por qué la arquitectura importa más que nunca.
+
+El patrón Orchestrator-Worker es la respuesta a ese segundo escenario. Es la forma en que los sistemas multi-agente maduros distribuyen responsabilidad, evitan saturación de contexto y escalan sin colapsar.
+
+## El Problema del Agente Único Sobrecargado
+
+Un agente con acceso a todas las herramientas del mundo tiene un problema fundamental: el contexto se satura. Cada tool que invoca, cada resultado que procesa, cada decisión que justifica consume tokens de su ventana de contexto. Cuando el problema es suficientemente complejo, el agente comienza a "olvidar" las instrucciones iniciales, tomar atajos o simplemente producir output degradado.
+
+La solución intuitiva — "dale más contexto al modelo" — no escala. La solución arquitectónica — "divide el problema en subproblemas con agentes especializados" — sí.
+
+<Callout type="note" title="Analogía con equipos de ingeniería">
+  Un tech lead que intenta codificar, revisar PRs, hablar con stakeholders y escribir documentación simultáneamente produce trabajo de calidad mediocre en todo. Un tech lead que delega, coordina y revisa — y tiene un equipo especializado — produce sistemas mejores. Orchestrator-Worker replica esa dinámica.
+</Callout>
+
+## Qué es el Patrón Orchestrator-Worker
+
+El patrón define dos roles con responsabilidades distintas:
+
+**Orchestrator:** recibe el objetivo de alto nivel, lo descompone en subtareas, asigna cada subtarea a un worker especializado, y sintetiza los resultados en una respuesta coherente. No ejecuta tareas operativas — razona sobre el flujo.
+
+**Workers:** son agentes especializados con acceso a un subconjunto acotado de herramientas. Reciben una subtarea específica, la ejecutan, y devuelven un resultado estructurado al orchestrator. No toman decisiones sobre el flujo global.
+
+```
+                    Objetivo
+                       │
+              ┌────────▼────────┐
+              │   Orchestrator  │
+              │  (razona+planea)│
+              └──┬──────────┬───┘
+                 │          │
+        ┌────────▼──┐  ┌────▼──────┐
+        │  Worker A │  │  Worker B │
+        │ (búsqueda)│  │ (redacción│
+        └───────────┘  └───────────┘
+                 │          │
+              ┌──▼──────────▼───┐
+              │   Orchestrator  │
+              │  (sintetiza)    │
+              └─────────────────┘
+                       │
+                   Resultado
+```
+
+## Implementación Paso a Paso
+
+Vamos a implementar un sistema que genera borradores de posts del blog a partir de un topic. El orchestrator coordina tres workers: un investigador, un escritor y un revisor SEO.
+
+<Steps>
+  <Step title="Definir el contrato de comunicación">
+    Antes de escribir código de agentes, define los tipos de mensajes entre orchestrator y workers. Este es tu contrato.
+
+    ```typescript
+    interface TaskRequest {
+      taskId: string;
+      type: "research" | "draft" | "seo_review";
+      input: string;
+      context?: Record<string, string>;
+    }
+
+    interface TaskResult {
+      taskId: string;
+      success: boolean;
+      output: string;
+      metadata?: Record<string, unknown>;
+    }
+    ```
+  </Step>
+
+  <Step title="Implementar los workers especializados">
+    Cada worker es un agente con un system prompt acotado y herramientas específicas para su dominio.
+
+    ```typescript
+    async function researchWorker(task: TaskRequest): Promise<TaskResult> {
+      const response = await anthropic.messages.create({
+        model: "claude-opus-4-6",
+        max_tokens: 2048,
+        system: `Eres un investigador especializado. Tu única responsabilidad
+    es recopilar información factual sobre el topic asignado.
+    Devuelve SOLO hechos verificables en formato estructurado.
+    No redactes, no opines, no expandas el scope.`,
+        tools: [searchWebTool, fetchPageTool],
+        messages: [{ role: "user", content: task.input }],
+      });
+
+      return {
+        taskId: task.taskId,
+        success: true,
+        output: extractTextContent(response),
+      };
+    }
+    ```
+
+    La restricción del system prompt es intencional: el worker especializado produce output más predecible porque su espacio de decisión es menor.
+  </Step>
+
+  <Step title="Construir el orchestrator con planificación explícita">
+    El orchestrator toma el objetivo, genera un plan, ejecuta los workers en el orden correcto y sintetiza.
+
+    ```typescript
+    async function orchestrate(goal: string): Promise<string> {
+      // Fase 1: Planificación
+      const plan = await planTasks(goal);
+      // plan = [{ type: "research", input: "..." }, { type: "draft", ... }]
+
+      const results: TaskResult[] = [];
+
+      // Fase 2: Ejecución (secuencial o paralela según dependencias)
+      for (const task of plan) {
+        const context = buildContext(results); // resultados previos como contexto
+        const result = await dispatchWorker({ ...task, context });
+        results.push(result);
+      }
+
+      // Fase 3: Síntesis
+      return synthesize(goal, results);
+    }
+    ```
+  </Step>
+
+  <Step title="Manejar fallos con reintentos acotados">
+    Un worker puede fallar. El orchestrator necesita una política de reintentos que no genere loops infinitos.
+
+    ```typescript
+    async function dispatchWorker(
+      task: TaskRequest,
+      maxRetries = 2
+    ): Promise<TaskResult> {
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          const result = await routeToWorker(task);
+          if (result.success) return result;
+          console.warn(`Worker ${task.type} falló en intento ${attempt + 1}`);
+        } catch (err) {
+          if (attempt === maxRetries) {
+            return { taskId: task.taskId, success: false, output: String(err) };
+          }
+        }
+      }
+      // Never reached, pero TypeScript lo requiere
+      throw new Error("Unreachable");
+    }
+    ```
+  </Step>
+</Steps>
+
+## Cuándo Usar Workers en Paralelo vs. Secuencial
+
+La elección entre ejecución paralela y secuencial depende de las dependencias entre tareas. Modelarlas explícitamente evita bugs difíciles de detectar.
+
+<ComparisonTable
+  headers={["Ejecución Paralela", "Ejecución Secuencial"]}
+  highlight={0}
+  rows={[
+    ["Workers sin dependencias entre sí", "Worker B necesita output de Worker A"],
+    ["Menor latencia total", "Mayor control sobre el flujo de datos"],
+    ["Requiere manejo de concurrencia", "Más simple de implementar y debuggear"],
+    ["Ideal: investigación multi-fuente", "Ideal: draft → revisión SEO → publicación"],
+  ]}
+/>
+
+```typescript
+// Paralelo: cuando las tareas son independientes
+const [researchResult, competitorResult] = await Promise.all([
+  dispatchWorker({ type: "research", input: topic }),
+  dispatchWorker({ type: "research", input: `competidores de ${topic}` }),
+]);
+
+// Secuencial: cuando hay dependencia de datos
+const draft = await dispatchWorker({ type: "draft", input: researchResult.output });
+const reviewed = await dispatchWorker({ type: "seo_review", input: draft.output });
+```
+
+## Estructura de Archivos del Sistema
+
+<FileTree title="Sistema multi-agente — estructura recomendada">
+{`
+  multi-agent/
+    orchestrator/
+      index.ts          [highlight]
+      planner.ts
+      synthesizer.ts
+    workers/
+      research.ts
+      draft.ts
+      seo-review.ts
+    contracts/
+      types.ts          [highlight]
+      schemas.ts
+    lib/
+      dispatch.ts
+      context.ts
+      retry.ts
+    tests/
+      orchestrator.test.ts
+      workers/
+`}
+</FileTree>
+
+El directorio `contracts/` es el más importante: define los tipos que mantienen la coherencia entre orchestrator y workers. Si esos tipos cambian, los tests lo detectan antes que producción.
+
+## Los Errores Más Comunes
+
+**Orchestrator que hace trabajo de worker.** Cuando el orchestrator empieza a ejecutar llamadas a herramientas directamente en lugar de delegar, el sistema pierde modularidad y el contexto del orchestrator se satura. La regla: si una acción no es "planificar", "delegar" o "sintetizar", pertenece a un worker.
+
+**Workers sin límite de contexto.** Un worker que recibe el historial completo de la conversación es un agente sobrecargado con un nombre diferente. Cada worker debe recibir solo el contexto mínimo necesario para su tarea.
+
+**Loops de corrección sin condición de salida.** El patrón "reviewer devuelve feedback → writer corrige → reviewer vuelve a revisar" puede iterar indefinidamente. Define siempre un `maxIterations` y una condición de éxito explícita.
+
+<Callout type="danger" title="Anti-patrón: el orchestrator omnisciente">
+  Si tu orchestrator tiene más de 5 tools disponibles directamente, probablemente estás mezclando roles. Un orchestrator que puede buscar en la web, escribir archivos, llamar APIs Y coordinar workers tiene demasiada responsabilidad — y su comportamiento se vuelve menos predecible a medida que los problemas se hacen más complejos.
+</Callout>
+
+## Lecciones del Mundo Real
+
+En el contexto del blog que ya tienes —  construido con la filosofía de mínima complejidad — la aplicación natural de Orchestrator-Worker sería un pipeline de creación de contenido: un worker que investiga el topic, uno que redacta el MDX con los componentes correctos, uno que audita el SEO del frontmatter, y un orchestrator que coordina todo y entrega el archivo listo para revisión humana.
+
+Lo que aprendí al implementar variaciones de este patrón en producción: el orchestrator no tiene que ser perfecto desde el primer prompt. Lo que tiene que ser perfecto es el contrato entre orchestrator y workers. Una vez que los tipos son correctos y los workers son testables de forma aislada, mejorar el razonamiento del orchestrator es iterativo y seguro.
+
+## Conclusión
+
+Orchestrator-Worker no es solo un patrón de arquitectura de agentes — es una filosofía de responsabilidad única aplicada a sistemas autónomos. Cada componente hace una cosa, la hace bien, y se comunica a través de contratos explícitos.
+
+El siguiente post de esta serie entra en el problema más difícil de estos sistemas en producción: cuando algo sale mal, ¿cómo sabes qué worker falló, por qué, y cómo lo reproducís? La respuesta está en la observabilidad — y es un territorio completamente diferente al del software tradicional.
+
+¿Estás implementando sistemas multi-agente? Cuéntame en los comentarios el caso de uso — me interesa saber qué patrones están emergiendo en distintos dominios.

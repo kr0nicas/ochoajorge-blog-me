@@ -1,0 +1,254 @@
+---
+title: "MCP como Contrato: el Protocolo que Redefine Cómo los Agentes se Conectan al Mundo"
+description: "Model Context Protocol convierte herramientas externas en contratos formales para agentes IA. Aprende a diseñar tu primer MCP server propio desde cero."
+date: "2026-04-01"
+tags: ["mcp", "agentes", "ia-aplicada", "arquitectura", "software-engineering"]
+lang: "es"
+draft: false
+featured: true
+canonical: "https://ochoajorge.me/es/blog/mcp-como-contrato-protocolo-agentes"
+resources:
+  - label: "Model Context Protocol — Especificación Oficial"
+    url: "https://modelcontextprotocol.io"
+  - label: "MCP SDK (TypeScript y Python) — Anthropic"
+    url: "https://github.com/modelcontextprotocol/typescript-sdk"
+---
+
+Cuando empecé a integrar agentes de IA en sistemas reales, el mayor punto de fricción no era el modelo. Era la forma en que el agente accedía al mundo exterior. Cada integración era un ad-hoc: una función aquí, un wrapper allá, y a los tres sprints el sistema era una caja de conexiones que nadie quería tocar.
+
+Model Context Protocol (MCP) resuelve exactamente ese problema. No es una librería ni un framework — es un contrato abierto. Y una vez que lo entiendes como arquitecto, no quieres construir integraciones de otra manera.
+
+## El Problema de las Integraciones Ad-Hoc
+
+Antes de MCP, la forma estándar de conectar un agente a una herramienta externa era envolver la herramienta en una función y exponerla como "tool" del modelo. Eso funciona para un prototipo. En producción, esa decisión acumula deuda rápidamente.
+
+<Callout type="warning" title="El costo oculto del tool-calling sin contrato">
+  Cada integración ad-hoc crea un acoplamiento implícito entre el modelo, el formato de parámetros y la implementación. Cambiar la herramienta implica cambiar el prompt, los tipos y el wrapper simultáneamente — sin ninguna garantía de compatibilidad.
+</Callout>
+
+Lo que faltaba era una capa de indirección con semántica clara: un servidor que declare qué puede hacer, en qué formato, y que cualquier agente compatible pueda descubrir y usar sin modificar su núcleo.
+
+## Qué es MCP exactamente
+
+MCP (Model Context Protocol) es un protocolo abierto diseñado por Anthropic que estandariza cómo los modelos de lenguaje se comunican con herramientas externas, fuentes de datos y sistemas de contexto. La analogía más precisa es la de una API REST, pero pensada para que el consumidor sea un agente en lugar de un humano.
+
+El protocolo define tres primitivos fundamentales:
+
+<ComparisonTable
+  headers={["Primitivo", "Qué expone", "Caso de uso típico"]}
+  highlight={0}
+  rows={[
+    ["Tools", "Acciones que el agente puede ejecutar", "Llamar APIs, escribir archivos, ejecutar queries"],
+    ["Resources", "Datos que el agente puede leer", "Documentos, bases de código, contexto de sesión"],
+    ["Prompts", "Plantillas reutilizables de instrucción", "Flujos de trabajo repetibles, system prompts compartidos"],
+  ]}
+/>
+
+Un MCP server puede exponer uno, dos o los tres primitivos. El cliente — que puede ser Claude, un agente custom, o cualquier sistema compatible — los descubre en tiempo de ejecución mediante un handshake de inicialización.
+
+## La Arquitectura del Protocolo
+
+MCP utiliza JSON-RPC 2.0 como protocolo de transporte, lo que lo hace simple de implementar y depurar. La comunicación puede ocurrir sobre:
+
+- **stdio**: ideal para procesos locales y desarrollo
+- **HTTP con SSE**: para servidores remotos en producción
+- **WebSocket**: para conexiones bidireccionales de baja latencia
+
+```
+Cliente (Agente)          MCP Server
+      |                        |
+      |--- initialize -------->|
+      |<-- capabilities -------|
+      |                        |
+      |--- tools/list -------->|
+      |<-- [tool_1, tool_2] ---|
+      |                        |
+      |--- tools/call -------->|  { name: "buscar_doc", args: {...} }
+      |<-- result -------------|
+```
+
+La ventaja de este modelo es que el agente nunca necesita saber cómo está implementada la herramienta. Solo necesita conocer su nombre, sus parámetros y el esquema de respuesta. El servidor puede cambiar su implementación interna sin afectar al cliente.
+
+## Diseñando tu Primer MCP Server
+
+Vamos a construir un MCP server concreto: un servidor que expone acceso a una base de datos de posts del blog con capacidad de búsqueda semántica. El patrón aplica a cualquier fuente de datos.
+
+<Steps>
+  <Step title="Instalar el SDK y definir la estructura">
+    Usa el SDK oficial de TypeScript (o Python si prefieres).
+    ```bash
+    npm install @modelcontextprotocol/sdk zod
+    ```
+
+    La estructura del servidor es mínima:
+    ```typescript
+    import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+    import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+    import { z } from "zod";
+
+    const server = new McpServer({
+      name: "blog-search-server",
+      version: "1.0.0",
+    });
+    ```
+  </Step>
+
+  <Step title="Declarar las tools con esquemas Zod">
+    La clave es que los esquemas son el contrato. El modelo los recibe y los respeta.
+    ```typescript
+    server.tool(
+      "search_posts",
+      "Busca posts del blog por tema o palabra clave",
+      {
+        query: z.string().describe("Término de búsqueda en lenguaje natural"),
+        lang: z.enum(["es", "en"]).default("es").describe("Idioma del post"),
+        limit: z.number().min(1).max(10).default(5),
+      },
+      async ({ query, lang, limit }) => {
+        const results = await searchPosts(query, lang, limit);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(results, null, 2),
+            },
+          ],
+        };
+      }
+    );
+    ```
+  </Step>
+
+  <Step title="Exponer recursos de contexto">
+    Además de tools ejecutables, puedes exponer recursos de solo lectura. El agente los puede incluir en su contexto antes de razonar.
+    ```typescript
+    server.resource(
+      "blog://posts/recent",
+      "Los 5 posts más recientes del blog",
+      async () => {
+        const posts = await getRecentPosts(5);
+        return {
+          contents: [
+            {
+              uri: "blog://posts/recent",
+              mimeType: "application/json",
+              text: JSON.stringify(posts),
+            },
+          ],
+        };
+      }
+    );
+    ```
+  </Step>
+
+  <Step title="Iniciar el transporte">
+    Para desarrollo local, stdio es suficiente. Para producción, levanta un servidor HTTP.
+    ```typescript
+    async function main() {
+      const transport = new StdioServerTransport();
+      await server.connect(transport);
+      console.error("MCP Blog Server corriendo en stdio");
+    }
+
+    main().catch(console.error);
+    ```
+  </Step>
+</Steps>
+
+## El Contrato como Ventaja Arquitectónica
+
+Lo que hace a MCP poderoso no es la implementación — es el contrato. Cuando defines un MCP server correctamente, obtienes tres propiedades que con integraciones ad-hoc son difíciles de garantizar:
+
+**Descubribilidad.** El agente no necesita que le expliques qué puede hacer. Lo descubre. Esto significa que puedes añadir tools al servidor y el agente las tendrá disponibles sin cambiar su configuración.
+
+**Versionabilidad.** El servidor declara su versión. Los clientes pueden negociar compatibilidad. Puedes deprecar tools de forma controlada, exactamente como deprecas endpoints de una API.
+
+**Auditabilidad.** Cada llamada es un mensaje JSON explícito. Puedes interceptarla, loguearla y reproducirla. El debugging de un agente con MCP es más parecido al debugging de una API que a desenterrar logs de un modelo.
+
+<Callout type="tip" title="Regla de diseño clave">
+  Diseña cada tool como si la fuera a usar un desarrollador que no sabe nada de tu sistema. El nombre tiene que ser un verbo-objeto claro (`search_posts`, `create_draft`, `publish_post`). La descripción es el contrato semántico que el modelo va a leer para decidir si usarla o no.
+</Callout>
+
+## Estructura de Archivos de un Proyecto MCP
+
+<FileTree title="MCP Server — estructura recomendada">
+{`
+  mcp-blog-server/
+    src/
+      index.ts          [highlight]
+      tools/
+        search.ts
+        drafts.ts
+        publish.ts
+      resources/
+        recent-posts.ts
+        series.ts
+      lib/
+        posts.ts
+        db.ts
+    package.json
+    tsconfig.json
+    README.md
+`}
+</FileTree>
+
+Separar tools por dominio facilita el testing y la evolución independiente de cada área funcional.
+
+## Integración con Claude y Herramientas de Desarrollo
+
+MCP ya es el protocolo estándar de Claude Desktop, Claude Code y cualquier cliente construido sobre el Anthropic SDK. Configurar el servidor es tan simple como añadir una entrada al archivo de configuración:
+
+```json
+{
+  "mcpServers": {
+    "blog-server": {
+      "command": "node",
+      "args": ["/ruta/al/mcp-blog-server/dist/index.js"]
+    }
+  }
+}
+```
+
+A partir de ahí, Claude puede buscar posts, crear borradores o publicar contenido sin que yo tenga que explicarle cómo funciona cada operación. El servidor es el vocabulario; el contrato, la gramática.
+
+## Antes y Después del Contrato
+
+<CodeComparison
+  before={{ label: "❌ Integración ad-hoc", code: `// Tool definida inline en el prompt del agente
+const tools = [{
+  name: "search",
+  description: "Search posts",
+  // Sin esquema explícito — el modelo adivina los params
+  parameters: { query: "string" }
+}];
+// La implementación está en otro archivo
+// No hay versión, no hay descubrimiento
+// Si cambia el schema, todo se rompe en silencio` }}
+  after={{ label: "✅ Con MCP", code: `// Contrato declarado en el servidor
+server.tool(
+  "search_posts",
+  "Busca posts por tema, etiqueta o palabra clave",
+  {
+    query: z.string().min(2).describe("Término de búsqueda"),
+    lang: z.enum(["es", "en"]).default("es"),
+    tags: z.array(z.string()).optional(),
+  },
+  async (params) => searchPosts(params)
+);
+// El cliente descubre la tool en runtime
+// Schema versionado, validado, auditable` }}
+/>
+
+## Lecciones Aprendidas
+
+Después de migrar las integraciones del blog a MCP, lo que más noto no es la velocidad de desarrollo — es la confianza. Puedo cambiar la implementación de `search_posts` (cambiar el motor de búsqueda, añadir un cache, cambiar el formato de respuesta) sin tocar el agente que la consume. El contrato aguanta.
+
+Las tres cosas que haría diferente si empezara de nuevo: primero, definir los esquemas Zod antes de la implementación — son la especificación, no la validación. Segundo, construir un test de integración que ejecute el servidor en stdio y valide cada tool desde el primer día. Tercero, versionar el servidor desde v1.0.0, no desde v0.0.1 — esto obliga a pensar en la compatibilidad desde el inicio.
+
+## Conclusión
+
+MCP no es una tecnología de nicho para proyectos de investigación. Es el protocolo que está estandardizando cómo los agentes IA interactúan con el mundo en 2026. Si construyes integraciones de agentes hoy sin MCP, estás creando deuda que tendrás que pagar cuando la industria converja — y ya está convergiendo.
+
+El siguiente post de esta serie explora el siguiente nivel: qué pasa cuando tienes múltiples agentes que necesitan coordinarse entre sí, y cómo el patrón Orchestrator-Worker te da la estructura para manejarlo sin que el sistema explote.
+
+¿Tienes un caso de integración donde MCP sería la solución natural? Los comentarios están abajo.
