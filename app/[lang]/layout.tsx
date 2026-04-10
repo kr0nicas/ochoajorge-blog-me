@@ -7,6 +7,7 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { siteConfig } from "@/lib/utils";
 import "../globals.css";
+import "highlight.js/styles/github-dark.css";
 
 
 export const metadata: Metadata = {

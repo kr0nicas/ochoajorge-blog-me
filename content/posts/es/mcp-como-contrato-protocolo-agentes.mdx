@@ -172,28 +172,26 @@ Lo que hace a MCP poderoso no es la implementación — es el contrato. Cuando d
 
 ## Estructura de Archivos de un Proyecto MCP
 
-<FileTree title="MCP Server — estructura recomendada">
-{`
-  mcp-blog-server/
-    src/
-      index.ts          [highlight]
-      tools/
-        search.ts
-        drafts.ts
-        publish.ts
-      resources/
-        recent-posts.ts
-        series.ts
-      lib/
-        posts.ts
-        db.ts
-    package.json
-    tsconfig.json
-    README.md
-`}
-</FileTree>
-
 Separar tools por dominio facilita el testing y la evolución independiente de cada área funcional.
+
+```text
+mcp-blog-server/
+├── src/
+│   ├── index.ts          
+│   ├── tools/
+│   │   ├── search.ts
+│   │   ├── drafts.ts
+│   │   └── publish.ts
+│   ├── resources/
+│   │   ├── recent-posts.ts
+│   │   └── series.ts
+│   └── lib/
+│       ├── posts.ts
+│       └── db.ts
+├── package.json
+├── tsconfig.json
+└── README.md
+```
 
 ## Integración con Claude y Herramientas de Desarrollo
 
@@ -214,31 +212,9 @@ A partir de ahí, Claude puede buscar posts, crear borradores o publicar conteni
 
 ## Antes y Después del Contrato
 
-<CodeComparison
-  before={{ label: "❌ Integración ad-hoc", code: `// Tool definida inline en el prompt del agente
-const tools = [{
-  name: "search",
-  description: "Search posts",
-  // Sin esquema explícito — el modelo adivina los params
-  parameters: { query: "string" }
-}];
-// La implementación está en otro archivo
-// No hay versión, no hay descubrimiento
-// Si cambia el schema, todo se rompe en silencio` }}
-  after={{ label: "✅ Con MCP", code: `// Contrato declarado en el servidor
-server.tool(
-  "search_posts",
-  "Busca posts por tema, etiqueta o palabra clave",
-  {
-    query: z.string().min(2).describe("Término de búsqueda"),
-    lang: z.enum(["es", "en"]).default("es"),
-    tags: z.array(z.string()).optional(),
-  },
-  async (params) => searchPosts(params)
-);
-// El cliente descubre la tool en runtime
-// Schema versionado, validado, auditable` }}
-/>
+**❌ Sin MCP:** Las tools se definen inline en el prompt del agente, sin esquema explícito. El modelo adivina los parámetros, no hay versión ni descubrimiento. Si cambia el schema, todo se rompe en silencio.
+
+**✅ Con MCP:** El contrato se declara en el servidor con esquemas Zod validados. El cliente descubre la tool en runtime. El schema está versionado, validado y es auditable.
 
 ## Lecciones Aprendidas
 

@@ -59,8 +59,6 @@
     "eslint-config-next": "16.1.6",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
-    "rehype-pretty-code": "^0.14.1",
-    "shiki": "^3.23.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

@@ -2,7 +2,7 @@ import { compileMDX } from "next-mdx-remote/rsc";
 import remarkGfm from "remark-gfm";
 import rehypeSlug from "rehype-slug";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
-import rehypePrettyCode from "rehype-pretty-code";
+import rehypeHighlight from "rehype-highlight";
 import type { ReactElement } from "react";
 import { FileTree } from "@/components/mdx/FileTree";
 import {
@@ -46,7 +46,7 @@ export async function compileMDXContent(source: string): Promise<MDXResult> {
                 rehypePlugins: [
                     rehypeSlug,
                     [rehypeAutolinkHeadings, { behavior: "wrap", properties: { className: ["anchor"] } }],
-                    [rehypePrettyCode, { theme: "one-dark-pro", keepBackground: false }],
+                    rehypeHighlight,
                 ],
             },
         },

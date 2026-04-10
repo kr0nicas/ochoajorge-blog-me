@@ -299,7 +299,7 @@ export function CodeComparison({
                     className="overflow-x-auto bg-[var(--bg-elevated)] p-4 text-xs leading-relaxed text-[var(--text-primary)]"
                     style={{ fontFamily: "var(--font-mono)" }}
                 >
-                    <code>{currentCode}</code>
+                    <span className="font-mono whitespace-pre">{currentCode}</span>
                 </motion.pre>
             </AnimatePresence>
         </div>
