@@ -1,0 +1,267 @@
+---
+title: "MCP como Contrato entre Agentes"
+description: "MCP es el protocolo que define cómo los agentes IA se conectan a herramientas. Aprende a crear contratos confiables entre modelos y sistemas externos."
+date: "2026-05-28"
+canonical: "https://ochoajorge.me/es/blog/mcp-como-contrato-entre-agentes"
+tags: ["mcp", "agentes", "arquitectura-ia", "ia-aplicada", "software-engineering"]
+lang: "es"
+draft: false
+featured: false
+series:
+  name: "Construyendo con IA: Lo que nadie te dice"
+  part: 4
+resources:
+  - label: "Model Context Protocol — Especificación Oficial"
+    url: "https://modelcontextprotocol.io"
+  - label: "MCP SDK TypeScript — Anthropic"
+    url: "https://github.com/modelcontextprotocol/typescript-sdk"
+---
+
+En los [posts anteriores de esta serie](/blog/construyendo-con-ia-parte-1-caja-negra-black-box-problem) abordamos el black box problem, la gobernanza como código y qué pasa cuando los agentes rompen todo. Hay un tema transversal que mencioné sin profundizar: cómo los agentes acceden al mundo exterior.
+
+La respuesta que encontré después de meses de prueba y error se llama MCP (Model Context Protocol). No es una librería ni un framework — es un contrato. Y ese contrato cambió completamente cómo pienso sobre arquitectura de agentes.
+
+## El Problema del Acoplamiento Implícito
+
+Cuando integras un agente con una herramienta externa, la solución "obvia" es envolver la herramienta en una función y exponerla como tool del modelo. Algo así:
+
+```typescript
+const tools = [{
+  name: "search_posts",
+  description: "Busca posts del blog",
+  parameters: {
+    type: "object",
+    properties: {
+      query: { type: "string" },
+      limit: { type: "number" }
+    }
+  }
+}];
+```
+
+Esto funciona para prototipos. En producción, acumula tres tipos de deuda que no son obvias hasta que muerden:
+
+**Deuda de conocimiento.** El agente no sabe qué hace la tool más allá de la descripción. No sabe qué casos maneja, cuáles falla, ni cuáles parámetros son opcionales. Cada prompt tiene que incluir context que ya debería ser implícito.
+
+**Deuda de versión.** Si cambias la firma de la herramienta, el agente sigue intentando llamarla como antes. No hay negociación de compatibilidad, no hay deprecation, solo breakages silenciosos.
+
+**Deuda de descubrimiento.** El agente no puede descubrir nuevas herramientas en runtime. Cada tool que añades requiere cambiar la configuración del agente, reiniciar, y probar de nuevo.
+
+<Callout type="warning" title="El costo oculto del ad-hoc">
+  Cada integración ad-hoc crea un acoplamiento triple: agente-tool, tool-sistema, prompt-tool. Cambiar cualquiera de los tres implica romper los otros dos. Sin contrato, no hay forma de evolucionar el sistema sin introducir fragilidad.
+</Callout>
+
+Lo que faltaba no era mejor prompting ni modelos más grandes. Era una capa de indirección con semántica clara que sirviera como contrato entre el agente y el mundo exterior.
+
+## Qué es MCP y Por Qué Importa
+
+MCP (Model Context Protocol) es un protocolo abierto diseñado por Anthropic que estandariza cómo los modelos de lenguaje se comunican con herramientas externas. La analogía más precisa: es a los agentes lo que las APIs REST son a los clientes web — un contrato explícito, versionable y descubrible.
+
+El protocolo define tres primitivos fundamentales:
+
+<ComparisonTable
+  headers={["Primitivo", "Qué expone", "Caso de uso"]}
+  highlight={0}
+  rows={[
+    ["Tools", "Acciones ejecutables", "Llamar APIs, escribir archivos, ejecutar queries"],
+    ["Resources", "Datos de solo lectura", "Documentos, código fuente, estado de sesión"],
+    ["Prompts", "Plantillas reutilizables", "Workflows repetibles, system prompts compartidos"]
+  ]}
+/>
+
+Un MCP server puede exponer uno, dos o los tres primitivos. El cliente — Claude, un agente custom, cualquier sistema compatible — los descubre en tiempo de ejecución mediante un handshake.
+
+## El Contrato en JSON Schema
+
+Lo que hace a MCP diferente es que el contrato se define explícitamente. Cuando declares una tool, especificas su schema en JSON Schema:
+
+```json
+{
+  "tools": [
+    {
+      "name": "search_posts",
+      "description": "Busca posts del blog por tema o palabra clave",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Término de búsqueda en lenguaje natural"
+          },
+          "lang": {
+            "type": "string",
+            "enum": ["es", "en"],
+            "default": "es",
+            "description": "Idioma del post a buscar"
+          },
+          "limit": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10,
+            "default": 5
+          }
+        },
+        "required": ["query"]
+      }
+    }
+  ]
+}
+```
+
+Este schema no es documentación. Es código ejecutable que valida las llamadas antes de procesarlas. El modelo lo recibe y respeta. Si el agente intenta pasar un parámetro inválido, el server rechaza la llamada con un error específico.
+
+### Arquitectura del Handshake
+
+El flujo de inicialización sigue un patrón predecible:
+
+```
+Cliente (Agente)          MCP Server
+      |                        |
+      |--- initialize -------->| { protocolVersion: "2024-11-05" }
+      |<-- capabilities -------| { tools: {}, resources: {}, prompts: {} }
+      |                        |
+      |--- tools/list -------->|
+      |<-- [tool_1, tool_2] ---|
+      |                        |
+      |--- tools/call -------->| { name: "search_posts", args: {...} }
+      |<-- result -------------|
+```
+
+La ventaja es que el agente nunca necesita saber cómo está implementada la herramienta. Solo necesita conocer su contrato. El servidor puede cambiar su implementación interna sin afectar al cliente — igual que una API REST puede cambiar su backend sin afectar a sus consumidores.
+
+## Sin MCP vs Con MCP
+
+La diferencia no es teórica. Es la diferencia entre un sistema que evoluciona y uno que se fossiliza.
+
+<ComparisonTable
+  headers={["Aspecto", "Sin MCP", "Con MCP"]}
+  highlight={0}
+  rows={[
+    ["Descubrimiento", "Manual en configuración", "Automático en runtime"],
+    ["Validación", "Implícita en prompt", "Explícita en JSON Schema"],
+    ["Versionado", "No existe", "Protocolo negociado"],
+    ["Depuración", "Logs de modelo", "Mensajes JSON auditable"],
+    ["Testing", "Integración frágil", "Mock del contrato"],
+    ["Evolución", "Cambio breakage", "Deprecación controlada"]
+  ]}
+/>
+
+### Caso Concreto: Blog Search Server
+
+Voy a mostrarte cómo se ve esto en práctica. Este es un MCP server que expone búsqueda de posts del blog:
+
+```typescript
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
+
+const server = new McpServer({
+  name: "blog-search-server",
+  version: "1.0.0"
+});
+
+// Tool con schema Zod que se valida automáticamente
+server.tool(
+  "search_posts",
+  "Busca posts del blog por tema o palabra clave",
+  {
+    query: z.string().describe("Término de búsqueda en lenguaje natural"),
+    lang: z.enum(["es", "en"]).default("es").describe("Idioma del post"),
+    limit: z.number().min(1).max(10).default(5)
+  },
+  async ({ query, lang, limit }) => {
+    const results = await searchPosts(query, lang, limit);
+    return {
+      content: [{
+        type: "text",
+        text: JSON.stringify(results, null, 2)
+      }]
+    };
+  }
+);
+
+// Resource de contexto de solo lectura
+server.resource(
+  "blog://posts/recent",
+  "Los 5 posts más recientes del blog",
+  async () => {
+    const posts = await getRecentPosts(5);
+    return {
+      contents: [{
+        uri: "blog://posts/recent",
+        mimeType: "application/json",
+        text: JSON.stringify(posts)
+      }]
+    };
+  }
+);
+
+async function main() {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.error("MCP Blog Server running on stdio");
+}
+
+main().catch(console.error);
+```
+
+Observa que el schema es la única verdad. El cliente no necesita saber cómo funciona `searchPosts` internamente. Solo sabe que recibe `{ query: string, lang: "es"|"en", limit: number }` y devuelve resultados en JSON. Si mañana cambio el motor de búsqueda de Postgres a Elasticsearch, el contrato sigue siendo el mismo.
+
+### Estructura de Proyecto
+
+```text
+mcp-blog-server/
+├── src/
+│   ├── index.ts          # Entry point
+│   ├── tools/
+│   │   ├── search.ts
+│   │   ├── drafts.ts
+│   │   └── publish.ts
+│   ├── resources/
+│   │   ├── recent-posts.ts
+│   │   └── series.ts
+│   └── lib/
+│       ├── posts.ts
+│       └── db.ts
+├── package.json
+├── tsconfig.json
+└── README.md
+```
+
+Separar tools por dominio facilita el testing y la evolución independiente de cada área funcional. Cada tool se puede mockear y probar en aislamiento sin levantar el servidor completo.
+
+## Lecciones Aprendidas
+
+Después de migrar las integraciones del blog a MCP, tres cosas cambiaron:
+
+**Confianza en cambios.** Antes, cada refactor de una herramienta requería revisar todos los prompts del agente. Con MCP, el contrato valida los cambios automáticamente. Si rompo el schema, el build falla antes de que el código llegue a producción.
+
+**Velocidad de desarrollo.** Añadir una nueva tool es de cinco líneas: declarar el schema, implementar la función, desplegar. El agente la descubre automáticamente en la siguiente inicialización. No hay configuración que actualizar.
+
+**Componibilidad.** Puedo combinar múltiples MCP servers sin que se afecten entre sí. Un server para la base de datos, otro para el sistema de archivos, otro para APIs externas. Cada uno tiene su contrato, su versión, su ciclo de vida.
+
+<Callout type="tip" title="Regla de diseño: verbo-objeto claro">
+  Diseña cada tool como si la fuera a usar un desarrollador que no sabe nada de tu sistema. `search_posts` es mejor que `find`. `create_draft` es mejor que `add`. La descripción del schema es el contrato semántico que el modelo lee para decidir si usar la tool o no. Hazla específica.
+</Callout>
+
+## Cuando MCP No Es la Respuesta
+
+MCP es excelente para integraciones agente-sistema, pero no es la solución universal. Hay casos donde el overhead del protocolo no vale la pena:
+
+- Intercambios simples unidireccionales (enviar notificaciones sin respuesta)
+- Sistemas extremadamente táticos (scripts de one-shot que no evolucionan)
+- Integraciones donde el cliente es humano (use APIs REST, es lo que esperan)
+
+La regla práctica: si la integración va a ser llamada por un agente, será versionada, o necesita descubrimiento dinámico, usa MCP. Si es un endpoint one-shot que nunca cambiará, probablemente sea overkill.
+
+## Conclusión
+
+MCP no es una tecnología de nicho para proyectos de investigación. Es el protocolo que está estandarizando cómo los agentes IA interactúan con el mundo en 2026. Si construyes integraciones de agentes hoy sin MCP, estás creando deuda técnica que tendrás que pagar cuando la industria converja — y ya está convergiendo.
+
+El siguiente paso natural es: ¿qué pasa cuando tienes múltiples agentes que necesitan coordinarse entre sí? Cada agente tiene su contexto, sus prioridades, su contrato. El patrón Orchestrator-Worker te da la estructura para manejar esa coordinación sin que el sistema explote — y es exactamente de lo que hablaré en el próximo post de esta serie.
+
+<Callout type="note" title="Próximo post">
+  <strong>Parte 5:</strong> Orchestrator-Worker: Cómo coordinar múltiples agentes sin perder el control.
+</Callout>
+
+¿Has intentado integrar agentes con sistemas externos? ¿Encontraste el mismo problema de acoplamiento implícito? Los comentarios están abajo para compartir experiencias.
