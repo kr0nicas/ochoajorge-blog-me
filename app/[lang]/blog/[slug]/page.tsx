@@ -12,6 +12,7 @@ import { ReaderMode } from "@/components/blog/ReaderMode";
 import { Comments } from "@/components/blog/Comments";
 import { ReferencePanel } from "@/components/blog/ReferencePanel";
 import { CitationButton } from "@/components/blog/CitationButton";
+import { ShareButton } from "@/components/blog/ShareButton";
 import { Github } from "lucide-react";
 import { slugify } from "@/lib/utils";
 import { BlogPostingJsonLd, PersonJsonLd, OrganizationJsonLd } from "@/components/seo/JsonLd";
@@ -197,12 +198,19 @@ export default async function PostPage({ params }: PostPageProps) {
                                             </span>
                                             . {isSpanish ? "¿Encontraste un error?" : "Found a typo or an error?"}
                                         </p>
-                                        <CitationButton
-                                            title={post.title}
-                                            url={`${siteConfig.url}/${lang}/blog/${post.slug}`}
-                                            datePublished={post.date}
-                                            lang={lang as "es" | "en"}
-                                        />
+                                        <div className="flex items-center gap-2">
+                                            <CitationButton
+                                                title={post.title}
+                                                url={`${siteConfig.url}/${lang}/blog/${post.slug}`}
+                                                datePublished={post.date}
+                                                lang={lang as "es" | "en"}
+                                            />
+                                            <ShareButton
+                                                title={post.title}
+                                                url={`${siteConfig.url}/${lang}/blog/${post.slug}`}
+                                                lang={lang as "es" | "en"}
+                                            />
+                                        </div>
                                     </div>
                                     <a
                                         href={siteConfig.author.github}
