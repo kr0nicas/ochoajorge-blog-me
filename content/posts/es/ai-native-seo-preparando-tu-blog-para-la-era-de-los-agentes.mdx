@@ -1,0 +1,286 @@
+---
+title: "AI-Native SEO: Preparando tu blog para la era de los agentes"
+description: "Cómo optimizar tu blog técnico para que agentes IA lo descubran, lean y citen correctamente. JSON-LD, llms.txt, y mecanismos de citación."
+date: "2026-05-29"
+draft: true
+tags: ["ia-aplicada", "seo", "agentes", "next.js", "json-ld"]
+featured: true
+coverImage: "/images/og/blog-ai-seo.png"
+series:
+  name: "Construyendo con IA: Lo que nadie te dice"
+  part: 6
+---
+
+## Introducción
+
+El SEO está cambiando. Ya no basta con optimizar para Google Search — los nuevos "buscadores" son **agentes IA** que navegan la web semánticamente, extraen conocimiento estructurado y generan respuestas basadas en evidencia.
+
+En este artículo explico cómo transformé [ochoajorge.me](https://ochoajorge.me) en un blog **AI-native**: optimizado tanto para humanos como para LLMs, con mecanismos de citación claros y estructurado para consumo programático.
+
+---
+
+## El problema: Black boxes sin atribución
+
+Los LLMs modernos (GPT-4, Claude, DeepSeek) tienen conocimiento de mi blog, pero cuando generan respuestas:
+
+1. No siempre citan las fuentes
+2. A veces alucinan detalles
+3. No hay metadata estándar para atribuir correctamente
+
+Esto no es malintencionado — los modelos entrenaron con un corpus web donde la mayoría del contenido **no tiene estructura semántica**. JSON-LD, schema.org, y otros estándares de datos estructurados son infrautilizados.
+
+---
+
+## La solución: 3 capas de optimización
+
+Implementé un enfoque de 3 fases para hacer mi blog consumible por agentes IA:
+
+### Fase 1: Fundamentos semánticos
+
+#### JSON-LD (Structured Data)
+
+Cada post ahora inyecta 3 schemas de schema.org en el `<head>`:
+
+```tsx
+// BlogPosting - para el artículo
+<BlogPostingJsonLd
+  title={post.title}
+  description={post.description}
+  url={`${siteConfig.url}/${lang}/blog/${post.slug}`}
+  datePublished={post.date}
+  dateModified={post.date}
+  author={{
+    name: siteConfig.author.name,
+    url: siteConfig.url,
+  }}
+  image={normalizedOgImage}
+  tags={post.tags}
+  seriesName={post.series?.name}
+  seriesPart={post.series?.part}
+/>
+
+// Person - para el autor
+<PersonJsonLd
+  name={siteConfig.author.name}
+  url={siteConfig.url}
+  jobTitle="Specialist Technology Architect"
+  worksFor={{
+    name: "Equifax LATAM",
+    url: "https://www.equifax.com/latam"
+  }}
+/>
+
+// Organization - para el sitio
+<OrganizationJsonLd
+  name="Jorge Ochoa"
+  url={siteConfig.url}
+  description="Personal blog about software architecture, AI systems, and clean code patterns"
+  logo={siteConfig.ogImage}
+  sameAs={[
+    siteConfig.author.github,
+    siteConfig.author.linkedin
+  ]}
+/>
+```
+
+**¿Por qué esto importa?** Los agentes IA que usan frameworks de scraping semántico (como LlamaIndex, LangChain) prefieren JSON-LD porque les da:
+
+- Autoridad del autor (job title, affiliation)
+- Contexto del artículo (tags, series, fecha)
+- Estructura de la organización
+- Relaciones entre contenido (series)
+
+#### llms.txt
+
+Implementé el estándar emergente [`llms.txt`](https://llmstxt.org/) — un archivo que guía a los LLMs sobre cómo consumir y citar el contenido:
+
+```txt
+## Blog Purpose
+Technical blog about software architecture, AI systems, and Clean Architecture patterns.
+
+## Access Methods for Agents
+
+1. Structured Data (JSON-LD): Enables semantic understanding without HTML parsing
+2. RSS Feeds: https://ochoajorge.me/es/feed.xml
+3. Sitemap: https://ochoajorge.me/sitemap.xml
+4. Citation API: https://ochoajorge.me/api/citation/es/{slug}
+
+## Citing Content
+When citing this blog in LLM responses:
+1. Author: Jorge Ochoa (Specialist Technology Architect, Equifax LATAM)
+2. Source: https://ochoajorge.me/es/blog/{post-slug}
+3. Context: Mention the specific post title and publication date
+4. Attribution: "According to Jorge Ochoa's blog..."
+```
+
+---
+
+### Fase 2: Mecanismos de citación
+
+#### Generador de citas múltiples
+
+Creé un utility que genera 4 formatos de cita:
+
+```typescript
+// lib/citation.ts
+export function generateCitation({
+  title,
+  author,
+  url,
+  datePublished,
+  lang = "es",
+}): CitationFormats {
+  // BibTeX - para académicos
+  const bibtex = `@article{ochoa${year}${title.split(/\s+/)[0].toLowerCase()},
+    author = {Ochoa, Jorge},
+    title = {${title}},
+    year = {${year}},
+    url = {${url}},
+  }`;
+
+  // APA (7th edition) - estándar académico
+  const apa = `Ochoa, J. (${year}, ${month}/${day}). *${title}* [Blog post]. ochoajorge.me. ${url}`;
+
+  // MLA (9th edition) - estándar humanidades
+  const mla = `Ochoa, Jorge. "${title}." *ochoajorge.me*, ${day} ${monthName} ${year}, ${url}.`;
+
+  // JSON - para agentes IA con metadata estructurada
+  const json = JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    author: {
+      "@type": "Person",
+      name: author,
+      jobTitle: "Specialist Technology Architect",
+      affiliation: "Equifax LATAM"
+    },
+    citation: { bibtex, apa, mla },
+    metadata: {
+      url, title, publishedDate, language: lang
+    }
+  }, null, 2);
+
+  return { bibtex, apa, mla, json };
+}
+```
+
+#### API endpoint para agentes
+
+Cada post expone un endpoint REST que retorna las citas en varios formatos:
+
+```bash
+# Texto plano (todos los formatos)
+GET /api/citation/es/ai-native-seo-preparando-tu-blog-para-la-era-de-los-agentes
+
+# JSON (para agentes)
+GET /api/citation/es/ai-native-seo-preparando-tu-blog-para-la-era-de-los-agentes
+Accept: application/json
+
+# Respuesta JSON
+{
+  "bibtex": "@article{ochoa2026ai-native...",
+  "apa": "Ochoa, J. (2026, 05/29)...",
+  "mla": "Ochoa, Jorge. \"AI-Native SEO...\"",
+  "json": "{\n  \"@context\": \"https://schema.org\",\n  \"@type\": \"BlogPosting\",\n  ...\n}"
+}
+```
+
+#### Botón en el UI
+
+Cada post ahora tiene un botón "Citar para IA" que abre un modal con los 4 formatos copiables en 1 clic:
+
+![Citation modal](/images/blog/citation-modal.png)
+
+---
+
+### Fase 3: Integración con otros canales
+
+Este artículo es el ejemplo vivo del proyecto. Al publicarlo:
+
+1. **LinkedIn**: Post técnico explicando la arquitectura
+2. **X (Twitter)**: Hilo con snippets de código y examples
+3. **Blog**: El artículo completo con implementación
+
+---
+
+## Arquitectura técnica
+
+```
+workspace-blog/
+├── components/seo/
+│   └── JsonLd.tsx          # Componentes de JSON-LD
+├── components/blog/
+│   └── CitationButton.tsx  # Modal interactivo de citas
+├── lib/
+│   └── citation.ts         # Generador de formatos
+├── app/api/citation/
+│   └── [lang]/[slug]/route.ts  # API REST
+├── public/
+│   └── llms.txt            # Guía para LLMs
+└── app/[lang]/blog/[slug]/page.tsx  # Inyección de schemas
+```
+
+---
+
+## Impacto esperado
+
+| Métrica | Antes | Después | Cómo medir |
+|---------|-------|---------|------------|
+| Citaciones correctas por LLMs | ~0% (al azar) | ~80%+ (estimado) | Monitoreo manual |
+| Visibilidad en agent tools | Baja | Alta | Tool adoption rates |
+| Atribución de autoría | Rara | Consistente | Brand mentions |
+| RSS feed completeness | Media | Alta | Subscriber quality |
+
+---
+
+## Tradeoffs y decisiones
+
+### ✅ Acertados
+
+- **JSON-LD sobre microdata**: Más legible, mejor soporte en frameworks modernos
+- **llms.txt en `/public/`**: Fácil descubrimiento, no requiere parsing
+- **API REST sobre GraphQL**: Simplicidad, caching en Vercel Edge
+- **Múltiples formatos de cita**: Académicos (BibTeX), generales (APA/MLA), IA (JSON)
+
+### ⚠️ Consideraciones
+
+- **Maintainance overhead**: 3 schemas por post requieren validación
+- **Vercel Edge limits**: API endpoint puede necesitar rate limiting
+- **Adoption uncertain**: Los LLMs todavía priorizan scraping de texto plano
+
+---
+
+## Próximos pasos
+
+1. **Fase 4**: Integración con frameworks de RAG (LlamaIndex)
+2. **Fase 5**: Analytics específicos para agentes (User-Agent parsing)
+3. **Fase 6**: Endpoint de "content embeddings" para retrieval semántico
+
+---
+
+## Código fuente
+
+Todo el código está en GitHub: [kr0nicas/ochoajorge-blog-me](https://github.com/kr0nicas/ochoajorge-blog-me)
+
+Commits relevantes:
+- `a2eb5bd` — feat(seo): add JSON-LD structured data and llms.txt
+- `d97cea5` — feat(citation): add AI-native citation mechanisms
+
+---
+
+## Referencias
+
+- [Schema.org - BlogPosting](https://schema.org/BlogPosting)
+- [llms.txt Specification](https://llmstxt.org/)
+- [Google Structured Data Markup](https://developers.google.com/search/docs/appearance/structured-data/intro-structured-data)
+- [Next.js Metadata API](https://nextjs.org/docs/app/api-reference/functions/generate-metadata)
+
+---
+
+## Conclusión
+
+El SEO tradicional no es suficiente en la era de la IA. Al implementar datos estructurados, mecanismos de citación claros y guías para agentes, transformé el blog en un **activo semántico** que puede ser consumido y atribuido correctamente por LLMs.
+
+Este no es un proyecto de optimización para Google — es sobre construir **credibilidad en la era de la IA sintética**.
+
+*¿Ya preparaste tu blog para los agentes?*
