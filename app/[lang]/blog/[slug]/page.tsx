@@ -13,6 +13,7 @@ import { Comments } from "@/components/blog/Comments";
 import { ReferencePanel } from "@/components/blog/ReferencePanel";
 import { Github } from "lucide-react";
 import { slugify } from "@/lib/utils";
+import { BlogPostingJsonLd, PersonJsonLd, OrganizationJsonLd } from "@/components/seo/JsonLd";
 
 interface PostPageProps {
     params: Promise<{ slug: string; lang: string }>;
@@ -88,34 +89,55 @@ export default async function PostPage({ params }: PostPageProps) {
     const { content } = await compileMDXContent(post.content);
     const seriesSlug = post.series ? slugify(post.series.name) : undefined;
 
-    // JSON-LD structured data
-    const jsonLd = {
-        "@context": "https://schema.org",
-        "@type": "TechArticle",
-        headline: post.title,
-        description: post.description,
-        datePublished: post.date,
-        author: {
-            "@type": "Person",
-            name: siteConfig.author.name,
-            url: siteConfig.url,
-        },
-        publisher: {
-            "@type": "Person",
-            name: siteConfig.author.name,
-        },
-        keywords: (post.tags ?? []).join(", "),
-        url: `${siteConfig.url}/${lang}/blog/${post.slug}`,
-    };
+    // Normalize OG image for JSON-LD
+    const ogImage = post.coverImage ?? post.ogImage ?? siteConfig.ogImage;
+    const normalizedOgImage =
+        ogImage && !ogImage.startsWith("http")
+            ? new URL(ogImage.startsWith("/") ? ogImage : `/${ogImage}`, siteConfig.url).toString()
+            : ogImage;
 
     const isSpanish = lang === "es";
 
     return (
         <>
-            {/* JSON-LD */}
-            <script
-                type="application/ld+json"
-                dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+            {/* JSON-LD Structured Data for AI Agents */}
+            <BlogPostingJsonLd
+                title={post.title}
+                description={post.description}
+                url={`${siteConfig.url}/${lang}/blog/${post.slug}`}
+                datePublished={post.date}
+                dateModified={post.date}
+                author={{
+                    name: siteConfig.author.name,
+                    url: siteConfig.url,
+                }}
+                image={normalizedOgImage}
+                tags={post.tags}
+                seriesName={post.series?.name}
+                seriesPart={post.series?.part}
+            />
+
+            {/* Author Person Schema */}
+            <PersonJsonLd
+                name={siteConfig.author.name}
+                url={siteConfig.url}
+                jobTitle="Specialist Technology Architect"
+                worksFor={{
+                    name: "Equifax LATAM",
+                    url: "https://www.equifax.com/latam"
+                }}
+            />
+
+            {/* Organization Schema */}
+            <OrganizationJsonLd
+                name="Jorge Ochoa"
+                url={siteConfig.url}
+                description="Personal blog about software architecture, AI systems, and clean code patterns"
+                logo={siteConfig.ogImage}
+                sameAs={[
+                    siteConfig.author.github,
+                    siteConfig.author.linkedin
+                ]}
             />
 
             {/* Reading progress bar */}

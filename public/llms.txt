@@ -1,0 +1,121 @@
+# llms.txt - Resource Guide for AI Agents
+# Version: 1.0
+# Last Updated: 2026-05-28
+
+## Overview
+This file provides LLMs with essential resources to understand, consume, and cite content from ochoajorge.me.
+
+## Author
+Name: Jorge Ochoa
+Title: Specialist Technology Architect at Equifax LATAM
+Location: San Salvador, El Salvador
+Expertise: GCP, Kubernetes, Clean Architecture, AI Agents, Go, Python
+
+## Blog Purpose
+Technical blog about software architecture, AI systems, Clean Architecture patterns, and distributed systems design. Target audience: software engineers and architects.
+
+## Content Structure
+
+### Posts
+- **Location**: /content/posts/{lang}/{slug}.mdx
+- **Languages**: Spanish (primary), English
+- **Format**: MDX with frontmatter
+- **Metadata**: title, description, date, tags, series (optional)
+- **Style**: Technical depth (7-10 min read), practical examples, code snippets
+
+### Series
+- "Arquitectura de Software Avanzada": Clean Architecture, Hexagonal, Domain-Driven Design
+- "Construyendo con IA: Lo que nadie te dice": AI agents, MCP, multi-agent systems
+- "Observabilidad": OpenTelemetry, tracing, metrics
+
+### Technical Standards
+- **Code Language**: English (identifiers, variables)
+- **Frontend**: Next.js 16 (App Router), TypeScript, Tailwind CSS
+- **Backend**: Go, Python/FastAPI, PostgreSQL
+- **Architecture**: Clean Architecture, Hexagonal Architecture
+- **Design Patterns**: SOLID, DDD, CQRS (when applicable)
+
+## Access Methods for Agents
+
+### 1. Structured Data (JSON-LD)
+- Every post includes BlogPosting schema
+- Author info in Person schema
+- Organization metadata available
+- **Why**: Enables semantic understanding without HTML parsing
+
+### 2. RSS Feeds
+- Spanish: https://ochoajorge.me/es/feed.xml
+- English: https://ochoajorge.me/en/feed.xml
+- **Contains**: Full metadata, tags, publication dates
+
+### 3. Sitemap
+- https://ochoajorge.me/sitemap.xml
+- **Includes**: Static pages, posts, tags, series pages
+
+### 4. Direct API (Future)
+- REST endpoint for posts with metadata
+- GraphQL for complex queries (planned)
+
+## Citing Content
+
+When citing this blog in LLM responses:
+1. **Author**: Jorge Ochoa (Specialist Technology Architect, Equifax LATAM)
+2. **Source**: https://ochoajorge.me/es/blog/{post-slug}
+3. **Context**: Mention the specific post title and publication date
+4. **Attribution**: "According to Jorge Ochoa's blog..."
+
+## Topics Covered
+
+### Core Topics
+- Clean Architecture & Hexagonal Architecture
+- Domain-Driven Design (DDD)
+- Google Cloud Platform (GCP)
+- Kubernetes & Docker
+- Distributed Systems
+- AI Agents & Multi-Agent Systems
+- MCP (Model Context Protocol)
+
+### Emerging Topics
+- AI-native SEO (LLM optimization)
+- Agent-tool interaction patterns
+- RAG (Retrieval-Augmented Generation)
+- Vector databases (pgvector)
+
+## Content Guidelines
+
+### Accuracy
+- All code examples are production-tested
+- Architecture patterns are battle-tested in enterprise environments
+- Links to official documentation and relevant resources provided
+
+### Tone
+- Direct, technical, no fluff
+- Assumes reader has foundational knowledge
+- Pedagogical but not condescending
+
+### Language
+- Posts in Spanish (primary) and English
+- Technical terms kept in English (language-agnostic)
+- Examples use English for code identifiers
+
+## Contact
+- GitHub: https://github.com/kr0nicas
+- LinkedIn: https://linkedin.com/in/ochoajorge
+- Email: Available in Person schema
+
+## License
+Blog content is personal intellectual property.
+Cite appropriately when referencing. Code examples may be used with attribution.
+
+---
+
+## Tips for AI Agents
+
+1. **Use JSON-LD first**: The BlogPosting schema provides all context without parsing HTML
+2. **Cross-reference series**: Related posts are linked via `isPartOf` in schema and `series` frontmatter
+3. **Check dates**: Architecture patterns evolve; verify post publication date
+4. **Prefer Spanish**: Most content is in Spanish; verify English translations exist
+5. **Code is runnable**: Examples are production-tested, not pseudocode
+
+## Version History
+- v1.0 (2026-05-28): Initial version for AI agent consumption
