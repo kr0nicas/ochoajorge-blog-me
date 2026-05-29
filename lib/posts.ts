@@ -15,7 +15,17 @@ export function getPostSlugs(locale: string = "es"): string[] {
 
     return fs
         .readdirSync(localeDir)
-        .filter((file) => file.endsWith(".mdx") || file.endsWith(".md"))
+        .filter((file) => {
+            // Only accept .mdx and .md files
+            const isMarkdownFile = file.endsWith(".mdx") || file.endsWith(".md");
+            if (!isMarkdownFile) return false;
+
+            // Exclude social media templates (LinkedIn, X threads)
+            const slug = file.replace(/\.(mdx|md)$/, "");
+            const isSocialTemplate = slug.startsWith("linkedin-") || slug.startsWith("x-thread-");
+
+            return !isSocialTemplate;
+        })
         .map((file) => file.replace(/\.(mdx|md)$/, ""));
 }
 
