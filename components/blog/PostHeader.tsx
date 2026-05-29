@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Calendar, Clock, ArrowLeft } from "lucide-react";
 import type { Post } from "@/lib/types";
-import { formatDate } from "@/lib/utils";
+import { formatDate, siteConfig } from "@/lib/utils";
+import { ShareButton } from "@/components/blog/ShareButton";
 
 interface PostHeaderProps {
     post: Post;
@@ -62,6 +63,13 @@ export function PostHeader({ post, lang }: PostHeaderProps) {
                         {post.readingTime} {isSpanish ? "min de lectura" : "min read"}
                     </span>
                 )}
+                <div className="ml-auto">
+                    <ShareButton
+                        title={post.title}
+                        url={`${siteConfig.url}/${lang}/blog/${post.slug}`}
+                        lang={lang as "es" | "en"}
+                    />
+                </div>
             </div>
         </header>
     );
