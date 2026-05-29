@@ -43,7 +43,7 @@ export const dictionaries = {
         },
         hero: {
             title: "Technology Architect & Cloud Strategist",
-            subtitle: "8+ years architecting cloud transformations at Equifax LATAM. I write about production-grade architecture — Go, Kubernetes, Clean Architecture, and integrating AI Agents without breaking your stack.",
+            subtitle: "10+ years architecting cloud transformations at Equifax LATAM. I write about production-grade architecture — Go, Kubernetes, Clean Architecture, and integrating AI Agents without breaking your stack.",
         },
         footer: {
             built_with: "Built with",
