@@ -9,7 +9,7 @@ export const dictionaries = {
         },
         hero: {
             title: "Arquitecto de Plataforma & Entusiasta Tech",
-            subtitle: "Diseñando soluciones en la nube de alto rendimiento. Escribo sobre Kubernetes, Clean Architecture, Go y la integración de Agentes de IA.",
+            subtitle: "Specialist Technology Architect en Equifax LATAM. Transformo stacks heredados en plataformas cloud-first con Go y Kubernetes. Escribo sobre arquitectura avanzada, patrones multi-agente y cómo construir sistemas que escalan — no solo en código, sino en equipo.",
         },
         footer: {
             built_with: "Construido con",
@@ -43,7 +43,7 @@ export const dictionaries = {
         },
         hero: {
             title: "Technology Architect & Cloud Strategist",
-            subtitle: "Designing high-performance cloud solutions. Writing about Kubernetes, Clean Architecture, Go, and applied AI Agents.",
+            subtitle: "8+ years architecting cloud transformations at Equifax LATAM. I write about production-grade architecture — Go, Kubernetes, Clean Architecture, and integrating AI Agents without breaking your stack.",
         },
         footer: {
             built_with: "Built with",
