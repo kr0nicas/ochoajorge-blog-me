@@ -78,16 +78,19 @@ export function getPostBySlug(slug: string, locale: string = "es"): PostWithCont
 }
 
 /**
- * Get all posts for a locale, sorted by date.
+ * Get all posts for a locale, sorted by date with featured boost.
+ * Featured posts get a 30-day boost in sorting, but very recent non-featured posts can outrank old featured posts.
  */
 export function getAllPosts(locale: string = "es"): Post[] {
+    const FEATURED_BOOST_MS = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
+
     return getPostSlugs(locale)
         .map((slug) => getPostBySlug(slug, locale))
         .filter((post): post is PostWithContent => post !== null)
         .sort((a, b) => {
-            if (a.featured && !b.featured) return -1;
-            if (!a.featured && b.featured) return 1;
-            return new Date(b.date).getTime() - new Date(a.date).getTime();
+            const aTimestamp = new Date(a.date).getTime() + (a.featured ? FEATURED_BOOST_MS : 0);
+            const bTimestamp = new Date(b.date).getTime() + (b.featured ? FEATURED_BOOST_MS : 0);
+            return bTimestamp - aTimestamp;
         });
 }
 
