@@ -11,6 +11,7 @@ import { RelatedPosts } from "@/components/blog/RelatedPosts";
 import { ReaderMode } from "@/components/blog/ReaderMode";
 import { Comments } from "@/components/blog/Comments";
 import { ReferencePanel } from "@/components/blog/ReferencePanel";
+import { CitationButton } from "@/components/blog/CitationButton";
 import { Github } from "lucide-react";
 import { slugify } from "@/lib/utils";
 import { BlogPostingJsonLd, PersonJsonLd, OrganizationJsonLd } from "@/components/seo/JsonLd";
@@ -188,13 +189,21 @@ export default async function PostPage({ params }: PostPageProps) {
                             {/* Footer */}
                             <footer className="mt-16 border-t border-[var(--border)] pt-8">
                                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                                    <p className="text-sm text-[var(--text-muted)]">
-                                        {isSpanish ? "Escrito por" : "Written by"}{" "}
-                                        <span className="font-medium text-[var(--text-primary)]">
-                                            {siteConfig.author.name}
-                                        </span>
-                                        . {isSpanish ? "¿Encontraste un error?" : "Found a typo or an error?"}
-                                    </p>
+                                    <div className="flex flex-col gap-2">
+                                        <p className="text-sm text-[var(--text-muted)]">
+                                            {isSpanish ? "Escrito por" : "Written by"}{" "}
+                                            <span className="font-medium text-[var(--text-primary)]">
+                                                {siteConfig.author.name}
+                                            </span>
+                                            . {isSpanish ? "¿Encontraste un error?" : "Found a typo or an error?"}
+                                        </p>
+                                        <CitationButton
+                                            title={post.title}
+                                            url={`${siteConfig.url}/${lang}/blog/${post.slug}`}
+                                            datePublished={post.date}
+                                            lang={lang as "es" | "en"}
+                                        />
+                                    </div>
                                     <a
                                         href={siteConfig.author.github}
                                         target="_blank"
