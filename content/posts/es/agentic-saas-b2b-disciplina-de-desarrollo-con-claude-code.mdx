@@ -1,0 +1,560 @@
+---
+title: "Agentic SaaS B2B: Disciplina de Desarrollo con Claude Code"
+description: "Plugin Claude Code con 18 reglas universales para SaaS B2B multi-tenant. RLS, anti-type-invention, TDD obligatorio y disciplina de producción desde 50 sprints."
+date: "2026-05-29"
+canonical: "https://ochoajorge.me/es/blog/agentic-saas-b2b-disciplina-de-desarrollo-con-claude-code"
+tags: ["agentes-ia", "arquitectura", "devex-tools"]
+lang: "es"
+draft: true
+featured: false
+coverImage: "https://cdn.jsdelivr.net/gh/kr0nicas/ochoajorge-blog-me@og-images/agentic-saas-b2b-disciplina-claude-code.jpg"
+resources:
+  - label: "agentic-saas-b2b-itproject — GitHub"
+    url: "https://github.com/kr0nicas/agentic-saas-b2b-itproject"
+  - label: "Claude Code — Official Documentation"
+    url: "https://code.anthropic.com/docs"
+---
+
+## El Problema: Boilerplates No Resuelven la Disciplina
+
+Hace 50 sprints estábamos construyendo Kelova, una plataforma B2B de conocimiento para LATAM. Teníamos Clean Architecture, Hexagonal, patrones SOLID, y sin embargo los mismos problemas seguían apareciendo:
+
+- Un desarrollador crea `UserRepositoryV2` porque no encontró la original
+- Otro inventa `TenantContext` type cuando ya existe `TenantScope`
+- Query sin `WHERE tenant_id` porque se olvidó que es multi-tenant
+- Tests después de implementación porque "es más rápido"
+- 4 archivos de `utils.go`, `helpers.go`, `common.go` acumulando basura
+
+El problema no es el código. El problema es la **disciplina**.
+
+Boilerplates generan esqueletos. Esqueletos no aseguran que en el sprint 47 todavía estés respetando RLS, reusando tipos, y escribiendo tests primero.
+
+La única forma de mantener disciplina en un equipo de 5+ desarrolladores a lo largo de 50 sprints no es más documentación, ni más code reviews. Es **automatizar la disciplina**.
+
+---
+
+## El Concepto: Plugin de Claude Code como Guardrail del Equipo
+
+Acabo de liberar [agentic-saas-b2b-itproject](https://github.com/kr0nicas/agentic-saas-b2b-itproject), un plugin de Claude Code que provee la disciplina de desarrollo para SaaS B2B multi-tenant.
+
+<Callout type="warning" title="Lo que NO es">
+Este plugin NO es un boilerplate. NO genera handlers, schemas ni migraciones. NO te impone framework (Go, TypeScript, Python, todos funcionan). Provee **disciplina**, no **plantillas** de código.
+</Callout>
+
+**Filosofía central:** Las herramientas de IA deben enforcing your business rules, no generating your code.
+
+El plugin tiene tres capas:
+
+1. **18 Reglas Universales de Negocio** — Mandatorias, extraídas de producción
+2. **Agents Especializados** — Architect-Solution implementado, 12 más planeados
+3. **Skills Auto-Activables** — `interfaces-extraction`, `gotchas-discipline`, `multi-tenant-rls`
+
+---
+
+## Las 18 Reglas Universales
+
+Estas reglas no son "best practices genéricas". Son aprendizajes dolorosos de producción — bugs que explotaron en staging, clientes que bloquearon queries porque violamos RLS, `type` que causaron ciclos de import que tardamos 3 días en debuggear.
+
+Aquí están las 18 reglas, categorizadas por dominio:
+
+### Seguridad y Multi-Tenancy
+
+<Callout type="danger" title="R1: RLS obligatorio">
+Tenant isolation via `SET LOCAL` + Postgres policies. `TestTenantIsolation` debe pasar en CI sin excepción.
+</Callout>
+
+```sql
+-- Patrón canónico (survivió 50 sprints de producción)
+BEGIN;
+
+SET LOCAL app.current_tenant_id = 'tenant-123';
+
+-- Esta query automáticamente filtrará por tenant_id
+SELECT * FROM documents WHERE id = $1;
+
+COMMIT;
+```
+
+<Callout type="danger" title="R6: API keys shown once">
+bcrypt hash cost 12. El usuario ve el secret UNA vez. Si lo pierde, debe rotar. Nunca permitir "show secret again".
+</Callout>
+
+<Callout type="danger" title="R7: No client data en logs">
+Nunca loggear `query_text`, `response_text`, `chunk_content`. Solo metadata: `tenant_id`, `document_id`, `status`.
+</Callout>
+
+<Callout type="danger" title="R12: Encrypted credentials at rest">
+AES-256-GCM. Key en cloud secret manager (GCP Secret Manager, AWS Secrets Manager). Nunca en variables de entorno ni en código.
+</Callout>
+
+<Callout type="info" title="R16: Infra endpoints sin JWT">
+`/health`, `/webhooks/*` usan HMAC propio o son públicos por diseño. JWT solo para endpoints de negocio.
+</Callout>
+
+### Desarrollo y Calidad
+
+<Callout type="warning" title="R9: Mandatory modularity">
+300 líneas max por archivo. No `utils.go`, `helpers.go`, `common.go`. Sin ciclos de import.
+</Callout>
+
+<Callout type="warning" title="R13: Anti-type-invention">
+Leer `docs/architecture/interfaces.md` antes de definir cualquier nuevo type. Reuso es mandatorio.
+</Callout>
+
+<Callout type="warning" title="R18: Mandatory TDD">
+Tests primero, implementación después. No `*_test.*` = PR no mergea.
+</Callout>
+
+<Callout type="warning" title="R2: Agent never invents data">
+Si la info no existe: "No encontré información sobre X". Nunca alucinar precios, condiciones, límites de plan.
+</Callout>
+
+### Negocio y Facturación
+
+<Callout type="tip" title="R3: Plan limits don't block">
+Overages se loguean y facturan, no bloquean. Solo `status: suspended` afecta operaciones.
+</Callout>
+
+<Callout type="tip" title="R8: Manual billing in pilot">
+No gateway automático hasta milestone explícito (>5 clientes pagando). Stripe manual, Excel, o lo que sea.
+</Callout>
+
+<Callout type="tip" title="R11: Transactional agent no se autoconfirma">
+Cada orden es `draft` hasta confirmación explícita humana. Nunca auto-commit.
+</Callout>
+
+### Ingestión y Datos
+
+<Callout type="info" title="R4: chunk_strategy is automatic">
+Sistema detecta por MIME type. Usuario nunca elige chunking manualmente.
+</Callout>
+
+<Callout type="info" title="R5: Visible freshness">
+Cada chunk tiene `synced_at`. Badge de freshness es parte de value proposition.
+</Callout>
+
+<Callout type="info" title="R10: Atomic ingestion">
+Pipeline 2-fase: embeddings parciales OK, DB write en single transaction.
+</Callout>
+
+<Callout type="info" title="R14: Immutable migrations">
+Una vez aplicada, nunca se edita. Corrección = nueva migración con número siguiente.
+</Callout>
+
+<Callout type="info" title="R15: Errors update sources.status">
+Cada falla de ingestión deja trace en DB + logs. No silent failures.
+</Callout>
+
+<Callout type="info" title="R17: Suspended tenant retains read">
+Bloquear queries en producción rompe operaciones del cliente. Suspensión = bloqueo de escritura, no lectura.
+</Callout>
+
+---
+
+## Skills Implementadas
+
+### Skill 1: interfaces-extraction
+
+Problema: En equipos de 5+ desarrolladores, el catálogo de tipos se fragmenta. Alguien inventa `TenantID`, otro usa `TenantID string`, otro `type TenantId string`.
+
+<Callout type="success" title="Auto-invocable">
+Esta skill se auto-activa ANTES de crear cualquier nuevo type. No necesitas pedirla.
+</Callout>
+
+**Cómo funciona:**
+1. Lee `docs/architecture/interfaces.md` (catálogo canónico)
+2. Extrae AST del codebase actual (Go/TypeScript/Python)
+3. Genera diff: tipos nuevos vs existentes
+4. Si intentas inventar un type duplicado, te bloquea y muestra la ubicación del original
+
+<FileTree title="Estructura generada por la skill">
+docs/
+  architecture/
+    interfaces.md
+templates/
+  interfaces-catalog/
+    go/
+      tenant.go
+      document.go
+    typescript/
+      tenant.ts
+      document.ts
+</FileTree>
+
+**Output típico cuando intentas inventar `TenantID`:**
+
+```
+❌ ERROR: Anti-type-invention violado
+
+Intentaste definir: `type TenantID string`
+Pero ya existe en: `docs/architecture/interfaces.md#L42`
+Definición canónica:
+  - Go: `type TenantID string` (pkg/domain/tenant/tenant.go:12)
+  - TS: `type TenantID = string` (src/types/tenant.ts:8)
+
+Action: Importar y reusar el tipo existente.
+```
+
+---
+
+### Skill 2: gotchas-discipline
+
+Problema: Bug que te tomó 3 horas resolver hoy, el equipo lo vuelve a cometer en 2 semanas porque no se documentó.
+
+**Workflow:**
+
+<Steps>
+<Step title="Inicio de sesión de código">
+La skill escanea `.claude/gotchas.md`. Si está vacío, lo inicializa con template.
+
+```markdown
+# Gotchas — Capital de equipo
+
+Ultima actualización: 2026-05-29
+
+## [R13] Anti-type-invention
+Fecha descubrimiento: 2026-03-17
+Sprint: 23
+
+**El bug:** Inventamos `TenantID` cuando ya existía `TenantId`. Causó 2 horas de debugging de cyclical imports.
+
+**La solución:** Skill `interfaces-extraction` ahora auto-escanea y previene reinvento de tipos.
+
+**Pattern:** Nunca definir type nuevo sin revisar `docs/architecture/interfaces.md` primero.
+```
+</Step>
+
+<Step title="En debugging">
+Cuando estás atascado en un bug no-obvio ("esto debería funcionar pero no"), ejecutas:
+
+```
+/gotchas-discipline --analyze
+```
+
+La skill busca en `gotchas.md` patrones similares. Si encuentra algo:
+
+```
+💡 GOTCHA DETECTADO
+
+Tu actual bug parece relacionado con [R13]:
+  - Patrón: type duplicado causando cyclic imports
+  - Ocurrencia previa: Sprint 23
+  - Siéntete libre de revisar el diff de ese commit para comparar
+```
+</Step>
+<Step title="Al resolver">
+Cuando resuelves el bug, la skill te pregunta si quieres agregarlo a `gotchas.md`. Si confirmas:
+
+```
+✅ Gotcha agregado al capital del equipo
+
+Título: [R9] Modularity — 300 lines max file
+Sprint: 47
+Categoría: Architecture
+
+El bug fue causado por `pkg/services/document_processor.go` llegando a 450 líneas.
+Split en 3 archivos: `ingestion.go`, `embedding.go`, `storage.go`.
+
+Ahora: Team nunca perderá tiempo en el mismo problema.
+```
+</Step>
+</Steps>
+
+**Resultado:** Después de 50 sprints, `gotchas.md` tiene 45+ gotchas que el equipo nunca vuelve a cometer. Capital acumulado, no repetición de errores.
+
+---
+
+### Skill 3: multi-tenant-rls
+
+Problema: Escribir queries sin `WHERE tenant_id` es el error #1 en SaaS multi-tenant. Code review a veces lo atrapa, a veces no.
+
+**Auto-activación:** Cuando escribes queries DML (SELECT/INSERT/UPDATE/DELETE) en archivos que matchean patrones de DB layer.
+
+<Callout type="danger" title="Anti-pattern detectado">
+Si escribes `SELECT * FROM documents` sin `WHERE tenant_id`, la skill te bloquea con patch sugerido.
+</Callout>
+
+**Patrón canónico que enforcea:**
+
+```go
+// ✅ CORRECTO — Pattern enforced por skill
+func (r *DocumentRepository) FindByID(ctx context.Context, id string) (*Document, error) {
+    tenantID := tenant.FromContext(ctx)
+
+    var doc Document
+    err := r.db.QueryRowContext(ctx, `
+        SELECT id, tenant_id, content, created_at
+        FROM documents
+        WHERE id = $1
+    `, id).Scan(&doc.ID, &doc.TenantID, &doc.Content, &doc.CreatedAt)
+
+    return &doc, err
+}
+
+// ❌ INCORRECTO — Te bloquea la skill
+func (r *DocumentRepository) FindByID(ctx context.Context, id string) (*Document, error) {
+    // FALTA: tenant.FromContext(ctx)
+    var doc Document
+    err := r.db.QueryRowContext(ctx, `
+        SELECT id, tenant_id, content, created_at
+        FROM documents
+        WHERE id = $1
+    `, id).Scan(&doc.ID, &doc.TenantID, &doc.Content, &doc.CreatedAt)
+
+    return &doc, err
+}
+```
+
+**Output de la skill:**
+
+```
+🚨 RLS VIOLATION DETECTADO
+
+File: pkg/db/documents/repository.go:17
+Query: SELECT id, tenant_id, content, created_at FROM documents WHERE id = $1
+
+Problema:
+  - Falta `tenant.FromContext(ctx)` antes de la query
+  - Sin tenant_id en WHERE, esta query podría leak data cross-tenant
+
+Patch sugerido:
+
+```diff
++ tenantID := tenant.FromContext(ctx)
+
+  var doc Document
+  err := r.db.QueryRowContext(ctx, `
+      SELECT id, tenant_id, content, created_at
+      FROM documents
+-     WHERE id = $1
++     WHERE id = $1 AND tenant_id = $2
+- `, id).Scan(...)
++ `, id, tenantID).Scan(...)
+```
+
+Apply? [y/N]
+```
+
+---
+
+## Agents: Architect-Solution Implementado
+
+Actualmente **1 agent implementado**, **12 planeados**. El único disponible es `architect-solution`.
+
+### Cuando usar Architect-Solution
+
+- Nuevos ADRs (Architecture Decision Records)
+- Decisiones cross-module que afectan múltiples services
+- Enforcing R9 (modularity) y R13 (anti-invention)
+- Review de patrones que podrían causar debt técnico
+
+### Prompt de ejemplo
+
+```
+/architect-solution "Estamos agregando un connector para Google Drive. ¿Qué arquitectura debemos usar? Monolito vs microservicio?"
+
+Contexto:
+- Ya tenemos connectors para OneDrive y SharePoint (monolito)
+- Este connector requiere webhooks (Drive API push notifications)
+- El equipo de 5 devs está cómodo con Go, menos con TS
+
+Output esperado:
+1. Recomendación con trade-offs
+2. Si es monolito: cómo integrar webhooks sin romper R9 (300 lines max)
+3. Si es microservicio: cómo orquestar sin introducir 2 nuevos services
+4. Referencias a ADRs previos similares
+5. Check de compatibilidad con R13 (anti-type-invention)
+```
+
+### Output típico
+
+```
+## Recomendación: Monolito Modular
+
+**Trade-off analysis:**
+
+| Factor | Monolito | Microservicio | Veredicto |
+|--------|----------|---------------|-----------|
+| Time to market | 2 sprints | 4 sprints | Monolito ✅ |
+| R9 compliance | Fácil (enforce en code review) | Complicado (orquestación cross-service) | Monolito ✅ |
+| Webhooks | Funciona bien | Mejor separación concerns | Tie |
+| Dev familiarity | Go fuerte, TS medio | Go fuerte, TS medio | Monolito ✅ |
+
+**Patroón propuesto:**
+
+```go
+pkg/connectors/drive/
+  ├── webhook_handler.go       (max 200 lines)
+  ├── ingestion_service.go     (max 250 lines)
+  └── storage_adapter.go       (max 150 lines)
+```
+
+**Check de R13 (anti-type-invention):**
+- ✅ Reusing `ConnectorID` (docs/architecture/interfaces.md:78)
+- ✅ Reusing `WebhookEvent` (same file:85)
+- ❌ WARNING: No inventar `DriveFileID` — usar `ExternalFileID` existente
+
+**Referencias:**
+- ADR-003: Connectors monolíticos (OneDrive/SharePoint pattern)
+- ADR-007: Webhook handling (event sourcing pattern)
+- Sprint 34: SharePoint connector retrospecitiva (lessons learned)
+
+**Next steps:**
+1. Revisar ADR-003 para entender patrones existentes
+2. Crear `pkg/connectors/drive/webhook_handler.go` (target: 200 lines)
+3. Integrar con `webhook_ingestion_queue` existente
+4. PR debe pasar `CheckR9Modularity` (max 300 lines/file)
+```
+
+<Callout type="tip" title="12 agents planeados">
+Backend, DB, Frontend, QA, Security Officer, SRE, Billing, Connector Orchestrator, Migration Owner, API Gateway, Observability, Support Bot. Roadmap: Q3 2026 - Q2 2027.
+</Callout>
+
+---
+
+## Lessons Learned: 50 Sprints de Producción
+
+### 1. Reglas no escritas no existen
+
+Teníamos una wiki interna con "Best Practices". Nadie la leía. Escribir 18 reglas en README del repo las hace **disponibles**, pero no **enforceadas**.
+
+La diferencia crítica: **skills que se auto-activan**. `interfaces-extraction` corre antes de que definas un tipo. `multi-tenant-rls` te bloquea si escribes query sin tenant_id. La regla se ejecuta, no se sugiere.
+
+### 2. Anti-type-invention vale más de lo que crees
+
+R13 fue la regla más costosa de aprender. En el sprint 23, inventar `TenantID` cuando ya existía `TenantId` nos costó:
+- 2 horas debugging cyclic imports
+- 4 horas de refactor que afectó 7 archivos
+- 1 hour de code review para reviewers que ya lo habían revisado
+
+Total: 7 horas de billable time + deuda técnica + frustración del equipo.
+
+Hoy `interfaces-extraction` previene esto. La skill escanea antes de escribir. 7 horas ahorradas **por ocurrencia**. Si esto pasa 10 veces en 50 sprints, **70 horas ahorradas**.
+
+### 3. Gotchas como capital organizacional
+
+Después de 50 sprints, `gotchas.md` tiene 45+ gotchas documentadas. Cada gotcha es:
+- Una vez que el team perdió time
+- Una vez que NO perderá time de nuevo porque está documentado
+
+Esto no es solo documentation. Es **institutional memory** que se transfiere:
+
+- Nuevo dev se une: `gotchas.md` es su primer reading
+- Bug que toma 3 horas resolver: se agrega a `gotchas.md`
+- Sprint 47 sufre problema X: Sprint 48 no lo repite
+
+Capital acumulado vs repetición de errores.
+
+### 4. Stack-agnostic es key
+
+El plugin funciona con Go, TypeScript y Python. ¿Por qué? Porque las **reglas de negocio** son agnósticas:
+
+- RLS (R1) → Postgres pattern, no importa el lenguaje
+- Anti-type-invention (R13) → AST extraction, syntax-agnostic
+- TDD (R18) → Test framework convention, no se cierra a pytest/gotest/jest
+
+Si hubiéramos creado este plugin solo para Go, en el sprint 32 cuando adoptamos TypeScript para connectors, habríamos tenido que duplicar disciplina. Stack-agnostic = disciplina portable.
+
+### 5. Claude Code como substrate, no como silver bullet
+
+Este plugin **no hace que el equipo sea disciplinado**. El plugin **asiste al equipo disciplinado**.
+
+Diferencia clave:
+- ❌ Equipo indisciplinado + plugin = plugin bloquea, team lo desactiva
+- ✅ Equipo disciplinado + plugin = plugin previene errores humanos
+
+El plugin es un guardrail. Guardrails no te hacen mejor conductor, te evitan salirte de la carretera cuando te descuidas.
+
+---
+
+## Cómo Usarlo
+
+### Instalación
+
+```bash
+/plugin marketplace add kr0nicas/agentic-saas-b2b-itproject
+/plugin install agentic-saas-b2b-itproject
+```
+
+### Flujo de trabajo típico
+
+1. **Nuevo feature:** Claude Code detecta que vas a crear type → `interfaces-extraction` se auto-activa → te muestra tipos existentes
+2. **Query DB:** Escribes `SELECT * FROM documents` → `multi-tenant-rls` te bloquea → sugiere `WHERE tenant_id = $1`
+3. **Bug debugging:** Ejecutas `/gotchas-discipline --analyze` → detecta patrón similar → te muestra gotcha previa
+4. **Architecture decision:** `/architect-solution "debemos agregar X?"` → te da recomendación con trade-offs
+
+### Configuración mínima
+
+```bash
+# Inicializar interfaces.md (si no existe)
+touch docs/architecture/interfaces.md
+
+# Inicializar gotchas.md (si no existe)
+touch .claude/gotchas.md
+
+# Configurar tenant context (ejemplo en Go)
+# pkg/tenant/context.go
+package tenant
+
+type contextKey string
+
+const TenantKey contextKey = "tenant"
+
+func FromContext(ctx context.Context) string {
+    if tenantID, ok := ctx.Value(TenantKey).(string); ok {
+        return tenantID
+    }
+    return "" // O panic si strict
+}
+```
+
+---
+
+## Roadmap: Lo que viene
+
+**Q3 2026:**
+- [ ] Agent `backend` — Enforcing R9 modularity, R18 TDD
+- [ ] Agent `db` — Schema reviews, migration checks (R14)
+- [ ] Agent `qa` — Test coverage enforcement, flaky test detection
+
+**Q4 2026:**
+- [ ] Skill `pgvector-rag` — RAG patterns con pgvector
+- [ ] Skill `mcp-per-tenant` — MCP isolation por tenant
+- [ ] Agent `security-officer` — Enforcing R6, R12, R16
+
+**Q1 2027:**
+- [ ] Agent `billing` — Enforcing R3, R8, R11
+- [ ] Agent `connector-orchestrator` — Standardizing connectors (Drive, Dropbox, etc.)
+- [ ] Skill `manual-billing` — Excel/Stripe workflows hasta milestone de 5 clientes
+
+**Q2 2027:**
+- [ ] Agent `migration-owner` — Orquestando migrations (R14)
+- [ ] Agent `api-gateway` — API design, versioning, deprecation
+- [ ] Skill `credential-encryption` — Enforcing AES-256-GCM (R12)
+
+---
+
+## Conclusión
+
+El problema que este plugin resuelve no es "cómo escribir SaaS B2B". El problema es "cómo mantener disciplina en un equipo de 5+ desarrolladores a lo largo de 50+ sprints".
+
+Boilerplates te dan estructura. Code reviews dan feedback. Pero **ninguno enforcea las reglas de negocio**.
+
+18 reglas universales, extraídas de producción, automatizadas vía Claude Code. Skills que se auto-activan. Agents que recomiendan patrones basados en ADRs previos.
+
+<Callout type="success" title="El shift de mentalidad">
+No es "generar código más rápido". Es "evitar errores que ya aprendimos".
+</Callout>
+
+Si estás construyendo SaaS B2B multi-tenant, te invito a probar el plugin. No es silver bullet, pero si tu equipo es disciplinado, será un guardrail invaluable.
+
+---
+
+**Posts relacionados:**
+
+- [Hexagonal Architecture en Python](/es/blog/hexagonal-architecture-python-fastapi) — Patrones de arquitectura que informan R9 (modularity)
+- [ERP Multi-Tenant con Clean Architecture](/es/blog/building-multitenant-erp-clean-architecture) — Lecciones de producción que informan las 18 reglas
+- [Orchestrator-Worker en Producción](/es/blog/orchestrator-worker-multi-agente-produccion) — Agentes especializados como patrón de diseño
+- [MCP como Contrato entre Agentes](/es/blog/mcp-como-contrato-entre-agentes) — Patrones de integración que informan MCP-per-tenant (roadmap Q4)
+- [Vibe Coding en Producción](/es/blog/vibe-coding-en-produccion-realidad) — Por qué disciplina > velocidad sin guardrails
+- [Cursor/Copilot/Claude Code Evaluación 2026](/es/blog/cursor-copilot-claude-code-evaluacion-2026) — Por qué elegí Claude Code como substrate
