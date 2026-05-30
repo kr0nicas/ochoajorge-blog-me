@@ -5,7 +5,7 @@ date: "2026-05-29"
 canonical: "https://ochoajorge.me/es/blog/agentic-saas-b2b-disciplina-de-desarrollo-con-claude-code"
 tags: ["agentes-ia", "arquitectura", "devex-tools"]
 lang: "es"
-draft: true
+draft: false
 featured: false
 coverImage: "https://cdn.jsdelivr.net/gh/kr0nicas/ochoajorge-blog-me@og-images/agentic-saas-b2b-disciplina-claude-code.jpg"
 resources:
@@ -167,7 +167,9 @@ Esta skill se auto-activa ANTES de crear cualquier nuevo type. No necesitas pedi
 3. Genera diff: tipos nuevos vs existentes
 4. Si intentas inventar un type duplicado, te bloquea y muestra la ubicación del original
 
-<FileTree title="Estructura generada por la skill">
+**Estructura generada por la skill:**
+
+```
 docs/
   architecture/
     interfaces.md
@@ -179,7 +181,7 @@ templates/
     typescript/
       tenant.ts
       document.ts
-</FileTree>
+```
 
 **Output típico cuando intentas inventar `TenantID`:**
 
