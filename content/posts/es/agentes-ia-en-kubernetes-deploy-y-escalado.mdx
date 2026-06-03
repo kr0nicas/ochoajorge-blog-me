@@ -1,0 +1,499 @@
+---
+title: "Agentes IA en Kubernetes: Deploy y Escalado"
+description: "Deploy sistemas multi-agente en Kubernetes. Resource management, auto-scaling y mejores prácticas para agentes IA en producción con GKE y costos controlados."
+date: "2026-06-04"
+tags: ["agentes-ia", "kubernetes", "gcp", "devops"]
+lang: "es"
+draft: false
+featured: true
+---
+
+# Agentes IA en Kubernetes: Deploy y Escalado
+
+Los sistemas de agentes IA cambian las reglas del juego en Kubernetes. A diferencia de aplicaciones tradicionales, los agentes tienen características únicas: latencia variable, resource usage impredecible y patrones de tráfico bursty. Deployarlos en producción requiere un enfoque especial.
+
+## El Problema: Agentes ≠ Servicios Web
+
+Un API REST tradicional es predecible:
+
+```yaml
+# API REST típica: requests predecibles
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "500m"
+    memory: "256Mi"
+```
+
+Un agente IA es completamente diferente:
+
+```python
+# Agente con comportamiento no-determinista
+class ResearchAgent:
+    async def process_query(self, query: str):
+        # LLM call: 50-500 tokens, 100-2000ms latencia
+        context = await llm.generate(query)
+        
+        # RAG query: 10-100ms latencia, variable según tamaño de DB
+        docs = await vector_db.search(context)
+        
+        # Tool calls: 0-5 llamadas, cada una 100-5000ms
+        for tool in detected_tools:
+            result = await tool.execute(context)
+        
+        # Otro LLM call para síntesis: 200-1000 tokens
+        response = await llm.synthesize(context, docs, tool_results)
+        
+        return response
+```
+
+<Callout type="danger" title="Patrón de tráfico bursty">
+  Un query simple puede tardar 200ms (solo LLM) o 10s (LLM + RAG + 5 tools). Requests/sec son inútiles como métrica. Necesitas track de tokens/sec, tools calls/sec y latencia por tipo de query.
+</Callout>
+
+## Arquitectura de Deploy
+
+### Stack Tecnológico Recomendado
+
+- **Kubernetes:** GKE (Google Kubernetes Engine)
+- **Runtime:** gVisor para sandboxing de agentes
+- **Storage:** Cloud Storage para knowledge bases, Cloud SQL para metadata
+- **Monitoring:** Prometheus + Grafana + OpenTelemetry traces
+- **Autoscaling:** KEDA para scale-to-zero
+
+### Deployment Manifest
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: research-agent
+  labels:
+    app: research-agent
+    agent-type: llm
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: research-agent
+  template:
+    metadata:
+      labels:
+        app: research-agent
+        agent-type: llm
+    spec:
+      runtimeClassName: gvisor
+      containers:
+      - name: agent
+        image: gcr.io/project/research-agent:v1.2.0
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "512Mi"
+          limits:
+            cpu: "2000m"
+            memory: "2Gi"
+        env:
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: openai-credentials
+              key: api-key
+        - name: VECTOR_DB_URL
+          valueFrom:
+            configMapKeyRef:
+              name: agent-config
+              key: vector-db-url
+        - name: OTLP_ENDPOINT
+          value: "http://otel-collector:4317"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: research-agent-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: research-agent
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+```
+
+<Callout type="tip" title="Por qué gVisor?">
+  Los agentes IA ejecutan código dinámico (tool calls, plugins). gVisor proporciona sandboxing sin overhead significativo de rendimiento. Mejor que Docker para multi-tenancy.
+</Callout>
+
+## Resource Management
+
+### 1. Requests y Limits Estratégicos
+
+<ComparisonTable
+  headers={["Agente Simple (LLM only)", "Agente RAG (LLM + vector DB)", "Agente Complejo (LLM + tools)"]}
+  highlight={2}
+  rows={[
+    ["CPU: 100-500m, Memory: 256-512Mi", "CPU: 500-1000m, Memory: 512Mi-1Gi", "CPU: 1-2 cores, Memory: 1-2Gi"],
+    ["Latencia: 100-500ms", "Latencia: 200-1500ms", "Latencia: 500ms-10s"],
+    ["HPA min: 2, max: 6", "HPA min: 2, max: 8", "HPA min: 3, max: 12"],
+  ]}
+/>
+
+### 2. Prioridad y Preemption
+
+Para sistemas costosos, usa PriorityClass para proteger trabajos críticos:
+
+```yaml
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: agent-critical
+value: 1000
+globalDefault: false
+description: "Agents handling customer queries"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: agent-batch
+value: 500
+globalDefault: false
+description: "Agents for batch processing, analytics"
+```
+
+```python
+# Deployment para agentes críticos
+spec:
+  template:
+    spec:
+      priorityClassName: agent-critical
+      containers:
+      - name: critical-agent
+        # ... config
+
+# Deployment para agentes batch
+spec:
+  template:
+    spec:
+      priorityClassName: agent-batch
+      containers:
+      - name: batch-agent
+        # ... config
+```
+
+### 3. Node Affinity para GPUs
+
+Si usas modelos locales (Llama 3, Whisper):
+
+```yaml
+spec:
+  template:
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: nvidia.com/gpu
+                operator: Exists
+        containers:
+        - name: llm-agent
+          resources:
+            limits:
+              nvidia.com/gpu: "1"
+```
+
+## Auto-Scaling Inteligente
+
+### KEDA para Scale-to-Zero
+
+Los agentes IA pueden estar inactivos por horas. Scale-to-zero reduce costos drásticamente:
+
+```yaml
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: research-agent-scaler
+spec:
+  scaleTargetRef:
+    name: research-agent
+  minReplicaCount: 0
+  maxReplicaCount: 10
+  cooldownPeriod: 300
+  triggers:
+  - type: redis
+    metadata:
+      address: redis.default.svc.cluster.local:6379
+      listName: agent-queue
+      listLength: "5"
+      activationListLength: "1"
+```
+
+<Callout type="warning" title="Cold start penalties">
+  Scale-to-zero introduce cold starts (30-60s para primera request). Para sistemas interactivos, usa minReplicas > 0.
+</Callout>
+
+### Custom Metrics para Scaling
+
+CPU/Memory no son suficientes para agentes. Escala basado en tokens/sec:
+
+```yaml
+apiVersion: v1
+kind: ServiceMonitor
+metadata:
+  name: research-agent-monitor
+spec:
+  selector:
+    matchLabels:
+      app: research-agent
+  endpoints:
+  - port: metrics
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: research-agent-hpa-custom
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: research-agent
+  minReplicas: 2
+  maxReplicas: 15
+  metrics:
+  - type: Pods
+    pods:
+      metric:
+        name: tokens_per_second
+      target:
+        type: AverageValue
+        averageValue: "500"
+```
+
+```python
+# En tu agente: exporta métrica custom
+from prometheus_client import Counter, Gauge
+
+tokens_processed = Counter(
+    'agent_tokens_processed_total',
+    'Total tokens processed by agent',
+    ['agent_type', 'model']
+)
+
+tokens_rate = Gauge(
+    'agent_tokens_per_second',
+    'Tokens processed per second',
+    ['agent_type', 'model']
+)
+
+async def process_query(self, query: str):
+    start_time = time.time()
+    
+    # LLM call
+    response = await llm.generate(query)
+    tokens = response.usage.total_tokens
+    
+    # Update metrics
+    tokens_processed.labels(
+        agent_type="research",
+        model="gpt-4"
+    ).inc(tokens)
+    
+    # Calculate rate
+    elapsed = time.time() - start_time
+    rate = tokens / elapsed if elapsed > 0 else 0
+    tokens_rate.labels(
+        agent_type="research",
+        model="gpt-4"
+    ).set(rate)
+    
+    return response
+```
+
+## Observabilidad
+
+### OpenTelemetry para Distributed Tracing
+
+Los agentes IA son sistemas distribuidos complejos. Tracing es esencial:
+
+```python
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+
+# Setup
+trace.set_tracer_provider(TracerProvider())
+trace.get_tracer_provider().add_span_processor(
+    BatchSpanProcessor(OTLPSpanExporter(endpoint="http://otel-collector:4317"))
+)
+
+tracer = trace.get_tracer(__name__)
+
+async def process_query(self, query: str):
+    with tracer.start_as_current_span("agent.process_query") as span:
+        span.set_attribute("query.length", len(query))
+        span.set_attribute("query.type", self._detect_query_type(query))
+        
+        # LLM call span
+        with tracer.start_as_current_span("agent.llm_call") as llm_span:
+            llm_span.set_attribute("llm.model", "gpt-4")
+            llm_span.set_attribute("llm.temperature", 0.7)
+            
+            response = await llm.generate(query)
+            llm_span.set_attribute("llm.tokens_input", response.usage.prompt_tokens)
+            llm_span.set_attribute("llm.tokens_output", response.usage.completion_tokens)
+        
+        # RAG span
+        if self._needs_rag(query):
+            with tracer.start_as_current_span("agent.rag_search") as rag_span:
+                docs = await vector_db.search(query)
+                rag_span.set_attribute("rag.results_count", len(docs))
+        
+        # Tool calls span
+        for tool in detected_tools:
+            with tracer.start_as_current_span("agent.tool_call") as tool_span:
+                tool_span.set_attribute("tool.name", tool.name)
+                result = await tool.execute()
+                tool_span.set_attribute("tool.success", result.success)
+        
+        return response
+```
+
+### Dashboard Clave en Grafana
+
+Crea dashboards para:
+1. **Tokens/sec per agent** — throughput real
+2. **Latencia p50/p95/p99** — percentiles por tipo de query
+3. **Cost per agent** — tracking de costs
+4. **Error rate by tool** — qué tools fallan más
+5. **Vector DB query latency** — cuello de botella común
+
+## Cost Management
+
+### Cost Optimization Strategies
+
+<Steps>
+  <Step title="Right-sizing de recursos">
+    <CodeComparison
+      before={{
+        label: "❌ Over-provisioned",
+        code: `resources:
+  requests:
+    cpu: "2000m"      # Nunca usa más de 500m
+    memory: "4Gi"     # Nunca usa más de 1Gi
+  limits:
+    cpu: "4000m"
+    memory: "8Gi"
+# Costo mensual: ~$80 por pod`
+      }}
+      after={{
+        label: "✅ Right-sized",
+        code: `resources:
+  requests:
+    cpu: "500m"
+    memory: "512Mi"
+  limits:
+    cpu: "2000m"
+    memory: "2Gi"
+# Costo mensual: ~$20 por pod`
+      }}
+    />
+  </Step>
+  
+  <Step title="Spot preemptible instances">
+    Para workloads batch y non-critical, usa preemptible VMs:
+    
+    ```yaml
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: cloud.google.com/gke-preemptible
+              operator: Exists
+    ```
+  </Step>
+  
+  <Step title="Regional deployment para reducir latency">
+    Deploya agentes cerca de tus usuarios para reducir token costs (menos retries):
+    
+    ```yaml
+    # Deploy en regiones específicas
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: research-agent-us-east1
+    spec:
+      template:
+        spec:
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: topology.kubernetes.io/zone
+                    operator: In
+                    values:
+                    - us-east1-a
+                    - us-east1-b
+    ```
+  </Step>
+</Steps>
+
+### Budget Alerts
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cost-config
+data:
+  monthly-budget: "500"  # USD
+  alert-threshold: "0.8"  # 80% del budget
+  alerts-enabled: "true"
+```
+
+## Lecciones Aprendidas
+
+- **HPA basado solo en CPU/Memory es insuficiente** para agentes IA. Escala basado en tokens/sec y queue length.
+- **Cold starts son aceptables para batch, no para interactivos**. Usa KEDA con minReplicas > 0 para sistemas que necesitan respuesta inmediata.
+- **Right-sizing reduce costs 60-80%**. Monitoriza resource usage real y ajusta requests/limits mensualmente.
+- **Tracing no es opcional**. Sin distributed tracing, debugging agentes en producción es imposible.
+- **Spot instances para batch workloads**. Preemptible VMs son 70-80% más baratas que on-demand.
+
+## Conclusión
+
+Deployar agentes IA en Kubernetes requiere un enfoque diferente a aplicaciones tradicionales. Resource management debe considerar comportamiento no-determinista, auto-scaling basado en tokens/sec, y observabilidad con tracing distribuido.
+
+Kubernetes + GKE + OpenTelemetry + KEDA crea una plataforma robusta para sistemas multi-agente en producción. La clave está en adaptar las mejores prácticas de K8s al comportamiento único de los agentes IA.
+
+**¿Qué sigue?** En el próximo post de la serie "Construyendo con IA", exploraremos cómo la IA cambia (y no cambia) la deuda técnica: mitos y realidades.
+
+¿Has deployado agentes IA en producción? ¿Qué desafíos enfrentaste con auto-scaling y cost management? Comparte en los comentarios.
