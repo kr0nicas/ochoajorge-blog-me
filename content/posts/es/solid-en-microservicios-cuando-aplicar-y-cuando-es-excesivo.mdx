@@ -6,7 +6,7 @@ tags: ["arquitectura", "solid", "microservicios", "ingenieria-software"]
 lang: "es"
 draft: false
 featured: false
----
+series:
   name: "Arquitectura de Software Avanzada"
   part: 8
 ---
@@ -141,15 +141,15 @@ async def create_user(
 ```
 
 <ComparisonTable
-  headers={["Enfoque SOLID Extremo", "Enfoque Pragmático"]}
+  headers='["Enfoque SOLID Extremo", "Enfoque Pragmático"]'
   highlight={1}
-  rows={[
+  rows='[
     ["8 archivos para un CRUD", "1 archivo, funcionalidad completa"],
     ["Cambio = tocar 4 archivos", "Cambio = tocar 1 archivo"],
     ["Curva de aprendizaje alta", "Cualquier dev lo entiende en 5 min"],
     ["Testing requiere mocks complejos", "Testing simple con fixtures"],
-    ["Abstracciones nunca usadas", "Solo lo que necesitas"],
-  ]}
+    ["Abstracciones nunca usadas", "Solo lo que necesitas"]
+  ]'
 />
 
 ## Cuándo SOLID Importa
@@ -281,16 +281,16 @@ class PaymentService:
 ## Matriz de Decisión
 
 <ComparisonTable
-  headers={["Contexto", "SOLID Recomendado", "Pragmatismo Preferido"]}
+  headers='["Contexto", "SOLID Recomendado", "Pragmatismo Preferido"]'
   highlight={0}
-  rows={[
+  rows='[
     ["Dominio complejo (facturación, compliance)", "✅ SOLID", "❌"],
     ["Microservicio CRUD simple", "❌", "✅ Pragmático"],
     ["Equipo junior en crecimiento", "⚠️ Balanceado", "✅ Más pragmático"],
     ["Requerimientos cambiantes frecuentes", "✅ SOLID", "⚠️ Balanceado"],
     ["Time-to-market crítico (startup)", "❌", "✅ Pragmático"],
-    ["Sistema regulatorio (banca, salud)", "✅ SOLID", "❌"],
-  ]}
+    ["Sistema regulatorio (banca, salud)", "✅ SOLID", "❌"]
+  ]'
 />
 
 ## Trade-offs: Cuándo Escoger Qué
@@ -300,36 +300,8 @@ class PaymentService:
 <Steps>
   <Step title="Startup: Escoge pragmatismo">
     <CodeComparison
-      before={{
-        label: "❌ Startup con SOLID excesivo",
-        code: `# 3 meses construyendo infraestructura
-# 0 features shippeadas
-# Equipo frustrado
-
-class AbstractFactory(ABC):
-    @abstractmethod
-    def create(self) -> Any: pass
-
-class UserRepositoryFactory(AbstractFactory):
-    def create(self) -> UserRepository:
-        return PostgresqlUserRepository(...)
-        
-# Y así para cada entidad...`
-      }}
-      after={{
-        label: "✅ Startup pragmática",
-        code: `# 3 semanas, 5 features shippeadas
-# Equipo motivado, feedback rápido
-
-@app.post("/users")
-async def create_user(request: CreateUserRequest):
-    user = User(email=request.email, name=request.name)
-    db.add(user)
-    await db.commit()
-    return user
-
-# refactorizar cuando tenga deuda técnica`
-      }}
+      before='{"label":"❌ Startup con SOLID excesivo","code":"# 3 meses construyendo infraestructura\n# 0 features shippeadas\n# Equipo frustrado\n\nclass AbstractFactory(ABC):\n    @abstractmethod\n    def create(self) -> Any: pass\n\nclass UserRepositoryFactory(AbstractFactory):\n    def create(self) -> UserRepository:\n        return PostgresqlUserRepository(...)\n        \n# Y así para cada entidad..."}'
+      after='{"label":"✅ Startup pragmática","code":"# 3 semanas, 5 features shippeadas\n# Equipo motivado, feedback rápido\n\n@app.post(\"/users\")\nasync def create_user(request: CreateUserRequest):\n    user = User(email=request.email, name=request.name)\n    db.add(user)\n    await db.commit()\n    return user\n\n# refactorizar cuando tenga deuda técnica"}'
     />
   </Step>
   

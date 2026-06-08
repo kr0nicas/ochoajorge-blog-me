@@ -103,20 +103,24 @@ export function Callout({
    ══════════════════════════════════════════════════════════════ */
 
 export function ComparisonTable({
-    headers = [],
-    rows = [],
+    headers = "",
+    rows = "",
     highlight = 0,
 }: {
-    headers?: string[];
-    rows?: string[][];
+    headers?: string;
+    rows?: string;
     highlight?: number; // index of the "winning" column
 }) {
+    // Parse JSON strings to arrays
+    const parsedHeaders = headers ? JSON.parse(headers) : [];
+    const parsedRows = rows ? JSON.parse(rows) : [];
+
     return (
         <div className="not-prose my-6 overflow-x-auto rounded-xl border border-[var(--border)]">
             <table className="w-full text-sm">
                 <thead>
                     <tr className="border-b border-[var(--border)] bg-[var(--bg-elevated)]">
-                        {headers.map((h, i) => (
+                        {parsedHeaders.map((h: string, i: number) => (
                             <th
                                 key={i}
                                 className={cn(
@@ -137,12 +141,12 @@ export function ComparisonTable({
                     </tr>
                 </thead>
                 <tbody>
-                    {rows.map((row, ri) => (
+                    {parsedRows.map((row: string[], ri: number) => (
                         <tr
                             key={ri}
                             className="border-b border-[var(--border)] last:border-0 transition-colors hover:bg-[var(--bg-elevated)]"
                         >
-                            {row.map((cell, ci) => (
+                            {row.map((cell: string, ci: number) => (
                                 <td
                                     key={ci}
                                     className={cn(
@@ -236,13 +240,16 @@ export function CodeComparison({
     before,
     after,
 }: {
-    before: { label: string; code: string };
-    after: { label: string; code: string };
+    before: string;
+    after: string;
 }) {
     const [tab, setTab] = useState<"before" | "after">("before");
     const [copied, setCopied] = useState(false);
 
-    const currentCode = tab === "before" ? before.code : after.code;
+    // Parse JSON strings
+    const beforeObj = before ? JSON.parse(before) : { label: "", code: "" };
+    const afterObj = after ? JSON.parse(after) : { label: "", code: "" };
+    const currentCode = tab === "before" ? beforeObj.code : afterObj.code;
 
     const copy = () => {
         navigator.clipboard.writeText(currentCode);
@@ -266,7 +273,7 @@ export function CodeComparison({
                                     : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                             )}
                         >
-                            {t === "before" ? before.label : after.label}
+                            {t === "before" ? beforeObj.label : afterObj.label}
                         </button>
                     ))}
                 </div>
