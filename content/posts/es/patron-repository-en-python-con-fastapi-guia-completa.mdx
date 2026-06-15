@@ -1,38 +1,1027 @@
 ---
 title: "Patrón Repository en Python con FastAPI: Guía Completa"
-description: "Implementa el patrón Repository con FastAPI y Python. Arquitectura limpia, tests y ejemplos prácticos para aplicaciones escalables."
-date: "2026-06-18"
-tags: ["python", "fastapi", "arquitectura", "arquitectura-limpia"]
+description: "Implementa el patrón Repository en FastAPI con Clean Architecture y Hexagonal. Separa dominio de infraestructura, facilita testing y escala tu aplicación."
+date: "2026-06-25"
+canonical: "https://ochoajorge.me/es/blog/patron-repository-en-python-con-fastapi-guia-completa"
+tags: ["python", "fastapi", "arquitectura", "arquitectura-limpia", "hexagonal"]
 lang: "es"
-draft: true
-featured: false
 series:
   name: "Arquitectura de Software Avanzada"
   part: 7
+draft: true
+coverImage: "https://6pxof7rpjdk6gkca.public.blob.vercel-storage.com/patron-repository-python-fastapi.jpg"
 ---
 
-## Problem
+## El Problema que Nadie Menciona
 
-Describe the context and why this topic matters.
-
-## Core Concept
-
-Break down the main idea.
-
-## Implementation
-
-Provide real-world, production-ready code examples.
+Empecemos con una verdad incómoda: en la mayoría de servicios FastAPI que he revisado como arquitecto, la lógica de acceso a datos está mezclada directamente con la lógica de negocio.
 
 ```python
-# Example code
-def solve_problem():
-    pass
+from fastapi import FastAPI, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+
+app = FastAPI()
+
+@app.post("/users/")
+async def create_user(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
+    # Business logic + Data access en el mismo lugar
+    existing_user = await db.execute(
+        select(User).where(User.email == user_data.email)
+    )
+    if existing_user.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Email already exists")
+    
+    user = User(**user_data.dict())
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return user
 ```
 
-## Lessons Learned
+Este código funciona. Pero tiene problemas graves:
 
-Summary of key takeaways.
+1. **Acoplamiento extremo**: Cambiar de PostgreSQL a MongoDB requiere modificar el endpoint HTTP
+2. **Testing difícil**: Para testear la lógica de negocio necesitas una base de datos real
+3. **Violación de SRP**: El endpoint sabe de HTTP, validación, negocio y persistencia
+4. **No reutilizable**: La lógica de "crear usuario" no se puede reusar en un worker de colas o CLI
 
-## Conclusion
+<Callout type="warning">
+El problema no es FastAPI ni SQLAlchemy. Es que no hay una capa de abstracción entre tu dominio y tu infraestructura.
+</Callout>
 
-Wrap up and point to related articles.
+## Concepto Central: El Patrón Repository
+
+El patrón Repository introduce una capa de abstracción entre tu dominio de negocio y tu infraestructura de persistencia. Un Repository es una colección-like interface que parece un almacén de objetos en memoria, pero abstrae la implementación real de almacenamiento.
+
+> **Metáfora mental**: Un Repository es como una biblioteca. Pides un libro (entidad) por título o autor, no te importa si está en un estante específico, en un almacén externo, o digitalizado. El bibliotecario (repository) se encarga de encontrarlo.
+
+### Por Qué Funciona
+
+**Separación de concerns**: Tu dominio define QUÉ operaciones necesita (interfaces). Tu infraestructura define CÓMO se implementan (implementaciones).
+
+**Testability inyectable**: Puedes inyectar un repository mock que no toque base de datos, permitiendo tests unitarios rápidos.
+
+**Infraestructura intercambiable**: Cambiar de PostgreSQL a MySQL, MongoDB, o incluso Redis, no afecta tu lógica de negocio.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Service Layer                         │
+│              (use cases, business logic)                 │
+└────────────────────┬────────────────────────────────────┘
+                     │ depende de
+                     ▼
+┌─────────────────────────────────────────────────────────┐
+│              Repository Interface (Domain)              │
+│         abstract UserRepository:                         │
+│           async def get_by_id(id) -> User               │
+│           async def create(user) -> User                │
+│           async def update(user) -> User                │
+└────────────────────┬────────────────────────────────────┘
+                     │ implementado por
+        ┌────────────┴────────────┐
+        ▼                         ▼
+┌──────────────────┐    ┌──────────────────┐
+│  SQLRepository   │    │  MongoRepository │
+│  (PostgreSQL)    │    │  (MongoDB)       │
+└──────────────────┘    └──────────────────┘
+```
+
+## Implementación Completa
+
+Vamos a construir un sistema de usuarios completo con el patrón Repository aplicando Clean Architecture y Hexagonal Architecture.
+
+### Estructura de Carpetas Hexagonal
+
+```
+app/
+├── domain/                          # Núcleo puro de Python
+│   ├── entities.py                 # Entidades de dominio
+│   ├── repositories.py            # Interfaces de repositorios
+│   └── value_objects.py           # Value objects (email, money, etc.)
+├── infrastructure/                 # Implementaciones concretas
+│   ├── persistence/
+│   │   ├── sqlalchemy/
+│   │   │   ├── models.py          # SQLAlchemy models
+│   │   │   └── repositories.py    # Implementaciones concretas
+│   │   └── mongodb/
+│   │       └── repositories.py    # Implementación MongoDB
+│   └── web/
+│       ├── routers.py             # FastAPI endpoints
+│       └── dependencies.py        # Dependency injection setup
+└── application/                    # Casos de uso
+    ├── use_cases.py               # Business logic orquestada
+    └── services.py                # Application services
+```
+
+### Paso 1: Entidades de Dominio (Pure Python)
+
+```python
+# app/domain/entities.py
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Optional
+from enum import Enum
+
+class UserStatus(str, Enum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    SUSPENDED = "suspended"
+
+@dataclass(frozen=True)
+class Email:
+    """Value Object: encapsula validación de email"""
+    value: str
+    
+    def __post_init__(self):
+        if "@" not in self.value or "." not in self.value.split("@")[-1]:
+            raise ValueError(f"Invalid email: {self.value}")
+
+@dataclass
+class User:
+    """Entidad de dominio: identificado por su ID, con comportamiento"""
+    id: Optional[str] = None
+    email: Optional[Email] = None
+    username: str = ""
+    full_name: str = ""
+    status: UserStatus = UserStatus.ACTIVE
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: Optional[datetime] = None
+    
+    def can_be_activated(self) -> bool:
+        """Regla de negocio: solo usuarios inactivos pueden activarse"""
+        return self.status == UserStatus.INACTIVE
+    
+    def activate(self) -> None:
+        """Comportamiento de dominio: activar usuario"""
+        if not self.can_be_activated():
+            raise ValueError("User cannot be activated")
+        self.status = UserStatus.ACTIVE
+        self.updated_at = datetime.utcnow()
+    
+    @classmethod
+    def create(cls, email: str, username: str, full_name: str) -> "User":
+        """Factory method: crea usuario con estado inicial válido"""
+        return cls(
+            email=Email(value=email),
+            username=username,
+            full_name=full_name,
+            status=UserStatus.ACTIVE
+        )
+```
+
+<Callout type="tip">
+Las entidades de dominio están en Python puro — no importan SQLAlchemy ni FastAPI. Esto las hace reutilizables en workers de colas, scripts CLI, o microservicios separados.
+</Callout>
+
+### Paso 2: Interfaces de Repositorios (Domain Layer)
+
+```python
+# app/domain/repositories.py
+from abc import ABC, abstractmethod
+from typing import List, Optional
+from dataclasses import dataclass
+
+from app.domain.entities import User, UserStatus
+
+@dataclass
+class UserFilter:
+    """Specification pattern: filtros reutilizables para queries"""
+    email: Optional[str] = None
+    username: Optional[str] = None
+    status: Optional[UserStatus] = None
+    limit: Optional[int] = None
+    offset: Optional[int] = 0
+
+class UserRepository(ABC):
+    """
+    Interfaz de Repository: el dominio define QUÉ operaciones necesita.
+    No sabe nada de SQLAlchemy, MongoDB, o archivos.
+    
+    Naming convention:
+    - get_by_x: devuelve Optional (puede no existir)
+    - find_by_x: devuelve List (siempre lista, quizás vacía)
+    """
+    
+    @abstractmethod
+    async def get_by_id(self, user_id: str) -> Optional[User]:
+        """Obtiene un usuario por su ID único"""
+        pass
+    
+    @abstractmethod
+    async def get_by_email(self, email: str) -> Optional[User]:
+        """Obtiene un usuario por email (debe ser único)"""
+        pass
+    
+    @abstractmethod
+    async def find_by_filter(self, filters: UserFilter) -> List[User]:
+        """Busca usuarios con filtros opcionales (paginado)"""
+        pass
+    
+    @abstractmethod
+    async def create(self, user: User) -> User:
+        """Crea un nuevo usuario y lo devuelve con ID asignado"""
+        pass
+    
+    @abstractmethod
+    async def update(self, user: User) -> User:
+        """Actualiza un usuario existente"""
+        pass
+    
+    @abstractmethod
+    async def delete(self, user_id: str) -> None:
+        """Elimina un usuario por ID"""
+        pass
+    
+    @abstractmethod
+    async def exists_by_email(self, email: str) -> bool:
+        """Verifica si existe un email (optimizado para unicidad)"""
+        pass
+```
+
+### Paso 3: SQLAlchemy Models (Infrastructure Layer)
+
+```python
+# app/infrastructure/persistence/sqlalchemy/models.py
+from datetime import datetime
+from sqlalchemy import Column, String, DateTime, Enum as SQLEnum
+from sqlalchemy.ext.declarative import declarative_base
+
+Base = declarative_base()
+
+class UserModel(Base):
+    """SQLAlchemy model: representa la tabla en PostgreSQL"""
+    __tablename__ = "users"
+    
+    id = Column(String, primary_key=True)
+    email = Column(String, unique=True, nullable=False, index=True)
+    username = Column(String, unique=True, nullable=False, index=True)
+    full_name = Column(String, nullable=False)
+    status = Column(SQLEnum(UserStatus), default=UserStatus.ACTIVE, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, nullable=True)
+    
+    def to_domain(self) -> User:
+        """Convierte SQLAlchemy model a entidad de dominio"""
+        return User(
+            id=self.id,
+            email=Email(value=self.email),
+            username=self.username,
+            full_name=self.full_name,
+            status=UserStatus(self.status),
+            created_at=self.created_at,
+            updated_at=self.updated_at
+        )
+    
+    @classmethod
+    def from_domain(cls, user: User) -> "UserModel":
+        """Crea SQLAlchemy model desde entidad de dominio"""
+        return cls(
+            id=user.id,
+            email=user.email.value if user.email else None,
+            username=user.username,
+            full_name=user.full_name,
+            status=user.status,
+            created_at=user.created_at,
+            updated_at=user.updated_at
+        )
+```
+
+### Paso 4: Implementación Concreta de Repository
+
+```python
+# app/infrastructure/persistence/sqlalchemy/repositories.py
+from typing import List, Optional
+from uuid import uuid4
+from sqlalchemy import select, and_
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.domain.entities import User
+from app.domain.repositories import UserRepository, UserFilter
+from app.infrastructure.persistence.sqlalchemy.models import UserModel
+
+class SqlAlchemyUserRepository(UserRepository):
+    """
+    Implementación concreta usando SQLAlchemy + AsyncSession.
+    
+    Esta clase contiene todo el código específico de PostgreSQL.
+    Si cambiamos a MongoDB, solo escribimos MongoUserRepository
+    sin afectar el resto del sistema.
+    """
+    
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+    
+    async def get_by_id(self, user_id: str) -> Optional[User]:
+        result = await self._session.get(UserModel, user_id)
+        return result.to_domain() if result else None
+    
+    async def get_by_email(self, email: str) -> Optional[User]:
+        stmt = select(UserModel).where(UserModel.email == email)
+        result = await self._session.execute(stmt)
+        model = result.scalar_one_or_none()
+        return model.to_domain() if model else None
+    
+    async def find_by_filter(self, filters: UserFilter) -> List[User]:
+        stmt = select(UserModel)
+        
+        # Build dynamic query based on filters
+        conditions = []
+        if filters.email:
+            conditions.append(UserModel.email.like(f"%{filters.email}%"))
+        if filters.username:
+            conditions.append(UserModel.username.like(f"%{filters.username}%"))
+        if filters.status:
+            conditions.append(UserModel.status == filters.status)
+        
+        if conditions:
+            stmt = stmt.where(and_(*conditions))
+        
+        # Pagination
+        if filters.limit:
+            stmt = stmt.limit(filters.limit)
+        if filters.offset:
+            stmt = stmt.offset(filters.offset)
+        
+        # Execute
+        result = await self._session.execute(stmt)
+        models = result.scalars().all()
+        return [model.to_domain() for model in models]
+    
+    async def create(self, user: User) -> User:
+        model = UserModel.from_domain(user)
+        
+        # Generate ID if not provided
+        if not model.id:
+            model.id = str(uuid4())
+        
+        self._session.add(model)
+        await self._session.flush()  # Get ID without committing transaction
+        
+        return model.to_domain()
+    
+    async def update(self, user: User) -> User:
+        if not user.id:
+            raise ValueError("User ID is required for update")
+        
+        model = await self._session.get(UserModel, user.id)
+        if not model:
+            raise ValueError(f"User with ID {user.id} not found")
+        
+        # Update fields
+        model.email = user.email.value if user.email else model.email
+        model.username = user.username
+        model.full_name = user.full_name
+        model.status = user.status
+        model.updated_at = datetime.utcnow()
+        
+        await self._session.flush()
+        return model.to_domain()
+    
+    async def delete(self, user_id: str) -> None:
+        model = await self._session.get(UserModel, user_id)
+        if model:
+            await self._session.delete(model)
+    
+    async def exists_by_email(self, email: str) -> bool:
+        """Optimized query for uniqueness check"""
+        stmt = select(UserModel.id).where(UserModel.email == email).limit(1)
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none() is not None
+```
+
+### Paso 5: Service Layer (Application Layer)
+
+```python
+# app/application/services.py
+from dataclasses import dataclass
+from typing import Optional
+
+from app.domain.entities import User, Email
+from app.domain.repositories import UserRepository
+
+class UserServiceError(Exception):
+    """Base exception for user service errors"""
+    pass
+
+class UserAlreadyExistsError(UserServiceError):
+    """Raised when trying to create a user with duplicate email"""
+    pass
+
+class UserNotFoundError(UserServiceError):
+    """Raised when a user is not found"""
+    pass
+
+@dataclass
+class CreateUserCommand:
+    """DTO para comando de creación"""
+    email: str
+    username: str
+    full_name: str
+
+@dataclass
+class UpdateUserCommand:
+    """DTO para comando de actualización"""
+    user_id: str
+    email: Optional[str] = None
+    username: Optional[str] = None
+    full_name: Optional[str] = None
+
+class UserService:
+    """
+    Service Layer: orquesta casos de uso y coordina repositorios.
+    
+    Esta clase contiene lógica de negocio que involucra múltiples
+    operaciones de repositorio o reglas complejas.
+    """
+    
+    def __init__(self, repository: UserRepository) -> None:
+        self._repo = repository
+    
+    async def create_user(self, cmd: CreateUserCommand) -> User:
+        """
+        Caso de uso: crear usuario con validación de unicidad.
+        
+        Lógica de negocio:
+        1. Verificar que email no existe
+        2. Crear entidad de dominio
+        3. Persistir vía repository
+        """
+        # Validación de unicidad
+        if await self._repo.exists_by_email(cmd.email):
+            raise UserAlreadyExistsError(f"Email {cmd.email} already exists")
+        
+        # Crear entidad de dominio (validación incluida)
+        user = User.create(
+            email=cmd.email,
+            username=cmd.username,
+            full_name=cmd.full_name
+        )
+        
+        # Persistir
+        return await self._repo.create(user)
+    
+    async def get_user(self, user_id: str) -> User:
+        """
+        Caso de uso: obtener usuario por ID.
+        
+        Simula un caso de negocio más complejo donde necesitas
+        cargar datos adicionales de otros repositorios.
+        """
+        user = await self._repo.get_by_id(user_id)
+        if not user:
+            raise UserNotFoundError(f"User {user_id} not found")
+        return user
+    
+    async def update_user(self, cmd: UpdateUserCommand) -> User:
+        """
+        Caso de uso: actualizar usuario con validaciones.
+        """
+        user = await self.get_user(cmd.user_id)
+        
+        # Actualizar campos si se proporcionan
+        if cmd.email:
+            # Verificar unicidad si email cambia
+            if cmd.email != user.email.value:
+                if await self._repo.exists_by_email(cmd.email):
+                    raise UserAlreadyExistsError(f"Email {cmd.email} already exists")
+                user.email = Email(value=cmd.email)
+        
+        if cmd.username:
+            user.username = cmd.username
+        if cmd.full_name:
+            user.full_name = cmd.full_name
+        
+        return await self._repo.update(user)
+    
+    async def activate_user(self, user_id: str) -> User:
+        """
+        Caso de uso: activar usuario (comportamiento de dominio).
+        """
+        user = await self.get_user(user_id)
+        user.activate()  # Lógica de negocio encapsulada en entidad
+        return await self._repo.update(user)
+```
+
+### Paso 6: Pydantic Schemas (API Layer)
+
+```python
+# app/infrastructure/web/schemas.py
+from pydantic import BaseModel, EmailStr, Field
+
+class UserCreateRequest(BaseModel):
+    """Request DTO para crear usuario"""
+    email: EmailStr = Field(..., description="User email address")
+    username: str = Field(..., min_length=3, max_length=50)
+    full_name: str = Field(..., min_length=1, max_length=100)
+
+class UserUpdateRequest(BaseModel):
+    """Request DTO para actualizar usuario"""
+    email: Optional[EmailStr] = None
+    username: Optional[str] = Field(None, min_length=3, max_length=50)
+    full_name: Optional[str] = Field(None, min_length=1, max_length=100)
+
+class UserResponse(BaseModel):
+    """Response DTO para usuario"""
+    id: str
+    email: str
+    username: str
+    full_name: str
+    status: str
+    created_at: str
+    updated_at: Optional[str] = None
+    
+    @classmethod
+    def from_domain(cls, user: User) -> "UserResponse":
+        """Convierte entidad de dominio a response DTO"""
+        return cls(
+            id=user.id or "",
+            email=user.email.value if user.email else "",
+            username=user.username,
+            full_name=user.full_name,
+            status=user.status.value,
+            created_at=user.created_at.isoformat(),
+            updated_at=user.updated_at.isoformat() if user.updated_at else None
+        )
+```
+
+### Paso 7: FastAPI Endpoints con Dependency Injection
+
+```python
+# app/infrastructure/web/routers.py
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.domain.repositories import UserRepository
+from app.infrastructure.persistence.sqlalchemy.repositories import SqlAlchemyUserRepository
+from app.infrastructure.web.schemas import (
+    UserCreateRequest,
+    UserUpdateRequest,
+    UserResponse
+)
+from app.application.services import (
+    UserService,
+    CreateUserCommand,
+    UpdateUserCommand,
+    UserAlreadyExistsError,
+    UserNotFoundError
+)
+
+router = APIRouter(prefix="/api/v1/users", tags=["users"])
+
+# Dependency injection helpers
+async def get_user_repository(
+    session: AsyncSession = Depends(get_db_session)
+) -> UserRepository:
+    """Inyecta el repository de usuarios (concreto pero via interfaz)"""
+    return SqlAlchemyUserRepository(session)
+
+async def get_user_service(
+    repository: UserRepository = Depends(get_user_repository)
+) -> UserService:
+    """Inyecta el service de usuarios"""
+    return UserService(repository)
+
+@router.post("/", status_code=status.HTTP_201_CREATED, response_model=UserResponse)
+async def create_user(
+    request: UserCreateRequest,
+    service: UserService = Depends(get_user_service)
+):
+    """
+    Crea un nuevo usuario.
+    
+    - **email**: Email único del usuario
+    - **username**: Nombre de usuario único (3-50 caracteres)
+    - **full_name**: Nombre completo del usuario
+    """
+    try:
+        user = await service.create_user(
+            CreateUserCommand(
+                email=request.email,
+                username=request.username,
+                full_name=request.full_name
+            )
+        )
+        return UserResponse.from_domain(user)
+    except UserAlreadyExistsError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+@router.get("/{user_id}", response_model=UserResponse)
+async def get_user(
+    user_id: str,
+    service: UserService = Depends(get_user_service)
+):
+    """
+    Obtiene un usuario por ID.
+    
+    Retorna 404 si el usuario no existe.
+    """
+    try:
+        user = await service.get_user(user_id)
+        return UserResponse.from_domain(user)
+    except UserNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+
+@router.patch("/{user_id}", response_model=UserResponse)
+async def update_user(
+    user_id: str,
+    request: UserUpdateRequest,
+    service: UserService = Depends(get_user_service)
+):
+    """
+    Actualiza un usuario existente.
+    
+    Solo actualiza los campos proporcionados.
+    """
+    try:
+        user = await service.update_user(
+            UpdateUserCommand(
+                user_id=user_id,
+                email=request.email,
+                username=request.username,
+                full_name=request.full_name
+            )
+        )
+        return UserResponse.from_domain(user)
+    except UserNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except UserAlreadyExistsError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+@router.post("/{user_id}/activate", response_model=UserResponse)
+async def activate_user(
+    user_id: str,
+    service: UserService = Depends(get_user_service)
+):
+    """
+    Activa un usuario inactivo.
+    
+    Solo usuarios con estado INACTIVE pueden activarse.
+    """
+    try:
+        user = await service.activate_user(user_id)
+        return UserResponse.from_domain(user)
+    except UserNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+@router.get("/", response_model=list[UserResponse])
+async def list_users(
+    email: Optional[str] = None,
+    username: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = 10,
+    offset: int = 0,
+    service: UserService = Depends(get_user_service)
+):
+    """
+    Lista usuarios con filtros opcionales y paginación.
+    
+    Todos los filtros son opcionales y aplicados como LIKE queries.
+    """
+    from app.domain.entities import UserStatus
+    from app.domain.repositories import UserFilter
+    
+    # Parse status if provided
+    user_status = None
+    if status:
+        try:
+            user_status = UserStatus(status)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid status: {status}. Valid values: {', '.join([s.value for s in UserStatus])}"
+            )
+    
+    filters = UserFilter(
+        email=email,
+        username=username,
+        status=user_status,
+        limit=min(limit, 100),  # Cap at 100
+        offset=offset
+    )
+    
+    users = await service._repo.find_by_filter(filters)
+    return [UserResponse.from_domain(user) for user in users]
+```
+
+### Paso 8: Tests Unitarios con Mock Repositories
+
+```python
+# tests/test_user_service.py
+import pytest
+from unittest.mock import Mock, AsyncMock
+
+from app.domain.entities import User, Email, UserStatus
+from app.domain.repositories import UserRepository, UserFilter
+from app.application.services import (
+    UserService,
+    CreateUserCommand,
+    UpdateUserCommand,
+    UserAlreadyExistsError,
+    UserNotFoundError
+)
+
+@pytest.fixture
+def mock_repository():
+    """Repository mock para tests"""
+    repo = Mock(spec=UserRepository)
+    repo.get_by_id = AsyncMock()
+    repo.get_by_email = AsyncMock()
+    repo.find_by_filter = AsyncMock()
+    repo.create = AsyncMock()
+    repo.update = AsyncMock()
+    repo.delete = AsyncMock()
+    repo.exists_by_email = AsyncMock()
+    return repo
+
+@pytest.fixture
+def user_service(mock_repository):
+    """Service con repository inyectado"""
+    return UserService(mock_repository)
+
+@pytest.mark.asyncio
+async def test_create_user_success(user_service, mock_repository):
+    """Test: crear usuario exitosamente"""
+    # Setup
+    cmd = CreateUserCommand(
+        email="test@example.com",
+        username="testuser",
+        full_name="Test User"
+    )
+    mock_repository.exists_by_email.return_value = False
+    
+    created_user = User(
+        id="123",
+        email=Email(value="test@example.com"),
+        username="testuser",
+        full_name="Test User",
+        status=UserStatus.ACTIVE
+    )
+    mock_repository.create.return_value = created_user
+    
+    # Execute
+    result = await user_service.create_user(cmd)
+    
+    # Verify
+    assert result.email.value == "test@example.com"
+    assert result.username == "testuser"
+    assert result.status == UserStatus.ACTIVE
+    
+    mock_repository.exists_by_email.assert_called_once_with("test@example.com")
+    mock_repository.create.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_create_user_duplicate_email(user_service, mock_repository):
+    """Test: error al crear usuario con email duplicado"""
+    cmd = CreateUserCommand(
+        email="existing@example.com",
+        username="testuser",
+        full_name="Test User"
+    )
+    mock_repository.exists_by_email.return_value = True
+    
+    with pytest.raises(UserAlreadyExistsError):
+        await user_service.create_user(cmd)
+    
+    mock_repository.create.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_get_user_not_found(user_service, mock_repository):
+    """Test: error al obtener usuario inexistente"""
+    mock_repository.get_by_id.return_value = None
+    
+    with pytest.raises(UserNotFoundError):
+        await user_service.get_user("nonexistent-id")
+    
+    mock_repository.get_by_id.assert_called_once_with("nonexistent-id")
+
+@pytest.mark.asyncio
+async def test_activate_user_success(user_service, mock_repository):
+    """Test: activar usuario inactivo exitosamente"""
+    inactive_user = User(
+        id="123",
+        email=Email(value="test@example.com"),
+        username="testuser",
+        full_name="Test User",
+        status=UserStatus.INACTIVE
+    )
+    
+    active_user = User(
+        id="123",
+        email=Email(value="test@example.com"),
+        username="testuser",
+        full_name="Test User",
+        status=UserStatus.ACTIVE,
+        updated_at=datetime.utcnow()
+    )
+    
+    mock_repository.get_by_id.return_value = inactive_user
+    mock_repository.update.return_value = active_user
+    
+    result = await user_service.activate_user("123")
+    
+    assert result.status == UserStatus.ACTIVE
+    mock_repository.update.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_activate_user_already_active(user_service, mock_repository):
+    """Test: error al activar usuario ya activo"""
+    active_user = User(
+        id="123",
+        email=Email(value="test@example.com"),
+        username="testuser",
+        full_name="Test User",
+        status=UserStatus.ACTIVE
+    )
+    
+    mock_repository.get_by_id.return_value = active_user
+    
+    with pytest.raises(ValueError, match="User cannot be activated"):
+        await user_service.activate_user("123")
+    
+    mock_repository.update.assert_not_called()
+
+# Test de integración con repository real (opcional)
+@pytest.mark.asyncio
+async def test_create_user_with_sqlalchemy_integration():
+    """Test de integración con SQLAlchemy real"""
+    from app.infrastructure.persistence.sqlalchemy.repositories import SqlAlchemyUserRepository
+    from app.infrastructure.persistence.sqlalchemy.models import UserModel, Base
+    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+    from sqlalchemy.orm import sessionmaker
+    
+    # Setup in-memory database
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    
+    # Create tables
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    
+    # Test
+    async with async_session() as session:
+        repo = SqlAlchemyUserRepository(session)
+        service = UserService(repo)
+        
+        user = await service.create_user(
+            CreateUserCommand(
+                email="integration@example.com",
+                username="integrationuser",
+                full_name="Integration User"
+            )
+        )
+        
+        assert user.id is not None
+        assert user.email.value == "integration@example.com"
+        
+        # Verify persistence
+        retrieved = await repo.get_by_id(user.id)
+        assert retrieved is not None
+        assert retrieved.email.value == "integration@example.com"
+```
+
+## Lecciones Aprendidas
+
+### Cuándo Usar el Patrón Repository
+
+<ComparisonTable 
+  headers='["Escenario", "¿Usar Repository?"]'
+  rows='[
+    ["MVP / prototipo rápido", "❌ No — ve rápido, valida primero"],
+    ["CRUD simple (tabla única)", "❌ No — overhead innecesario"],
+    ["Dominio de negocio complejo", "✅ Sí — reglas de negocio valiosas"],
+    ["Múltiples data sources (DB + API)", "✅ Sí — abstracción crítica"],
+    ["Tests unitarios sin DB", "✅ Sí — mocks se vuelven prácticos"],
+    ["Equipo grande (3+ devs)", "✅ Sí — separación de concerns"],
+    ["Necesitas migrar DB más adelante", "✅ Sí — infraestructura intercambiable"],
+    ["Endpoint con lógica trivial", "❌ No — FastAPI directo"],
+    ["Worker de colas reusando lógica", "✅ Sí — service layer compartido"]
+  ]'
+/>
+
+### Patrones Anti a Evitar
+
+<Callout type="danger">
+**Anti-pattern #1: Repository que retorna SQLAlchemy Models**
+
+```python
+# MAL: Repository expone implementación de DB
+async def get_by_id(self, user_id: str) -> UserModel:  # ❌
+    return await self._session.get(UserModel, user_id)
+```
+
+El repository debe retornar entidades de dominio, no modelos de ORM.
+</Callout>
+
+<Callout type="danger">
+**Anti-pattern #2: Repository con lógica de negocio**
+
+```python
+# MAL: Repository contiene lógica de negocio
+async def create_user(self, email: str, username: str) -> User:
+    if await self.exists_by_email(email):  # ❌ Esto va en service layer
+        raise ValueError("Email exists")
+    user = User(...)
+    return await self._create(user)
+```
+
+Los repositories son solo para acceso a datos. La lógica de negocio va en Service Layer.
+</Callout>
+
+<Callout type="danger">
+**Anti-pattern #3: Repository God**
+
+```python
+# MAL: Repository con 20 métodos diferentes
+class UserRepository(ABC):
+    async def get_by_id(self, id): pass
+    async def get_by_email(self, email): pass
+    async def get_by_username(self, username): pass
+    async def get_active_users(self): pass
+    async def get_inactive_users(self): pass
+    async def get_users_created_after(self, date): pass
+    # ... 15 más métodos específicos
+```
+
+Usa Specification Pattern o filtros genéricos en lugar de un método por query.
+</Callout>
+
+### Tradeoffs Honestos
+
+**Lo que ganas:**
+
+1. **Testeabilidad sin infraestructura**: Tests unitarios corren en milisegundos sin Docker ni base de datos
+2. **Separación de concerns**: Cada capa tiene una responsabilidad clara
+3. **Infraestructura intercambiable**: Migrar de PostgreSQL a MongoDB es reescribir un repository, no toda la aplicación
+4. **Reutilización**: Service layer se comparte entre HTTP endpoints, workers CLI, y websockets
+5. **Paralelización**: Equipo puede trabajar en dominio e infraestructura en paralelo
+
+**Lo que pierdes:**
+
+1. **Complejidad inicial**: 5-7 archivos por entidad vs 1-2 en FastAPI directo
+2. **Curva de aprendizaje**: Devs juniors necesitan tiempo para entender el flujo
+3. **Overhead de indirección**: Más archivos, más saltos para seguir el código
+4. **Boilerplate**: Métodos de mapeo entre modelos y entidades
+
+<Callout type="success">
+**Regla empírica**: Si tu lógica de negocio tiene más de 50 líneas O involucra más de 2 operaciones de DB, el overhead del patrón Repository se paga a sí mismo.
+</Callout>
+
+## Conclusión
+
+El patrón Repository no es una bala de plata. Es una herramienta que brilla cuando tu aplicación cruza el umbral de complejidad donde la separación de concerns se vuelve más valiosa que la simplicidad.
+
+<Steps>
+<Step title="Evalúa tu contexto">
+¿Es un MVP? ¿CRUD simple? ¿Equipo grande? La respuesta dicta si vale la inversión.
+</Step>
+<Step title="Empieza por el dominio">
+Define entidades de dominio (Python puro) e interfaces de repositorios antes de escribir código de infraestructura.
+</Step>
+<Step title="Implementa Service Layer">
+Orquesta casos de uso y coordina repositorios aquí — mantiene endpoints HTTP thin.
+</Step>
+<Step title="Usa Dependency Injection">
+Inyecta repositorios via interfaz — esto permite mocks en tests e intercambio de implementaciones.
+</Step>
+<Step title="Escribe tests primero">
+Los tests unitarios de service layer te validan que la arquitectura está sirviendo su propósito.
+</Step>
+</Steps>
+
+La señal que busco para adoptar este patrón: **"¿Puedo testear este caso de uso sin una base de datos en ejecución?"** Si la respuesta es no y la lógica no es trivial, es momento de agregar los límites.
+
+### Otros Posts de esta Serie
+
+Este post es parte 7 de **Arquitectura de Software Avanzada**:
+
+1. [Arquitectura Hexagonal en Python: Cuándo Usarla y Cuándo Es Excesiva](/blog/hexagonal-architecture-python-fastapi) — Parte 1: Introducción a Ports & Adapters
+2. [Construyendo un ERP Multi-Tenant con Arquitectura Limpia y Next.js](/blog/building-multitenant-erp-clean-architecture) — Parte 2: Caso de estudio real-world
+3. [SOLID en Microservicios: Cuándo Aplicar y Cuándo Es Excesivo](/blog/solid-en-microservicios-cuando-aplicar-y-cuando-es-excesivo) — Parte 3: Principios SOLID en contexto
+4. [Agentes IA en Kubernetes: Deploy y Escalado](/blog/agentes-ia-en-kubernetes-deploy-y-escalado) — Parte 4: Arquitectura de sistemas de agentes
+5. [Deuda Técnica en la Era de la IA: Mitos y Realidades](/blog/deuda-tecnica-en-la-era-de-la-ia-mitos-y-realidades) — Parte 5: Deuda técnica con herramientas modernas
+6. [Go para Backend de Agentes: Por Qué y Cuándo](/blog/go-para-backend-de-agentes-por-que-y-cuando) — Parte 6: Selección de tecnología
+7. **Patrón Repository en Python con FastAPI: Guía Completa** (este post) — Parte 7: Abstracción de acceso a datos
+
+---
+
+*¿Has aplicado el patrón Repository en producción? ¿Fue overkill o salvó tu proyecto? Me encantaría leer tu experiencia en los comentarios.*
