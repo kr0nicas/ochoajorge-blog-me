@@ -4,7 +4,7 @@ description: "Descubre por qué Go domina en backend de agentes IA con goroutine
 date: "2026-06-25"
 tags: ["go", "agentes-ia", "arquitectura", "backend", "concurrency"]
 lang: "es"
-draft: true
+draft: false
 series:
   name: "Arquitectura de Software Avanzada"
   part: 1
@@ -591,18 +591,18 @@ func generateRequestID() string {
 ### Cuándo Usar Go vs Python
 
 <ComparisonTable
-  headers='["Factor", "Go (Backend)", "Python (AI/ML)"]'
-  rows='[
-    "Concurrency, Goroutines nativas, GIL limita paralelismo",
-    "Performance, 5-10x más rápido, Interprete overhead",
-    "Memory, Bajo y predecible, Alto y variable",
-    "Startup, Binario compilado, Interprete + imports",
-    "Ecosistema IA, Creciendo, Maduro y dominante",
-    "Developer Velocity, Verboso pero typesafe, Rápido y dinámico",
-    "Debugging, Herramientas robustas, Debugging simple",
-    "Deployment, Single binary, Dependency hell"
-  ]'
-  highlight={1}
+  headers={["Factor", "Go (Backend)", "Python (AI/ML)"]}
+  highlight={0}
+  rows={[
+    ["Concurrency", "Goroutines nativas", "GIL limita paralelismo"],
+    ["Performance", "5-10x más rápido", "Interprete overhead"],
+    ["Memory", "Bajo y predecible", "Alto y variable"],
+    ["Startup", "Binario compilado", "Interprete + imports"],
+    ["Ecosistema IA", "Creciendo", "Maduro y dominante"],
+    ["Developer Velocity", "Verboso pero typesafe", "Rápido y dinámico"],
+    ["Debugging", "Herramientas robustas", "Debugging simple"],
+    ["Deployment", "Single binary", "Dependency hell"]
+  ]}
 />
 
 <Callout type="tip">
