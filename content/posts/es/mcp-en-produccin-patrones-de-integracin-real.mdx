@@ -4,7 +4,7 @@ description: "Descubre cómo implementar Model Context Protocol en producción c
 date: "2026-06-25"
 tags: ["agentes-ia", "mcp", "arquitectura", "produccion", "observabilidad"]
 lang: "es"
-draft: true
+draft: false
 series:
   name: "Construyendo con IA: Lo que nadie te dice"
   part: 4
@@ -717,14 +717,14 @@ Usa service discovery o config management para endpoints. Never hardcode URLs en
 <ComparisonTable
   headers='["Aspecto", "MCP en Producción", "Integración Directa"]'
   rows='[
-    "Setup inicial, Más complejo (gateway, middleware), Más simple (direct API call)",
-    "Flexibilidad, Alta (plug-and-play tools), Baja (hard-coded integrations)",
-    "Observabilidad, Excelente (unified tracing), Variable (por implementar)",
-    "Overhead, Bajo-medio (gateway + proxies), Cero (directo)",
-    "Escalado, Fácil (stateless servers), Depende (service específico)",
-    "Testing, Fácil (mock MCP tools), Más complejo (mock services)",
-    "Versioning, Automático (MCP schema), Manual (API versioning)",
-    "Use case ideal, Sistemas multi-agent heterogéneos, Servicios monolíticos simples"
+    ["Setup inicial", "Más complejo (gateway, middleware)", "Más simple (direct API call)"],
+    ["Flexibilidad", "Alta (plug-and-play tools)", "Baja (hard-coded integrations)"],
+    ["Observabilidad", "Excelente (unified tracing)", "Variable (por implementar)"],
+    ["Overhead", "Bajo-medio (gateway + proxies)", "Cero (directo)"],
+    ["Escalado", "Fácil (stateless servers)", "Depende (service específico)"],
+    ["Testing", "Fácil (mock MCP tools)", "Más complejo (mock services)"],
+    ["Versioning", "Automático (MCP schema)", "Manual (API versioning)"],
+    ["Use case ideal", "Sistemas multi-agent heterogéneos", "Servicios monolíticos simples"]
   ]'
 />
 
