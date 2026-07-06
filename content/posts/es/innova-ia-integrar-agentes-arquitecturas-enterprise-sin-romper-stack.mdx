@@ -1,0 +1,1017 @@
+---
+title: "Innova IA: Cómo Integrar Agentes en Arquitecturas Enterprise sin Romper tu Stack"
+description: "Integra agentes IA en producción con Clean Architecture y Hexagonal. Go, Kubernetes, MCP: patrones production-ready para arquitectos y senior engineers."
+date: "2026-07-06"
+tags: ["agentes-ia", "arquitectura", "mcp", "go", "kubernetes"]
+lang: "es"
+draft: true
+series:
+  name: "Arquitectura de Software Avanzada"
+  part: 9
+---
+
+## Problem
+
+La revolución de agentes IA está aquí. Como arquitecto o senior engineer, ya sabes que no puedes ignorarla. Los agentes de IA están transformando cómo construimos software — desde automatización de tareas complejas hasta sistemas de decision-making autónomos. Pero hay un problema que nadie discute abiertamente:
+
+**¿Cómo integrar agentes IA en arquitecturas enterprise maduras sin romper el stack existente?**
+
+He visto equipos enfrentarse a este desafío de formas que van desde malas ideas a desastres en producción. Algunos inyectan llamadas directas a OpenAI en medio de servicios core, creando acoplamiento directo y dependencias de terceros en capas que deberían ser agnósticas. Otros construyen "microservicios de agentes" que son fundamentalmente monolitos enmascarados, sin seguir ningún patrón arquitectónico consistente.
+
+<Callout type="danger" title="El error más común">
+  Envolver una llamada a LLM en una función y llamarla "agente" no es una arquitectura. Es un wrapper con problemas de observabilidad, testing y escalabilidad. En producción, eso se convierte en deuda técnica que escala exponencialmente.
+</Callout>
+
+En un proyecto reciente para una fintech en LATAM, tuvimos que integrar un sistema de agentes de IA para análisis de riesgo crediticio. La arquitectura existente era sólida: Clean Architecture, hexagonal, microservicios en Go desplegados en Kubernetes. La integración de agentes amenazaba con romper años de disciplina arquitectónica.
+
+El desafío específico era triple:
+
+1. **Acoplamiento arquitectónico**: Los agentes necesitaban acceder a dominios core (solicitudes de crédito, historial de pagos, scores de riesgo) sin violar los principios de Clean Architecture
+2. **Observabilidad**: Cómo tracingar el flujo completo desde la entrada del usuario, a través de múltiples agentes, hasta la decisión final
+3. **Escalabilidad**: Agentes de IA tienen patrones de consumo de recursos impredecibles — latencia variable, burst traffic, timeouts no determinísticos
+
+La solución no fue reconstruir desde cero. Fue extender la arquitectura existente con patrones específicos para agentes IA.
+
+## Core Concept
+
+La clave es entender que **los agentes IA son una nueva capa en tu arquitectura, no un reemplazo de tu stack existente**. Puedes integrarlos sin romper Clean Architecture o Hexagonal patterns si sigues un principio fundamental: los agentes viven en el dominio de aplicación, no en el dominio core.
+
+### La Arquitectura Hexagonal Adaptada para Agentes
+
+En arquitectura hexagonal tradicional, tienes:
+
+```
+┌─────────────────────────────────────────┐
+│     Adaptadores de Entrada (HTTP)       │
+├─────────────────────────────────────────┤
+│          Aplicación (Use Cases)         │
+├─────────────────────────────────────────┤
+│        Dominio Core (Entities)          │
+├─────────────────────────────────────────┤
+│    Adaptadores de Salida (DB, APIs)     │
+└─────────────────────────────────────────┘
+```
+
+Para integrar agentes IA, extendemos este patrón:
+
+```
+┌─────────────────────────────────────────┐
+│     Adaptadores de Entrada (HTTP)       │
+├─────────────────────────────────────────┤
+│          Aplicación (Use Cases)         │
+│         + Agent Orchestration Layer     │
+├─────────────────────────────────────────┤
+│        Dominio Core (Entities)          │
+├─────────────────────────────────────────┤
+│    Adaptadores de Salida (DB, APIs)     │
+│    + MCP Servers (Tool Contracts)       │
+└─────────────────────────────────────────┘
+```
+
+<Callout type="tip">
+  El **Agent Orchestration Layer** vive en la capa de aplicación, no en el dominio core. Los agentes coordinan use cases existentes — no reemplazan la lógica de negocio. Esto mantiene el dominio core agnóstico a la implementación de IA.
+</Callout>
+
+### MCP como el Contrato entre Agentes y tu Stack
+
+[Model Context Protocol (MCP)](/es/blog/mcp-como-contrato-protocolo-agentes) es el componente que hace esto posible. MCP define un contrato estándar para que los agentes descubban e invoquen herramientas en tu sistema. Esto significa:
+
+- **Tu dominio core no sabe nada de agentes IA**: Solo expone puertos bien definidos a través de adaptadores MCP
+- **Los agentes no están acoplados a tu implementación**: Conocen las herramientas disponibles a través del contrato MCP, no los detalles de implementación
+- **Observabilidad end-to-end**: MCP facilita tracing desde el agente hasta la herramienta y de vuelta
+
+<Callout type="note">
+  Si no has leído sobre MCP, [MCP en Producción: Patrones de Integración Real](/es/blog/mcp-en-produccin-patrones-de-integracin-real) cubre cómo implementar MCP servers con middleware de retries, circuit breakers y telemetry.
+</Callout>
+
+### Go como el Runtime Ideal para Agent Orchestrators
+
+[Go para Backend de Agentes](/es/blog/go-para-backend-de-agentes-por-que-y-cuando) no es una elección casual — es una decisión arquitectónica fundamentada. Las goroutines de Go permiten orquestar múltiples agentes concurrentes con overhead mínimo. Los channels de Go facilitan comunicación segura entre componentes. Y el tooling de Go para observabilidad (OpenTelemetry, Prometheus) es de primera clase.
+
+<ComparisonTable
+  headers={["Componente", "Razón arquitectónica"]}
+  highlight={0}
+  rows={[
+    ["Goroutines", "Orquestación concurrente de múltiples agents con ~2KB stack per goroutine"],
+    ["Channels", "Comunicación type-safe entre orchestrator, workers y MCP clients"],
+    ["Context", "Cancellation propagation para timeouts distribuidos"],
+    ["Interface-based design", "Clean Architecture nativa: definimos puertos en el dominio, implementamos adaptadores en la infraestructura"],
+  ]}
+/>
+
+## Implementation
+
+Vamos a construir un ejemplo production-ready completo. El caso de uso: un sistema de análisis de riesgo crediticio orquestado por agentes IA, integrado en una arquitectura hexagonal existente.
+
+### Paso 1: Definir el Dominio Core (Sin Dependencias de IA)
+
+El dominio core debe permanecer agnóstico a la existencia de agentes IA. Aquí definimos las entidades y puertos:
+
+```go
+// domain/credit_analysis.go
+package domain
+
+import "time"
+
+// CreditRequest representa una solicitud de crédito
+type CreditRequest struct {
+    ID              string
+    ApplicantID     string
+    RequestedAmount float64
+    Purpose         string
+    SubmittedAt     time.Time
+}
+
+// CreditScore representa el score de riesgo de un solicitante
+type CreditScore struct {
+    Score       float64 // 0-100
+    Confidence  float64 // 0-1
+    Factors     []ScoreFactor
+    CalculatedAt time.Time
+}
+
+type ScoreFactor struct {
+    Name        string
+    Weight      float64
+    Value       float64
+    Description string
+}
+
+// RiskDecision es la decisión final de riesgo
+type RiskDecision struct {
+    Approved        bool
+    Reasoning       string
+    Confidence      float64
+    RequiredActions []string
+    DecisionAt      time.Time
+}
+
+// CreditAnalysisRepository es el puerto de salida del dominio
+type CreditAnalysisRepository interface {
+    GetCreditRequest(ctx context.Context, id string) (*CreditRequest, error)
+    GetPaymentHistory(ctx context.Context, applicantID string) ([]PaymentRecord, error)
+    GetExistingCreditScores(ctx context.Context, applicantID string) ([]CreditScore, error)
+    SaveRiskDecision(ctx context.Context, decision *RiskDecision) error
+}
+
+// ExternalDataGateway es el puerto para datos externos (bureaus, etc.)
+type ExternalDataGateway interface {
+    FetchBureauData(ctx context.Context, applicantID string) (*BureauData, error)
+    FetchIncomeVerification(ctx context.Context, applicantID string) (*IncomeData, error)
+}
+
+// AgentOrchestratorPort es el puerto específico para orquestación de agentes
+type AgentOrchestratorPort interface {
+    AnalyzeCreditRisk(ctx context.Context, requestID string) (*RiskDecision, error)
+}
+```
+
+**Observación importante**: Nota que `AgentOrchestratorPort` es definido en el dominio pero no implementa lógica de agentes. Es simplemente un puerto que declara "el sistema puede analizar riesgo crediticio". La implementación de agentes está en la capa de aplicación.
+
+### Paso 2: Implementar Adaptadores MCP en la Capa de Infraestructura
+
+Los MCP servers exponen las herramientas del dominio a los agentes. Estos son adaptadores que implementan los puertos del dominio:
+
+```go
+// infrastructure/mcp/credit_tools_server.go
+package mcp
+
+import (
+    "context"
+    "encoding/json"
+    "fmt"
+    "log"
+    "net/http"
+    "time"
+
+    "github.com/gorilla/websocket"
+    "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+    "go.opentelemetry.io/otel"
+    "go.opentelemetry.io/otel/attribute"
+    "go.opentelemetry.io/otel/codes"
+    "go.opentelemetry.io/otel/trace"
+    "github.com/sony/gobreaker"
+)
+
+type MCPTool struct {
+    Name        string                 `json:"name"`
+    Description string                 `json:"description"`
+    InputSchema map[string]interface{} `json:"inputSchema"`
+}
+
+type MCPToolResponse struct {
+    Content []map[string]interface{} `json:"content"`
+    IsError bool                     `json:"isError"`
+    Error   string                   `json:"error,omitempty"`
+}
+
+// CreditAnalysisMCPServer expone herramientas de análisis crediticio a agentes
+type CreditAnalysisMCPServer struct {
+    repo     domain.CreditAnalysisRepository
+    gateway  domain.ExternalDataGateway
+    cb       *gobreaker.CircuitBreaker
+    tracer   trace.Tracer
+    upgrader websocket.Upgrader
+}
+
+func NewCreditAnalysisMCPServer(
+    repo domain.CreditAnalysisRepository,
+    gateway domain.ExternalDataGateway,
+) *CreditAnalysisMCPServer {
+    cb := gobreaker.NewCircuitBreaker(gobreaker.Settings{
+        Name:    "credit-mcp-tools",
+        Timeout: 30 * time.Second,
+        ReadyToTrip: func(counts gobreaker.Counts) bool {
+            return counts.ConsecutiveFailures > 5
+        },
+    })
+
+    return &CreditAnalysisMCPServer{
+        repo:    repo,
+        gateway: gateway,
+        cb:      cb,
+        tracer:  otel.Tracer("credit-mcp-server"),
+        upgrader: websocket.Upgrader{
+            CheckOrigin: func(r *http.Request) bool {
+                return true // En producción, valida origin específico
+            },
+        },
+    }
+}
+
+func (s *CreditAnalysisMCPServer) ListTools() []MCPTool {
+    return []MCPTool{
+        {
+            Name:        "get_credit_request",
+            Description: "Obtiene detalles de una solicitud de crédito por ID",
+            InputSchema: map[string]interface{}{
+                "type": "object",
+                "properties": map[string]interface{}{
+                    "request_id": map[string]interface{}{
+                        "type":        "string",
+                        "description": "ID de la solicitud de crédito",
+                    },
+                },
+                "required": []string{"request_id"},
+            },
+        },
+        {
+            Name:        "get_payment_history",
+            Description: "Obtiene el historial de pagos de un solicitante",
+            InputSchema: map[string]interface{}{
+                "type": "object",
+                "properties": map[string]interface{}{
+                    "applicant_id": map[string]interface{}{
+                        "type":        "string",
+                        "description": "ID del solicitante",
+                    },
+                },
+                "required": []string{"applicant_id"},
+            },
+        },
+        {
+            Name:        "fetch_bureau_data",
+            Description: "Obtiene datos del bureau de crédito externo",
+            InputSchema: map[string]interface{}{
+                "type": "object",
+                "properties": map[string]interface{}{
+                    "applicant_id": map[string]interface{}{
+                        "type":        "string",
+                        "description": "ID del solicitante",
+                    },
+                },
+                "required": []string{"applicant_id"},
+            },
+        },
+        {
+            Name:        "save_risk_decision",
+            Description: "Guarda una decisión de riesgo en el sistema",
+            InputSchema: map[string]interface{}{
+                "type": "object",
+                "properties": map[string]interface{}{
+                    "request_id": map[string]interface{}{
+                        "type":        "string",
+                        "description": "ID de la solicitud de crédito",
+                    },
+                    "approved": map[string]interface{}{
+                        "type":        "boolean",
+                        "description": "True si aprobado, false si rechazado",
+                    },
+                    "reasoning": map[string]interface{}{
+                        "type":        "string",
+                        "description": "Razonamiento detallado de la decisión",
+                    },
+                    "confidence": map[string]interface{}{
+                        "type":        "number",
+                        "description": "Confianza en la decisión (0-1)",
+                    },
+                },
+                "required": []string{"request_id", "approved", "reasoning", "confidence"},
+            },
+        },
+    }
+}
+
+func (s *CreditAnalysisMCPServer) ExecuteTool(
+    ctx context.Context,
+    toolName string,
+    input map[string]interface{},
+) *MCPToolResponse {
+    ctx, span := s.tracer.Start(ctx, "mcp_tool."+toolName,
+        trace.WithAttributes(attribute.String("tool.name", toolName)))
+    defer span.End()
+
+    var result interface{}
+    var err error
+
+    result, err = s.cb.Execute(func() (interface{}, error) {
+        switch toolName {
+        case "get_credit_request":
+            requestID, _ := input["request_id"].(string)
+            return s.handleGetCreditRequest(ctx, requestID)
+        case "get_payment_history":
+            applicantID, _ := input["applicant_id"].(string)
+            return s.handleGetPaymentHistory(ctx, applicantID)
+        case "fetch_bureau_data":
+            applicantID, _ := input["applicant_id"].(string)
+            return s.handleFetchBureauData(ctx, applicantID)
+        case "save_risk_decision":
+            return s.handleSaveRiskDecision(ctx, input)
+        default:
+            return nil, fmt.Errorf("tool not found: %s", toolName)
+        }
+    })
+
+    if err != nil {
+        span.SetStatus(codes.Error, err.Error())
+        return &MCPToolResponse{
+            IsError: true,
+            Error:   err.Error(),
+        }
+    }
+
+    span.SetStatus(codes.Ok, "")
+    return &MCPToolResponse{
+        Content: []map[string]interface{}{{"result": result}},
+    }
+}
+
+func (s *CreditAnalysisMCPServer) handleGetCreditRequest(
+    ctx context.Context,
+    requestID string,
+) (interface{}, error) {
+    if requestID == "" {
+        return nil, fmt.Errorf("request_id is required")
+    }
+
+    request, err := s.repo.GetCreditRequest(ctx, requestID)
+    if err != nil {
+        return nil, fmt.Errorf("failed to get credit request: %w", err)
+    }
+
+    return map[string]interface{}{
+        "id":              request.ID,
+        "applicant_id":    request.ApplicantID,
+        "requested_amount": request.RequestedAmount,
+        "purpose":         request.Purpose,
+        "submitted_at":    request.SubmittedAt,
+    }, nil
+}
+
+// ... implementaciones similares para handleGetPaymentHistory, handleFetchBureauData, handleSaveRiskDecision
+
+func (s *CreditAnalysisMCPServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+    conn, err := s.upgrader.Upgrade(w, r, nil)
+    if err != nil {
+        log.Printf("Failed to upgrade connection: %v", err)
+        return
+    }
+    defer conn.Close()
+
+    // MCP protocol handshake y message handling
+    for {
+        _, message, err := conn.ReadMessage()
+        if err != nil {
+            log.Printf("Read error: %v", err)
+            break
+        }
+
+        var req map[string]interface{}
+        if err := json.Unmarshal(message, &req); err != nil {
+            continue
+        }
+
+        // Procesar requests MCP (tools/list, tools/call, etc.)
+        response := s.processRequest(r.Context(), req)
+        if err := conn.WriteJSON(response); err != nil {
+            log.Printf("Write error: %v", err)
+            break
+        }
+    }
+}
+
+func (s *CreditAnalysisMCPServer) processRequest(
+    ctx context.Context,
+    req map[string]interface{},
+) map[string]interface{} {
+    method, _ := req["method"].(string)
+
+    switch method {
+    case "tools/list":
+        return map[string]interface{}{
+            "result": map[string]interface{}{
+                "tools": s.ListTools(),
+            },
+        }
+    case "tools/call":
+        params := req["params"].(map[string]interface{})
+        toolName := params["name"].(string)
+        arguments := params["arguments"].(map[string]interface{})
+
+        response := s.ExecuteTool(ctx, toolName, arguments)
+        return map[string]interface{}{
+            "result": response,
+        }
+    }
+
+    return map[string]interface{}{
+        "error": map[string]interface{}{
+            "code":    -32601,
+            "message": "Method not found",
+        },
+    }
+}
+```
+
+Este MCP server:
+- Expone herramientas de dominio a través de un contrato estándar
+- Incluye circuit breakers para evitar cascadas de fallos
+- Proporciona tracing OpenTelemetry para observabilidad
+- Usa WebSocket para comunicación bidireccional con agentes
+
+### Paso 3: Implementar el Agent Orchestrator en la Capa de Aplicación
+
+El orchestrator vive en la capa de aplicación y coordina múltiples agentes especializados. Usa el patrón Orchestrator-Worker que cubrimos en [Orchestrator-Worker Multi-Agente en Producción](/es/blog/orchestrator-worker-multi-agente-produccion):
+
+```go
+// application/agent_orchestrator/credit_risk_orchestrator.go
+package agent_orchestrator
+
+import (
+    "context"
+    "encoding/json"
+    "fmt"
+    "log"
+    "sync"
+    "time"
+
+    "github.com/google/uuid"
+    "go.opentelemetry.io/otel"
+    "go.opentelemetry.io/otel/attribute"
+    "go.opentelemetry.io/otel/trace"
+)
+
+type AgentTask struct {
+    ID      string
+    Type    string
+    Input   interface{}
+    Context context.Context
+}
+
+type AgentResult struct {
+    TaskID   string
+    Success  bool
+    Output   interface{}
+    Metadata map[string]interface{}
+    Error    error
+}
+
+type AgentWorker interface {
+    Execute(ctx context.Context, task AgentTask) (*AgentResult, error)
+    Type() string
+}
+
+// CreditRiskOrchestrator orquesta análisis de riesgo usando múltiples agentes
+type CreditRiskOrchestrator struct {
+    workers     map[string]AgentWorker
+    workerQueue chan AgentTask
+    resultQueue chan *AgentResult
+    tracer      trace.Tracer
+}
+
+func NewCreditRiskOrchestrator() *CreditRiskOrchestrator {
+    return &CreditRiskOrchestrator{
+        workers:     make(map[string]AgentWorker),
+        workerQueue: make(chan AgentTask, 100),
+        resultQueue: make(chan *AgentResult, 100),
+        tracer:      otel.Tracer("credit-risk-orchestrator"),
+    }
+}
+
+func (o *CreditRiskOrchestrator) RegisterWorker(worker AgentWorker) {
+    o.workers[worker.Type()] = worker
+    go o.runWorker(worker)
+}
+
+func (o *CreditRiskOrchestrator) runWorker(worker AgentWorker) {
+    for task := range o.workerQueue {
+        if task.Type == worker.Type() {
+            result, err := worker.Execute(task.Context, task)
+            if err != nil {
+                o.resultQueue <- &AgentResult{
+                    TaskID:  task.ID,
+                    Success: false,
+                    Error:   err,
+                }
+            } else {
+                o.resultQueue <- result
+            }
+        } else {
+            // Re-enqueue si no es el worker correcto
+            o.workerQueue <- task
+        }
+    }
+}
+
+func (o *CreditRiskOrchestrator) AnalyzeCreditRisk(
+    ctx context.Context,
+    requestID string,
+) (*domain.RiskDecision, error) {
+    ctx, span := o.tracer.Start(ctx, "orchestrator.AnalyzeCreditRisk")
+    defer span.End()
+
+    span.SetAttributes(attribute.String("credit.request_id", requestID))
+
+    // Paso 1: Agente de recopilación de datos
+    dataTask := AgentTask{
+        ID:      uuid.New().String(),
+        Type:    "data_collection",
+        Input:   map[string]string{"request_id": requestID},
+        Context: ctx,
+    }
+    o.workerQueue <- dataTask
+
+    dataResult := <-o.resultQueue
+    if !dataResult.Success {
+        span.RecordError(dataResult.Error)
+        return nil, fmt.Errorf("data collection failed: %w", dataResult.Error)
+    }
+
+    collectedData := dataResult.Output.(map[string]interface{})
+
+    // Paso 2: Agente de análisis de riesgo (ejecuta en paralelo con validación)
+    var wg sync.WaitGroup
+    var riskAnalysisResult, validationResult *AgentResult
+
+    wg.Add(2)
+
+    go func() {
+        defer wg.Done()
+        riskTask := AgentTask{
+            ID:      uuid.New().String(),
+            Type:    "risk_analysis",
+            Input:   collectedData,
+            Context: ctx,
+        }
+        o.workerQueue <- riskTask
+        riskAnalysisResult = <-o.resultQueue
+    }()
+
+    go func() {
+        defer wg.Done()
+        validationTask := AgentTask{
+            ID:      uuid.New().String(),
+            Type:    "validation",
+            Input:   collectedData,
+            Context: ctx,
+        }
+        o.workerQueue <- validationTask
+        validationResult = <-o.resultQueue
+    }()
+
+    wg.Wait()
+
+    if !riskAnalysisResult.Success {
+        span.RecordError(riskAnalysisResult.Error)
+        return nil, fmt.Errorf("risk analysis failed: %w", riskAnalysisResult.Error)
+    }
+
+    if !validationResult.Success {
+        span.RecordError(validationResult.Error)
+        return nil, fmt.Errorf("validation failed: %w", validationResult.Error)
+    }
+
+    // Paso 3: Agente de síntesis y decisión final
+    synthesisTask := AgentTask{
+        ID: uuid.New().String(),
+        Type: "synthesis",
+        Input: map[string]interface{}{
+            "risk_analysis": riskAnalysisResult.Output,
+            "validation":    validationResult.Output,
+        },
+        Context: ctx,
+    }
+    o.workerQueue <- synthesisTask
+    synthesisResult := <-o.resultQueue
+
+    if !synthesisResult.Success {
+        span.RecordError(synthesisResult.Error)
+        return nil, fmt.Errorf("synthesis failed: %w", synthesisResult.Error)
+    }
+
+    decision := synthesisResult.Output.(*domain.RiskDecision)
+    span.SetAttributes(attribute.Bool("decision.approved", decision.Approved))
+
+    return decision, nil
+}
+
+// MCPClientWorker es un worker que se comunica con un MCP server
+type MCPClientWorker struct {
+    clientType string
+    mcpClient  *MCPClient
+}
+
+func NewMCPClientWorker(clientType string, mcpServerURL string) *MCPClientWorker {
+    return &MCPClientWorker{
+        clientType: clientType,
+        mcpClient:  NewMCPClient(mcpServerURL),
+    }
+}
+
+func (w *MCPClientWorker) Type() string {
+    return w.clientType
+}
+
+func (w *MCPClientWorker) Execute(
+    ctx context.Context,
+    task AgentTask,
+) (*AgentResult, error) {
+    ctx, span := otel.Tracer("mcp-worker").Start(ctx, "worker.Execute")
+    defer span.End()
+
+    switch task.Type {
+    case "data_collection":
+        return w.executeDataCollection(ctx, task)
+    case "risk_analysis":
+        return w.executeRiskAnalysis(ctx, task)
+    case "validation":
+        return w.executeValidation(ctx, task)
+    case "synthesis":
+        return w.executeSynthesis(ctx, task)
+    default:
+        return nil, fmt.Errorf("unknown task type: %s", task.Type)
+    }
+}
+
+func (w *MCPClientWorker) executeDataCollection(
+    ctx context.Context,
+    task AgentTask,
+) (*AgentResult, error) {
+    requestID := task.Input.(map[string]string)["request_id"]
+
+    // Llamadas paralelas a herramientas MCP
+    var wg sync.WaitGroup
+    var request, payments, bureau *MCPToolResponse
+    var requestErr, paymentsErr, bureauErr error
+
+    wg.Add(3)
+
+    go func() {
+        defer wg.Done()
+        request, requestErr = w.mcpClient.CallTool(ctx, "get_credit_request",
+            map[string]interface{}{"request_id": requestID})
+    }()
+
+    go func() {
+        defer wg.Done()
+        // Primero obtenemos el request para el applicant_id
+        time.Sleep(100 * time.Millisecond) // Simplificado
+        payments, paymentsErr = w.mcpClient.CallTool(ctx, "get_payment_history",
+            map[string]interface{}{"applicant_id": "temp_id"})
+    }()
+
+    go func() {
+        defer wg.Done()
+        bureau, bureauErr = w.mcpClient.CallTool(ctx, "fetch_bureau_data",
+            map[string]interface{}{"applicant_id": "temp_id"})
+    }()
+
+    wg.Wait()
+
+    if requestErr != nil || paymentsErr != nil || bureauErr != nil {
+        return nil, fmt.Errorf("data collection errors: %v, %v, %v",
+            requestErr, paymentsErr, bureauErr)
+    }
+
+    collectedData := map[string]interface{}{
+        "credit_request":   request.Content[0]["result"],
+        "payment_history":  payments.Content[0]["result"],
+        "bureau_data":      bureau.Content[0]["result"],
+    }
+
+    return &AgentResult{
+        TaskID:   task.ID,
+        Success:  true,
+        Output:   collectedData,
+        Metadata: map[string]interface{}{"tools_used": []string{"get_credit_request", "get_payment_history", "fetch_bureau_data"}},
+    }, nil
+}
+
+// Implementaciones similares para executeRiskAnalysis, executeValidation, executeSynthesis
+```
+
+### Paso 4: Deployment en Kubernetes
+
+El deployment sigue las mejores prácticas de [Agentes IA en Kubernetes](/es/blog/agentes-ia-en-kubernetes-deploy-y-escalado):
+
+```yaml
+# deployments/orchestrator-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: credit-risk-orchestrator
+  namespace: credit-analysis
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: credit-risk-orchestrator
+  template:
+    metadata:
+      labels:
+        app: credit-risk-orchestrator
+        agent-type: orchestrator
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      runtimeClassName: gvisor  # Sandboxing para agentes
+      containers:
+      - name: orchestrator
+        image: gcr.io/your-project/credit-risk-orchestrator:v1.0.0
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 9090
+          name: metrics
+        env:
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ai-secrets
+              key: openai-api-key
+        - name: MCP_SERVER_URL
+          value: "ws://credit-mcp-server:8080"
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: "http://jaeger-collector:4317"
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "512Mi"
+          limits:
+            cpu: "2000m"
+            memory: "2Gi"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      - name: otlp-collector
+        image: otel/opentelemetry-collector-contrib:0.78.0
+        args: ["--config=/etc/otel-collector-config.yaml"]
+        volumeMounts:
+        - name: config
+          mountPath: /etc/otel-collector-config.yaml
+          subPath: otel-collector-config.yaml
+      volumes:
+      - name: config
+        configMap:
+          name: otel-collector-config
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: orchestrator-hpa
+  namespace: credit-analysis
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: credit-risk-orchestrator
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Pods
+    pods:
+      metric:
+        name: active_goroutines
+      target:
+        type: AverageValue
+        averageValue: "100"
+```
+
+El MCP server se deploya separadamente:
+
+```yaml
+# deployments/mcp-server-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: credit-mcp-server
+  namespace: credit-analysis
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: credit-mcp-server
+  template:
+    metadata:
+      labels:
+        app: credit-mcp-server
+        mcp-server: credit-tools
+    spec:
+      containers:
+      - name: mcp-server
+        image: gcr.io/your-project/credit-mcp-server:v1.0.0
+        env:
+        - name: DB_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: db-host
+        - name: BUREAU_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: external-apis
+              key: bureau-api-key
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "256Mi"
+          limits:
+            cpu: "1000m"
+            memory: "1Gi"
+        ports:
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: credit-mcp-server
+  namespace: credit-analysis
+spec:
+  selector:
+    app: credit-mcp-server
+  ports:
+  - port: 8080
+    targetPort: 8080
+```
+
+## Lessons Learned
+
+### 1. Clean Architecture No Es Opcional Con Agentes
+
+La tentación de inyectar llamadas directas a LLMs en tu código existente es fuerte. Resistela. En producción, eso se convierte en un nightmare de debugging. Los principios de Clean Architecture son aún más importantes con agentes IA porque:
+
+- **Testing**: Puedes mockear el AgentOrchestratorPort para testing de dominio sin LLM calls
+- **Swapability**: Puedes cambiar tu provider de LLM (OpenAI → Anthropic → Local) sin tocar el dominio
+- **Evolution**: Tu arquitectura puede evolucionar mientras los agentes siguen siendo un detalle de implementación
+
+<Callout type="warning" title="Lección de campo">
+  Intentamos un enfoque "rápido" donde los servicios de dominio llamaban directamente a un servicio de LLM wrapper. El resultado: test suite roto, timeouts distribuidos no traceables, y refactor de 2 semanas para limpiar el technical debt. No repitas ese error.
+</Callout>
+
+### 2. MCP Es Más Que un Protocolo — Es Un Patrón Arquitectónico
+
+MCP no es solo JSON-RPC sobre WebSocket. Es un patrón arquitectónico que formaliza la relación entre agentes y tu stack. Los beneficios que no anticipamos:
+
+- **Versioning**: MCP servers pueden soportar múltiples versiones de herramientas simultáneamente
+- **Documentation**: El esquema JSON de herramientas es documentación living de tu API para agentes
+- **Governance**: Centralizaste la política de qué pueden hacer los agentes en un solo lugar (el MCP server)
+
+### 3. Observabilidad End-to-End No Es Negociable
+
+El debugging de sistemas de agentes sin tracing completo es casi imposible. Necesitas conectar los spans desde:
+
+```
+HTTP Request → Orchestrator → Worker Pool → MCP Client → MCP Server → Domain Layer → DB
+```
+
+Usamos OpenTelemetry con Jaeger para visualizar estos traces. Cada componente añade attributes contextuales (request IDs, agent types, tool names). Esto nos permitió:
+
+- Detectar que el agente de análisis de riesgo tenía timeouts en el 20% de requests
+- Identificar que el MCP server de bureau data tenía latencia en el p95 de 5 segundos
+- Optimizar el paralelismo de tasks reduciendo el tiempo total de orquestación de 8s a 3s
+
+<CodeComparison
+  before={`// Sin tracing
+func (w *MCPClientWorker) executeDataCollection(ctx context.Context, task AgentTask) (*AgentResult, error) {
+    request, _ := w.mcpClient.CallTool(ctx, "get_credit_request", ...)
+    payments, _ := w.mcpClient.CallTool(ctx, "get_payment_history", ...)
+    bureau, _ := w.mcpClient.CallTool(ctx, "fetch_bureau_data", ...)
+    return &AgentResult{Success: true, Output: ...}, nil
+}`}
+  after={`// Con OpenTelemetry tracing
+func (w *MCPClientWorker) executeDataCollection(ctx context.Context, task AgentTask) (*AgentResult, error) {
+    ctx, span := otel.Tracer("mcp-worker").Start(ctx, "worker.executeDataCollection")
+    defer span.End()
+
+    var wg sync.WaitGroup
+    wg.Add(3)
+
+    go func() {
+        defer wg.Done()
+        innerCtx, s := otel.Tracer("mcp-worker").Start(ctx, "get_credit_request")
+        request, err := w.mcpClient.CallTool(innerCtx, "get_credit_request", ...)
+        if err != nil {
+            s.RecordError(err)
+            s.SetStatus(codes.Error, err.Error())
+        }
+        s.End()
+    }()
+
+    // ... similares para payments y bureau
+
+    wg.Wait()
+    span.SetAttributes(attribute.Int("tools_called", 3))
+    return result, nil
+}`}
+/>
+
+### 4. Circuit Breakers No Son Optional, Son Críticos
+
+Los LLM providers tienen downtimes. Los servicios externos (bureau data, income verification) también. Sin circuit breakers, un fallo en un componente cause cascadas que derrumban todo el sistema.
+
+Implementamos gobreaker en cada MCP tool con:
+
+- **Threshold**: 5 fallos consecutivos
+- **Timeout**: 30 segundos antes de intentar recovery
+- **Half-open**: Un test request antes de reabrir el circuito
+
+Esto nos salvó en dos incidentes donde el bureau API estuvo down por más de una hora.
+
+### 5. Cost Management Empieza En La Arquitectura
+
+Los tokens no son gratis. Un agente que llama 5 herramientas, cada una con prompts de 500 tokens, y luego un LLM de síntesis con 2000 tokens de contexto... eso suma rápido.
+
+Diseñamos cost controls en la arquitectura:
+
+- **Token budgets por request**: El orchestrator rechaza requests que excederían el presupuesto
+- **Caching inteligente**: Respuestas MCP cacheadas con TTL (p. ej. bureau data por 24h)
+- **Modelo selection**: Agentes simples usan GPT-4o-mini, solo síntesis usa Claude Opus
+- **Tracing de costos**: Cada span incluye attribute `token_count` y `estimated_cost`
+
+<Callout type="success">
+  Resultado: Reducción de costos de LLM en 67% después de implementar caching y model selection inteligente. Observabilidad de costos en tiempo real permitió optimización continua.
+</Callout>
+
+## Conclusion
+
+Integrar agentes IA en arquitecturas enterprise no requiere reconstruir desde cero. Con Clean Architecture, Hexagonal patterns, MCP, y Go como runtime, puedes extender tu stack existente sin sacrificar los principios que te dieron estabilidad.
+
+Los takeaways clave:
+
+1. **Los agentes viven en la capa de aplicación, no en el dominio core**
+2. **MCP proporciona el contrato que desacopla agentes de tu implementación**
+3. **Go ofrece el runtime ideal para orquestación concurrente de agentes**
+4. **Observabilidad end-to-end con OpenTelemetry no es optional**
+5. **Circuit breakers, retries y cost management son production requirements**
+
+El resultado: un sistema donde los agentes de IA son ciudadanos de primera clase en tu arquitectura, con las mismas garantías de testability, observabilidad y escalabilidad que el resto de tu stack.
+
+<Steps>
+  <Step title="Define tus puertos de dominio primero">
+    Antes de escribir código de agentes, identifica qué acciones de dominio necesitan orquestación. Define interfaces en el dominio core (por ejemplo, `AgentOrchestratorPort`). Esto mantiene el dominio agnóstico a la implementación de IA.
+  </Step>
+  <Step title="Implementa MCP servers para exponer herramientas del dominio">
+    Cada MCP server implementa adaptadores que exponen funcionalidad del dominio a través del protocolo MCP. Incluye circuit breakers, retries y tracing desde el día uno.
+  </Step>
+  <Step title="Construye el orchestrator en la capa de aplicación">
+    El orchestrator coordina múltiples agentes (data collection, analysis, validation, synthesis). Usa goroutines y channels para concurrencia segura. Añade tracing OpenTelemetry en cada componente.
+  </Step>
+  <Step title="Deploy en Kubernetes con autoscaling inteligente">
+    Despliega orchestrators y MCP servers como pods separados. Usa HPA basado en métricas de negocio (goroutines activas, queue depth) en lugar de CPU/Memory genéricos.
+  </Step>
+  <Step title="Añade observabilidad y cost tracking desde el inicio">
+    Implementa tracing end-to-end, métricas Prometheus, y tracking de costos por token. Configura alerts para latencia p95, error rates, y anomalías en costos.
+  </Step>
+</Steps>
+
+La próxima vez que alguien te pregunte cómo integrar agentes IA en producción sin romper el stack, la respuesta es clara: Clean Architecture + MCP + Go + Kubernetes. Es una combinación probada en producción que escala.
+
+---
+
+**Lecturas relacionadas**:
+
+- [MCP en Producción: Patrones de Integración Real](/es/blog/mcp-en-produccin-patrones-de-integracin-real) — deep dive en MCP servers production-ready
+- [Go para Backend de Agentes: Por Qué y Cuándo](/es/blog/go-para-backend-de-agentes-por-que-y-cuando) — análisis de Go como runtime para orquestadores
+- [Agentes IA en Kubernetes: Deploy y Escalado](/es/blog/agentes-ia-en-kubernetes-deploy-y-escalado) — guía completa de deployment
+- [Orchestrator-Worker Multi-Agente en Producción](/es/blog/orchestrator-worker-multi-agente-produccion) — patrones de orquestación distribuida

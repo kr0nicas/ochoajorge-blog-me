@@ -1,0 +1,687 @@
+---
+title: "Hacking Blanco y Arquitectura de Software: Defensas en Capas para Sistemas Cloud-First"
+description: "Seguridad por diseño en arquitecturas cloud. Threat Modeling, defensas en capas con Kubernetes y DevSecOps para SREs y DevOps Engineers modernos."
+date: "2026-07-06"
+canonical: "https://ochoajorge.me/es/blog/hacking-blanco-arquitectura-software-defensas-capas-cloud-first"
+tags: ["hacking-blanco", "seguridad", "kubernetes", "devsecops", "cloud"]
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Arquitectura de Software Avanzada"
+  part: 12
+---
+
+# Hacking Blanco y Arquitectura de Software: Defensas en Capas para Sistemas Cloud-First
+
+Cuando diseñamos arquitecturas cloud-first, la seguridad no puede ser una capa que agregamos al final. Debe estar en el ADN del sistema, desde el primer commit hasta el último deployment. El hacking blanco — o ethical hacking — aplicado a la arquitectura de software nos permite anticipar amenazas antes de que exploiten vulnerabilidades reales.
+
+Este post es para SREs y DevOps Engineers que entienden que la seguridad por diseño no es un lujo, es un requisito para operar sistemas críticos en producción.
+
+---
+
+## El Problema: Seguridad Reactiva en Arquitecturas Cloud
+
+La realidad de muchos equipos: la seguridad entra cuando ya hay un incidente. Firewall rules creados apresuradamente, RBAC agregado por demanda, secrets hardcoded en repositorios que nadie debería tener acceso.
+
+<Callout type="danger" title="El costo de la seguridad reactiva">
+  - Tiempo medio de detección de incidentes: 200+ días según IBM Security 2025
+  - Costo promedio de breach cloud: $4.45M (más alto que on-premise)
+  - 60% de breaches son por configuraciones incorrectas, no exploits complejos
+</Callout>
+
+En sistemas cloud-first, la superficie de ataque es masiva. Kubernetes, microservicios, APIs externas, secrets management, identity providers — cada capa expone vectores de ataque que un arquitecto debe considerar desde el diseño.
+
+---
+
+## Core Concept: Threat Modeling en Arquitectura
+
+El threat modeling no es exclusivo de pentesters. Es una disciplina de arquitectura que aplica el hacking blanco mental: **"Si yo fuera un atacante, ¿por dónde entraría?"**
+
+### STRIDE aplicado a Arquitectura Cloud
+
+STRIDE es un framework que estructuriza el análisis de amenazas:
+
+| Amenaza | Impacto en Arquitectura Cloud | Ejemplo en Kubernetes |
+|---------|------------------------------|----------------------|
+| **S**poofing | Identidad comprometida | Service account tokens en pods |
+| **T**ampering | Modificación de datos | etcd sin encriptación at-rest |
+| **R**epudiation | Negación de acciones | Logs centralizados ausentes |
+| **I**nformation Disclosure | Fuga de datos sensibles | Secrets en ConfigMaps en lugar de Secret |
+| **D**enial of Service | Disponibilidad comprometida | Pod disruption budgets mal configurados |
+| **E**levation of Privilege | Escalación de privilegios | containers privileged:true |
+
+<Callout type="tip" title="Pragmatismo vs Parálisis">
+  No hagas threat modeling completo para cada cambio. Aplica STRIDE en puntos críticos: nuevos servicios, exposure público, integraciones con terceros. El 80% del riesgo viene del 20% de las decisiones arquitectónicas.
+</Callout>
+
+---
+
+## Implementation: Defensas en Capas con Kubernetes y Go
+
+Aquí es donde la teoría se encuentra con el código. Veamos cómo implementar defensas en profundidad usando Kubernetes como plataforma y Go para lógica de seguridad.
+
+### Capa 1: Network Security con CNI y NetworkPolicies
+
+La primera línea de defensa es controlar qué puede hablar con qué.
+
+```yaml
+# network-policy-deny-all.yaml - Deny all by default
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all-ingress
+  namespace: production
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+```
+
+```yaml
+# network-policy-allow-frontend.yaml - Whitelist approach
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-frontend-to-backend
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: api-backend
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: frontend
+    ports:
+    - protocol: TCP
+      port: 8080
+```
+
+<CodeComparison 
+  before={`# ❌ Default Kubernetes behavior: everything can reach everything
+# NetworkPolicy vacíos o inexistentes
+# Pods pueden hablar entre namespaces sin restricciones`}
+  after={`# ✅ Zero-trust networking: default deny, explicit allow
+# Deny-all por defecto en cada namespace
+# Whitelist solo las conexiones necesarias`}
+/>
+
+### Capa 2: Admission Controllers para Validar en el Runtime
+
+Kubernetes admission controllers interceptan requests antes de que persistan en etcd. Es tu firewall de arquitectura.
+
+```go
+// pkg/admission/privileged-containers.go - ValidatingWebhook
+package admission
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+
+	admissionv1 "k8s.io/api/admission/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+type PrivilegedContainerValidator struct{}
+
+func (v *PrivilegedContainerValidator) Handle(w http.ResponseWriter, r *http.Request) {
+	var admissionReview admissionv1.AdmissionReview
+	
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := json.Unmarshal(body, &admissionReview); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	request := admissionReview.Request
+	response := &admissionv1.AdmissionResponse{
+		UID: request.UID,
+	}
+
+	pod := &corev1.Pod{}
+	if err := json.Unmarshal(request.Object.Raw, pod); err != nil {
+		response.Allowed = false
+		response.Result = &metav1.Status{
+			Message: fmt.Sprintf("Failed to unmarshal pod: %v", err),
+		}
+	} else {
+		response.Allowed = !v.hasPrivilegedContainers(pod)
+		if !response.Allowed {
+			response.Result = &metav1.Status{
+				Message: "Privileged containers are not allowed in production",
+			}
+		}
+	}
+
+	admissionReview.Response = response
+	respBytes, err := json.Marshal(admissionReview)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(respBytes)
+}
+
+func (v *PrivilegedContainerValidator) hasPrivilegedContainers(pod *corev1.Pod) bool {
+	for _, container := range pod.Spec.Containers {
+		if container.SecurityContext != nil && container.SecurityContext.Privileged != nil && *container.SecurityContext.Privileged {
+			return true
+		}
+	}
+	return false
+}
+```
+
+```yaml
+# deployment-admission-webhook.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admission-webhook
+  namespace: security-system
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: admission-webhook
+  template:
+    metadata:
+      labels:
+        app: admission-webhook
+    spec:
+      serviceAccountName: admission-webhook
+      containers:
+      - name: webhook
+        image: your-registry/admission-webhook:v1.0.0
+        ports:
+        - containerPort: 8443
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+```
+
+<Callout type="warning" title="Admission controllers son tu primera línea">
+  No dependas solo de policies humanas. Un webhook que rechaza `privileged: true` en producción evita que un desarrollador cansado cometa el error del siglo. Automatiza la vigilancia arquitectónica.
+</Callout>
+
+### Capa 3: Secrets Management con Rotación Automática
+
+Secrets estáticos en Kubernetes son obsoletos. La arquitectura moderna integra con Vault, AWS Secrets Manager, o Azure Key Vault.
+
+```go
+// pkg/secrets/vault-client.go - Go client for Vault
+package secrets
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	vault "github.com/hashicorp/vault/api"
+)
+
+type VaultClient struct {
+	client *vault.Client
+}
+
+func NewVaultClient(address, token string) (*VaultClient, error) {
+	config := vault.DefaultConfig()
+	config.Address = address
+
+	client, err := vault.NewClient(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create vault client: %w", err)
+	}
+
+	client.SetToken(token)
+	return &VaultClient{client: client}, nil
+}
+
+func (v *VaultClient) GetSecretWithRotation(ctx context.Context, path string, ttl time.Duration) (map[string]interface{}, error) {
+	secret, err := v.client.Logical().Read(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read secret: %w", err)
+	}
+
+	if secret == nil {
+		return nil, fmt.Errorf("secret not found at path: %s", path)
+	}
+
+	// Check if secret needs rotation
+	if secret.LeaseDuration > 0 && secret.LeaseDuration <= int(ttl.Seconds()) {
+		// Renew or rotate secret
+		if err := v.rotateSecret(ctx, path); err != nil {
+			return nil, fmt.Errorf("failed to rotate secret: %w", err)
+		}
+	}
+
+	return secret.Data, nil
+}
+
+func (v *VaultClient) rotateSecret(ctx context.Context, path string) error {
+	// Implementation depends on your Vault configuration
+	// This might trigger a rotation engine or update the secret
+	return nil
+}
+```
+
+```yaml
+# deployment-with-vault-injector.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service
+  namespace: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: payment-service
+  template:
+    metadata:
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "payment-service"
+        vault.hashicorp.com/secret-volume-path: "/etc/secrets"
+        vault.hashicorp.com/secret-config: |
+          {
+            "database": {
+              "path": "secret/data/payment/db",
+              "template": "db_url={{ .Data.data.url }}\nusername={{ .Data.data.username }}\npassword={{ .Data.data.password }}"
+            }
+          }
+      labels:
+        app: payment-service
+    spec:
+      serviceAccountName: payment-service
+      containers:
+      - name: payment-processor
+        image: your-registry/payment-service:v2.1.0
+        volumeMounts:
+        - name: secrets
+          mountPath: /etc/secrets
+          readOnly: true
+        env:
+        - name: DB_CONFIG_PATH
+          value: /etc/secrets/database
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          readOnlyRootFilesystem: true
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 512Mi
+      volumes:
+      - name: secrets
+        emptyDir:
+          medium: Memory
+```
+
+### Capa 4: Service Mesh con mTLS para Zero Trust
+
+Un service mesh como Istio o Linkerd implementa mTLS automático entre servicios.
+
+```yaml
+# istio-peer-authentication.yaml - Enforce mTLS namespace-wide
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: production
+spec:
+  mtls:
+    mode: STRICT
+```
+
+```yaml
+# istio-authorization-policy.yaml - Fine-grained access control
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: payment-service-policy
+  namespace: production
+spec:
+  selector:
+    matchLabels:
+      app: payment-service
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/production/sa/frontend-service"]
+    to:
+    - operation:
+        methods: ["POST"]
+        paths: ["/api/v1/payments/*"]
+    when:
+    - key: source.ip
+      values: ["10.0.0.0/8"]
+```
+
+<Steps>
+  <Step title="Implementar mTLS automático">
+    No configures certificados manualmente entre servicios. Deja que el service mesh gestione rotación, distribución y validación de certificados. Zero trust significa que cada servicio autentica a cada otro servicio.
+  </Step>
+  <Step title="Definir políticas de autorización granular">
+    Más allá de mTLS, define qué servicios pueden hacer qué. Un servicio de frontend no debería poder llamar endpoints administrativos del backend. AuthorizationPolicy de Istio te permite esto.
+  </Step>
+  <Step title="Monitorear tráfico anómalo">
+    El service mesh genera telemetry por defecto. Configura alertas cuando un servicio comunique con destinations inesperados o patrones de tráfico cambien drásticamente.
+  </Step>
+</Steps>
+
+---
+
+## Lessons Learned: De Incidentes a Arquitectura
+
+<Callout type="success" title="Lo que aprendimos en producción">
+  Después de 3 años operando arquitecturas cloud-first con 50+ servicios, estos son los insights que más impactaron nuestra postura de seguridad:
+</Callout>
+
+### 1. RBAC No Es Seguridad Perimetral
+
+RBAC de Kubernetes controla quién puede hacer qué a nivel de cluster. Pero un atacante que compromete un pod con service account con permisos excesivos puede pivotar a otros recursos.
+
+```yaml
+# ❌ Antes: ServiceAccount con permisos excesivos
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: api-service
+  namespace: production
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: api-service-admin
+subjects:
+- kind: ServiceAccount
+  name: api-service
+  namespace: production
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin  # NEVER DO THIS
+  apiGroup: rbac.authorization.k8s.io
+```
+
+```yaml
+# ✅ Después: Principio de mínimo privilegio
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: api-service
+  namespace: production
+automountServiceAccountToken: false  # Solo montar si es necesario
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: api-service-reader
+  namespace: production
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list"]
+  resourceNames: ["api-config"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: api-service-config-reader
+subjects:
+- kind: ServiceAccount
+  name: api-service
+  namespace: production
+roleRef:
+  kind: Role
+  name: api-service-reader
+  apiGroup: rbac.authorization.k8s.io
+```
+
+### 2. Images Multi-Stage No Son Suficientes
+
+Alpine, distroless, multi-stage builds — todo ayuda, pero no reemplaza vulnerability scanning en runtime.
+
+```go
+// pkg/scanner/vulnerability-scanner.go - Runtime vulnerability scanner
+package scanner
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/anchore/grype/grype"
+	"github.com/anchore/syft/syft"
+)
+
+type VulnerabilityScanner struct{}
+
+func (s *VulnerabilityScanner) ScanImage(ctx context.Context, imageRef string) ([]string, error) {
+	// Create SBOM (Software Bill of Materials)
+	packages, err := syft.GetPackages(imageRef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate SBOM: %w", err)
+	}
+
+	// Scan for vulnerabilities
+	matches, err := grype.FindVulnerabilities(packages)
+	if err != nil {
+		return nil, fmt.Errorf("failed to scan for vulnerabilities: %w", err)
+	}
+
+	var criticalCVEs []string
+	for _, match := range matches {
+		if match.Severity.Severity >= "High" {
+			criticalCVEs = append(criticalCVEs, match.Vulnerability.ID)
+		}
+	}
+
+	return criticalCVEs, nil
+}
+```
+
+```yaml
+# pod-security-policy-restrictive.yaml
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: restrictive
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1
+        max: 65535
+  supplementalGroups:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1
+        max: 65535
+  readOnlyRootFilesystem: true
+```
+
+### 3. Chaos Engineering Expone Agujeros de Seguridad
+
+Cuando hacemos chaos engineering — matar pods, inyectar latencia, simular particiones de red — descubrimos fallas de seguridad que nunca anticipamos en diseño.
+
+<ComparisonTable
+  headers={["❌ Fallback inseguro", "✅ Fallback seguro"]}
+  highlight={2}
+  rows={[
+    ["Retry sin backoff a servicios externos", "Circuit breaker con timeout y fallback"],
+    ["Cache local de secrets en memcached no encriptado", "Cache en memoria del proceso, lifecycle-aware"],
+    ["Healthcheck HTTP sin autenticación", "Healthcheck con token rotativo o Unix socket"],
+    ["Metrics endpoint expuesto en pod directamente", "Metrics vía Prometheus service discovery con RBAC"],
+  ]}
+/>
+
+### 4. Telemetry de Seguridad No Es Opcional
+
+Logs no son suficientes. Necesitas traces estructurados que te permitan reconstruir incidentes.
+
+```go
+// pkg/observability/security-middleware.go - Security telemetry middleware
+package observability
+
+import (
+	"context"
+	"net/http"
+	"time"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+)
+
+type SecurityMiddleware struct {
+	next http.Handler
+}
+
+func NewSecurityMiddleware(next http.Handler) *SecurityMiddleware {
+	return &SecurityMiddleware{next: next}
+}
+
+func (m *SecurityMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	tracer := otel.Tracer("security-middleware")
+	
+	startTime := time.Now()
+	
+	// Extract security-relevant attributes
+	attrs := []attribute.KeyValue{
+		attribute.String("http.method", r.Method),
+		attribute.String("http.url", r.URL.String()),
+		attribute.String("http.user_agent", r.UserAgent()),
+		attribute.String("http.remote_addr", r.RemoteAddr),
+	}
+	
+	// Check for suspicious patterns
+	if isSuspiciousRequest(r) {
+		attrs = append(attrs, attribute.Bool("security.suspicious", true))
+		attrs = append(attrs, attribute.String("security.reason", detectSuspicionReason(r)))
+	}
+	
+	ctx, span := tracer.Start(ctx, "security-check", trace.WithAttributes(attrs...))
+	defer span.End()
+	
+	// Create response recorder to capture status code
+	rr := &responseRecorder{ResponseWriter: w}
+	
+	m.next.ServeHTTP(rr, r.WithContext(ctx))
+	
+	// Record response metrics
+	attrs = append(attrs, attribute.Int("http.status_code", rr.statusCode))
+	attrs = append(attrs, attribute.Int64("http.duration_ms", time.Since(startTime).Milliseconds()))
+	
+	span.SetAttributes(attrs...)
+	
+	// Alert on security events
+	if rr.statusCode >= 400 && isSuspiciousRequest(r) {
+		alertSecurityEvent(ctx, r, rr.statusCode)
+	}
+}
+
+type responseRecorder struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (r *responseRecorder) WriteHeader(statusCode int) {
+	r.statusCode = statusCode
+	r.ResponseWriter.WriteHeader(statusCode)
+}
+
+func isSuspiciousRequest(r *http.Request) bool {
+	// Implementation: detect SQL injection attempts, XSS, etc.
+	return false
+}
+
+func detectSuspicionReason(r *http.Request) string {
+	// Implementation: return reason for suspicion
+	return ""
+}
+
+func alertSecurityEvent(ctx context.Context, r *http.Request, statusCode int) {
+	// Implementation: send alert to your monitoring system
+}
+```
+
+---
+
+## Conclusion: Seguridad como Primera Clase en Arquitectura
+
+El hacking blanco aplicado a arquitectura de software no es sobre encontrar bugs en código. Es sobre diseñar sistemas que asumen compromiso y limitan el impacto.
+
+<Callout type="note" title="Defensa en profundidad no es redundancy">
+  Defense in depth significa que si una capa falla, la siguiente contiene el incidente. NetworkPolicy + admission controller + mTLS + RBAC + telemetry = cada capa valida lo que la anterior permitió.
+</Callout>
+
+Para SREs y DevOps Engineers, esto significa:
+
+1. **Threat modeling es parte del design review, no un workshop separado**
+2. **Kubernetes es tu enforcement layer, no solo tu orchestration platform**
+3. **DevSecOps no es un equipo separado, es una práctica integrada en el pipeline**
+4. **Observabilidad incluye security telemetry como primera clase**
+
+La próxima vez que diseñes un servicio, haz la pregunta del hacker blanco: *"Si este componente se compromete, ¿qué puede hacer? ¿Qué debería poder hacer?"* La diferencia entre esas dos respuestas es tu arquitectura de seguridad.
+
+---
+
+## Lecturas Recomendadas
+
+Si este post resonó contigo, estos posts relacionados pueden profundizar en temas específicos:
+
+- [SOLID en Microservicios: Cuándo Aplicar y Cuándo Es Excesivo](/es/blog/solid-en-microservicios-cuando-aplicar-y-cuando-es-excesivo) — Arquitectura modular que facilita contención de incidentes
+- [Agentes IA en Kubernetes: Deploy y Escalado](/es/blog/agentes-ia-en-kubernetes-deploy-y-escalado) — Patrones de deployment que aplican a servicios críticos
+- [RAG con pgVector: Arquitectura a Escala](/es/blog/rag-con-pgvector-arquitectura-a-escala) — Diseño de sistemas vectoriales con seguridad en mente
+- [Hexagonal Architecture en Python con FastAPI](/es/blog/hexagonal-architecture-python-fastapi) — Arquitectura limpia que facilita testing de seguridad
+
+---
+
+**¿Quieres implementar estas defensas en tu arquitectura?** Empieza con un audit de tus configuraciones actuales de Kubernetes: ¿tienes NetworkPolicies? ¿tienes admission controllers? ¿tienes mTLS? El gap entre tu estado actual y las defensas descritas aquí es tu roadmap de seguridad.
+
+---
