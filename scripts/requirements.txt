@@ -1,0 +1,22 @@
+# Social Media Publisher Dependencies
+# Production-ready Python packages for LinkedIn and X (Twitter) API integration
+
+# HTTP requests
+requests>=2.31.0
+
+# Frontmatter parsing
+python-frontmatter>=1.0.0
+
+# Twitter/X API
+tweepy>=4.14.0
+
+# LinkedIn API (optional - using direct REST API calls)
+# python-linkedin-v2>=0.1.0
+
+# Environment variable management
+python-dotenv>=1.0.0
+
+# Type checking and quality
+mypy>=1.5.0
+black>=23.7.0
+pylint>=2.17.0

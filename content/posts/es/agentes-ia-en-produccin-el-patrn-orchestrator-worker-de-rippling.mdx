@@ -11,28 +11,408 @@ series:
   part: 4
 ---
 
+# Agentes IA en Producción: El Patrón Orchestrator-Worker de Rippling
+
 ## Problem
 
-Describe the context and why this topic matters.
+En 2023, Rippling enfrentó un desafío de escala que la mayoría de empresas solo sueñan: tener que integrar capacidades de IA a través de múltiples productos (HR, payroll, IT, finanzas) para más de un millón de usuarios globalmente. El problema no era si debían usar agentes IA, sino cómo hacerlo a escala sin crear un sistema frágil e inmanejable.
+
+Los enfoques tradicionales fallaron:
+
+- **Workflows deterministas**: Intentaron crear agentes especializados con routing rígido por dominios (payroll vs IT vs HR). El problema: el lenguaje humano no respeta estos boundaries. "¿Cuántas personas se onboardaron la semana pasada?" vs "¿Cuántas personas se contrataron la semana pasada?" — misma información, rutas diferentes.
+- **Supervisores simples**: Un router que clasifica queries y las envía a agentes preexistentes. Funciona para casos claros, pero se rompe con edge cases y queries ambigüas.
+- **Sistemas monolíticos**: Un solo agente que intenta hacer todo. Resultado: context overflow, latencia inaceptable y falta de especialización.
+
+La pregunta que Ankur Bhatt, Head of AI de Rippling, tuvo que responder: **¿Cómo construir agentes de producción que manejen la complejidad empresarial sin sacrificar confiabilidad?**
 
 ## Core Concept
 
-Break down the main idea.
+Rippling encontró la respuesta en un patrón híbrido: **Orchestrator-Worker con Deep Agents**.
+
+### Arquitectura de tres capas
+
+```
+┌─────────────────────────────────────────┐
+│     Orchestrator (Supervisor Agent)     │
+│  - Reasoning de alto nivel              │
+│  - Decisión de sub-tareas en runtime    │
+│  - Síntesis de resultados               │
+└─────────────────────────────────────────┘
+                    │
+    ┌───────────────┼───────────────┐
+    │               │               │
+┌───▼────┐   ┌─────▼─────┐   ┌────▼────┐
+│  Read  │   │    RAG    │   │ Action  │
+│ Agents │   │  Agents   │   │ Agents  │
+│        │   │           │   │         │
+│ - Query│   │ - Retrieve│   │ - Write │
+│ - HR   │   │ - Docs    │   │ - Bonus │
+│ - IT   │   │ - Policies│   │ - Titles│
+│ - Pay  │   │ - Handbook│   │ - Hiring│
+└────────┘   └───────────┘   └─────────┘
+```
+
+### Tres tipos de Workers especializados
+
+1. **Read Agents**: Query data estructurado across todos los productos de Rippling
+   - HR, payroll, IT, finanzas
+   - Plataformas conectadas: Salesforce, Carta, GitHub
+   - Output: Data estructurada y normalizada
+
+2. **RAG Agents**: Retrieve de fuentes no estructuradas
+   - Help center docs
+   - Company handbooks
+   - HR policy documents
+   - Output: Contexto relevante para el orchestrator
+
+3. **Action Agents**: Ejecutan write operations
+   - Upload bonuses
+   - Normalizar job titles
+   - Pre-popular new hires desde perfiles previos
+   - Trigger workflows empresariales
+   - Output: Confirmación de ejecución
+
+### El insight clave: Deep Agent Paradigm
+
+La transición crítica de Rippling fue moverse de **workflows deterministas** al **deep agent paradigm**:
+
+<Callout type="tip" title="El cambio de mindset">
+  "Lean into the power of LLMs. Because they can do reasoning, thinking, and judgment. Give them ample context of the problem you're solving and the tools, you'll get much better outcomes."
+  
+  — Ankur Bhatt, Head of AI, Rippling
+</Callout>
+
+**Workflow determinista → Deep Agent:**
+- ❌ Rutas predefinidas que el agent debe seguir
+- ✅ Workflows como tools que el agent invoca cuando es necesario
+- ❌ LLM manipula data directamente
+- ✅ LLM decide qué hacer, código determinista formatea inputs
+- ❌ Contexto estático para todas las queries
+- ✅ Contexto dinámico basado en dominio relevante
 
 ## Implementation
 
-Provide real-world, production-ready code examples.
+### 1. Context Engineering con Semantic Layer
+
+El problema fundamental: context overflow. Rippling tiene cientos de operaciones posibles. No puedes dar todos los tools al agent a la vez.
+
+**Solución:** Semantic layer + domain-specific skills
 
 ```python
-# Example code
-def solve_problem():
-    pass
+class Orchestrator:
+    def __init__(self, semantic_layer, langsmith_client):
+        self.semantic_layer = semantic_layer
+        self.langsmith = langsmith_client
+    
+    async def process_query(self, user_query: str, context: dict):
+        # Step 1: Identificar dominio relevante (payroll, devices, ATS, spend, etc.)
+        domain = await self.semantic_layer.identify_domain(
+            user_query, 
+            context["user_context"]
+        )
+        
+        # Step 2: Load skill scoped al dominio
+        skill = await self.semantic_layer.load_skill(domain)
+        
+        # Step 3: Re-rank para reducir context size 100-500x
+        relevant_context = await self.semantic_layer.re_rank(
+            user_query, 
+            skill.context_candidates,
+            top_k=20  # Down from 500-1000
+        )
+        
+        # Step 4: Deep agent reasoning
+        return await self._deep_agent_reason(
+            user_query,
+            relevant_context,
+            skill.tools
+        )
+    
+    async def _deep_agent_reason(self, query: str, context: str, tools: list):
+        # LLM decide qué workers invocar
+        plan = await self.llm.generate(
+            f"""
+            Query: {query}
+            Context: {context}
+            Available tools: {[t.name for t in tools]}
+            
+            Decide which workers to invoke and in what order.
+            Return a structured plan.
+            """
+        )
+        
+        # Execute workers
+        worker_results = []
+        for step in plan.steps:
+            if step.type == "read":
+                result = await self.read_agent.execute(step.query)
+            elif step.type == "rag":
+                result = await self.rag_agent.retrieve(step.query)
+            elif step.type == "action":
+                result = await self.action_agent.execute(step.operation)
+            
+            worker_results.append(result)
+        
+        # Synthesize final response
+        return await self.llm.generate(
+            f"""
+            Original query: {query}
+            Worker results: {worker_results}
+            
+            Synthesize a comprehensive response.
+            """
+        )
+```
+
+### 2. Sandboxed Code Execution para Actions
+
+**Problema:** LLMs no formatean data consistentemente. CSV de cliente → formato interno de Rippling.
+
+**Solución:** Separar "qué hacer" (LLM) de "cómo formatear" (código determinista)
+
+```python
+class ActionAgent:
+    def __init__(self, code_executor):
+        self.executor = code_executor
+    
+    async def execute_operation(self, operation: str, raw_data: dict):
+        # Step 1: LLM decide qué operación ejecutar
+        operation_plan = await self.llm.generate(
+            f"""
+            Operation: {operation}
+            Raw data: {raw_data}
+            
+            Decide which workflow to execute:
+            - upload_bonus
+            - normalize_job_titles
+            - prepopulate_new_hire
+            
+            Return workflow name and required fields.
+            """
+        )
+        
+        # Step 2: Ejecutar code sandboxed para normalización
+        normalized_data = await self.executor.execute(
+            f"""
+            def normalize_{operation_plan.workflow}(data):
+                # Normalización determinista
+                result = {{
+                    'employee_id': data.get('id'),
+                    'amount': self._parse_currency(data.get('amount')),
+                    'effective_date': self._parse_date(data.get('date')),
+                    'approval_chain': self._determine_approvers(data)
+                }}
+                return result
+            
+            return normalize_{operation_plan.workflow}({raw_data})
+            """
+        )
+        
+        # Step 3: Ejecutar workflow de Rippling
+        workflow_result = await self.rippling_api.execute(
+            operation_plan.workflow,
+            normalized_data
+        )
+        
+        # Step 4: Log en LangSmith para traceability
+        await self.langsmith.trace_action(
+            operation=operation,
+            raw_data=raw_data,
+            normalized_data=normalized_data,
+            result=workflow_result
+        )
+        
+        return workflow_result
+    
+    def _parse_currency(self, amount_str: str) -> float:
+        # Lógica determinista para parsing
+        amount_str = amount_str.replace('$', '').replace(',', '').strip()
+        return float(amount_str)
+    
+    def _parse_date(self, date_str: str) -> datetime:
+        # Handle múltiples formatos de fecha
+        formats = ['%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y']
+        for fmt in formats:
+            try:
+                return datetime.strptime(date_str, fmt)
+            except ValueError:
+                continue
+        raise ValueError(f"Invalid date format: {date_str}")
+```
+
+### 3. LangSmith Integration para Observabilidad
+
+**El secreto de Rippling:** Todo team engineer trabaja en un single AI system con shared trace store.
+
+```python
+class ProductionMonitor:
+    def __init__(self, langsmith_client):
+        self.langsmith = langsmith_client
+    
+    async def monitor_production_health(self):
+        # Step 1: Pull failing traces from LangSmith
+        failing_traces = await self.langsmith.get_failed_traces(
+            time_range="last_24h",
+            min_confidence=0.3
+        )
+        
+        # Step 2: Agent analiza failures
+        failure_analysis = await self._analyze_failures(failing_traces)
+        
+        # Step 3: Auto-generate fixes
+        for failure in failure_analysis.critical_failures:
+            fix = await self._generate_fix(failure)
+            
+            # Step 4: Re-run evals para confirmar
+            eval_result = await self._run_evals(fix)
+            
+            if eval_result.passed:
+                # Step 5: Create PR para review humano
+                await self._create_pr(fix)
+        
+        return failure_analysis
+    
+    async def _analyze_failures(self, traces: list):
+        analysis_prompt = """
+        Analyze these failed traces:
+        {traces}
+        
+        Identify:
+        1. Root cause (routing, worker selection, synthesis)
+        2. Pattern across failures
+        3. Priority for fixing
+        
+        Return structured analysis.
+        """.format(traces=json.dumps(traces, indent=2))
+        
+        return await self.llm.generate(analysis_prompt)
+```
+
+### 4. Multi-Layered Evaluation System
+
+**Estructura de evals de Rippling:**
+
+```python
+class RipplingEvaluation:
+    def __init__(self):
+        self.layers = {
+            'offline': OfflineEvals(),
+            'post_merge': IntegrationEvals(),
+            'deploy_blocking': DeployEvals(),
+            'continuous': ContinuousEvals()
+        }
+    
+    async def run_evaluation(self, layer: str):
+        if layer == 'offline':
+            # Pre-recorded mocks, corre local en cada commit
+            return await self.layers['offline'].run()
+        
+        elif layer == 'post_merge':
+            # 300-400 queries contra full Rippling sandbox
+            return await self.layers['post_merge'].run(
+                queries=self._generate_queries(400),
+                environment='sandbox'
+            )
+        
+        elif layer == 'deploy_blocking':
+            # ~10 critical scenarios que gatean cada deployment
+            return await self.layers['deploy_blocking'].run(
+                scenarios=self._get_critical_scenarios()
+            )
+        
+        elif layer == 'continuous':
+            # Scheduled runs contra production data, multiple veces al día
+            return await self.layers['continuous'].run(
+                environment='production',
+                schedule='every_4h'
+            )
 ```
 
 ## Lessons Learned
 
-Summary of key takeaways.
+### 1. Workflows como Tools, no como Paths
+
+<Callout type="warning" title="La evolución de Rippling">
+  Empezamos con workflows deterministas. Eso rompió inmediatamente porque el lenguaje humano no respeta los boundaries de dominio que definimos.
+  
+  La solución: Workflows son tools que el agent invoca cuando es necesario, no rutas obligatorias.
+</Callout>
+
+**Ejemplo:**
+```python
+# ❌ Enfoque determinista (falló)
+if "payroll" in query:
+    route_to_payroll_agent()
+elif "it" in query:
+    route_to_it_agent()
+
+# ✅ Deep agent approach
+agent.invoke_tool(
+    "get_employee_payroll_history",
+    employee_id=user_id,
+    date_range=extract_date_range(query)
+)
+```
+
+### 2. Context Engineering > Better Prompts
+
+<Callout type="tip" title="El foco de Rippling">
+  "You really have to work with production data. You can't do a simple demo with a demo instance, but really curated production snapshots."
+  
+  — Ankur Bhatt
+</Callout>
+
+**Key learnings:**
+- **Dates son tricky**: "last week" cuando pay periods no alinean con calendar weeks
+- **Time zones matter**: Usuarios preguntando sobre "yesterday" desde diferentes timezones
+- **Domain-specific context es más importante que prompts genéricos**
+
+### 3. Three Feedback Mechanisms
+
+Rippling mantiene producción estable con tres feedback loops:
+
+1. **Dogfooding**: Switch on en Rippling, feedback inmediato (horas/días, no semanas)
+2. **Controlled Rollout**: Grupo pequeño de usuarios sophisticated
+3. **Obsessive Tracing**: LangSmith para cada interacción
+   - ¿Ruteó correctamente?
+   - ¿Escogió los tools correctos?
+   - ¿Dónde se rompió el reasoning?
+
+### 4. Build Systems LLMs Are Already Familiar With
+
+<Callout type="tip" title="Sahin Olut, Principal Engineer">
+  "Think of agents as your co-workers and build the best tools for them to be successful: enable code execution, enable writing SQL, don't obscure details from the LLM. And have a tight self-debugging loop."
+</Callout>
+
+**Principios:**
+- Dar tools, no ocultar complejidad
+- Habilitar code execution sandboxed
+- SQL access directo para data queries
+- Self-debugging loop automático
 
 ## Conclusion
 
-Wrap up and point to related articles.
+Rippling shipped multi-agent AI a escala en 6 meses. No fue porque tuvieron más recursos o mejor prompting — fue porque encontraron el patrón correcto.
+
+**El patrón Orchestrator-Worker con Deep Agents funciona en producción porque:**
+
+1. **Orchestrator** hace reasoning de alto nivel, decide sub-tareas en runtime
+2. **Workers** son especialistas (read, RAG, action) con tools específicos
+3. **Workflows deterministas** se encapsulan como tools, no como paths obligatorios
+4. **Context engineering** reduce size 100-500x con semantic layer
+5. **Sandboxed code execution** separa "qué hacer" de "cómo formatear"
+6. **LangSmith tracing** proporciona observabilidad y debugging
+7. **Multi-layered evals** (offline, post-merge, deploy-blocking, continuous) garantiza calidad
+
+**La lección más importante:** La transformación no es tecnología — es mindset. Workflows deterministas → deep agents. Prompts genéricos → context engineering. Demo instances → production snapshots.
+
+**¿Qué sigue?** En la parte 5 de esta serie, exploraremos cómo la IA transforma la deuda técnica: mitos, realidades y estrategias para mantener código sostenible en era de IA.
+
+¿Has intentado deployar agentes IA en producción? ¿Qué patrones funcionaron para ti? Comparte en los comentarios.
+
+## Referencias
+
+- [How Rippling went AI-native with Deep Agents and LangSmith](https://www.langchain.com/blog/how-rippling-went-ai-native-across-every-product-in-6-months-with-deep-agents-and-langsmith)
+- [Why AI Agents Break in Production — and How Rippling Fixes Them](https://www.rippling.com/resources/stop-building-ai-for-perfect-conditions)
+- [Orchestrator-Worker Pattern](https://github.com/agentpatternscatalog/patterns/blob/main/patterns/orchestrator-workers.md)
+- [Multi Agent Orchestration Patterns That Work in Production](https://www.requesty.ai/blog/multi-agent-orchestration-patterns-that-work-in-production)
