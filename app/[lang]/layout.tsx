@@ -65,6 +65,13 @@ export const metadata: Metadata = {
       "application/rss+xml": [{ url: "feed.xml", title: "Jorge Ochoa — RSS Feed" }],
     },
   },
+  // AI/LLM-specific meta tags
+  other: {
+    "ai-agent": "allowed",
+    "llms.txt": "/llms.txt",
+    "x-ai-content": "technical-blog",
+    "content-type": "technical-architecture",
+  },
 };
 
 export async function generateStaticParams() {
@@ -90,12 +97,46 @@ export default async function RootLayout({
       siteConfig.author.linkedin,
       siteConfig.author.github,
       `https://x.com/${siteConfig.author.twitter.replace("@", "")}`,
+      siteConfig.author.bluesky,
     ],
-    jobTitle: "Technology Architect",
+    jobTitle: "Specialist Technology Architect",
     worksFor: {
       "@type": "Organization",
-      name: "Equifax LATAM"
-    }
+      name: "Equifax LATAM",
+      url: "https://www.equifax.com"
+    },
+    knowsAbout: [
+      "Google Cloud Platform",
+      "Kubernetes",
+      "Docker",
+      "Clean Architecture",
+      "Hexagonal Architecture",
+      "AI Agents",
+      "Multi-Agent Systems",
+      "Go Programming",
+      "Python",
+      "Domain-Driven Design",
+      "DevOps"
+    ],
+    description: "Specialist Technology Architect at Equifax LATAM with 10+ years of experience. Expert in cloud architecture, distributed systems, and AI agent integration."
+  };
+
+  const organizationJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "Jorge Ochoa - Technical Blog",
+    url: siteConfig.url,
+    logo: siteConfig.ogImage,
+    description: "Technical blog about software architecture, AI systems, Clean Architecture patterns, and distributed systems design.",
+    founder: {
+      "@type": "Person",
+      name: siteConfig.author.name
+    },
+    sameAs: [
+      siteConfig.author.linkedin,
+      siteConfig.author.github,
+      `https://x.com/${siteConfig.author.twitter.replace("@", "")}`
+    ]
   };
 
   return (
@@ -106,6 +147,11 @@ export default async function RootLayout({
           <script
             type="application/ld+json"
             dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          />
+          {/* JSON-LD Organization Schema Global */}
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
           />
 
           <div className="relative flex min-h-screen flex-col">
