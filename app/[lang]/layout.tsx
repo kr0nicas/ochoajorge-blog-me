@@ -6,8 +6,30 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { siteConfig } from "@/lib/utils";
+import { Space_Grotesk, Archivo, JetBrains_Mono } from "next/font/google";
 import "../globals.css";
 import "highlight.js/styles/github-dark.css";
+
+const spaceGrotesk = Space_Grotesk({
+    subsets: ["latin"],
+    weight: ["500", "700"],
+    variable: "--font-space-grotesk",
+    display: "swap",
+});
+
+const archivo = Archivo({
+    subsets: ["latin"],
+    weight: ["400", "500", "600"],
+    variable: "--font-archivo",
+    display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+    subsets: ["latin"],
+    weight: ["400", "500", "700"],
+    variable: "--font-jetbrains-mono",
+    display: "swap",
+});
 
 
 export const metadata: Metadata = {
@@ -140,7 +162,7 @@ export default async function RootLayout({
   };
 
   return (
-      <html lang={lang} suppressHydrationWarning>
+      <html lang={lang} suppressHydrationWarning className={`${spaceGrotesk.variable} ${archivo.variable} ${jetbrainsMono.variable}`}>
       <body className="min-h-screen antialiased transition-colors duration-300">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange={false}>
           {/* JSON-LD Person Schema Global */}
