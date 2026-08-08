@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import matter from "gray-matter";
-import siteMetadata from "../config/site-metadata.json" assert { type: "json" };
+import siteMetadata from "../config/site-metadata.json" with { type: "json" };
 
 /**
  * SEO Audit Script: validates localized MDX posts metadata.
@@ -39,7 +39,14 @@ for (const locale of targetLocales) {
 
     const files = fs
         .readdirSync(localeDir)
-        .filter((file) => file.endsWith(".mdx") || file.endsWith(".md"));
+        .filter((file) => {
+            const isMarkdownFile = file.endsWith(".mdx") || file.endsWith(".md");
+            if (!isMarkdownFile) return false;
+
+            // Exclude social media templates (LinkedIn, X threads), same as lib/posts.ts
+            const slug = file.replace(/\.(mdx|md)$/, "");
+            return !slug.startsWith("linkedin-") && !slug.startsWith("x-thread-");
+        });
 
     for (const file of files) {
         const fullPath = path.join(localeDir, file);
@@ -48,9 +55,6 @@ for (const locale of targetLocales) {
 
         if (data.draft) continue;
         checked++;
-
-        const slug = file.replace(/\.(mdx|md)$/, "");
-        const expectedCanonical = `${siteMetadata.url}/${locale}/blog/${slug}`;
 
         if (!data.title || typeof data.title !== "string") {
             console.error(`Error: ${locale}/${file} is missing "title".`);
@@ -72,12 +76,12 @@ for (const locale of targetLocales) {
             errors++;
         }
 
-        if (!data.canonical || typeof data.canonical !== "string") {
-            console.warn(
-                `Warning: ${locale}/${file} is missing "canonical"; expected ${expectedCanonical}.`
-            );
-            warnings++;
-        } else if (!data.canonical.startsWith(siteMetadata.url)) {
+        // "canonical" is an optional override; the post page derives it from the slug
+        // when absent (see app/[lang]/blog/[slug]/page.tsx), so only validate if present.
+        if (data.canonical && typeof data.canonical !== "string") {
+            console.error(`Error: ${locale}/${file} has non-string "canonical".`);
+            errors++;
+        } else if (data.canonical && !data.canonical.startsWith(siteMetadata.url)) {
             console.warn(
                 `Warning: ${locale}/${file} canonical (${data.canonical}) should be under ${siteMetadata.url}.`
             );
