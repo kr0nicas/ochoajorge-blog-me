@@ -7,6 +7,8 @@
     --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
 }
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ─── Fonts: Space Grotesk / Archivo / JetBrains Mono via next/font (layout.tsx) ─── */
 
 /* ══════════════════════════════════════════════════════════════
