@@ -8,7 +8,7 @@ import { useTheme } from "next-themes";
  * Requires the repo to have Discussions enabled and configured.
  */
 export function Comments({ lang }: { lang: string }) {
-    const { theme } = useTheme();
+    const { resolvedTheme } = useTheme();
 
     return (
         <section className="mt-20 border-t border-[var(--border)] pt-12">
@@ -27,7 +27,7 @@ export function Comments({ lang }: { lang: string }) {
                     reactionsEnabled="1"
                     emitMetadata="0"
                     inputPosition="bottom"
-                    theme={theme === "dark" ? "transparent_dark" : "light"}
+                    theme={resolvedTheme === "dark" ? "transparent_dark" : "light"}
                     lang={lang === "es" ? "es" : "en"}
                     loading="lazy"
                 />
