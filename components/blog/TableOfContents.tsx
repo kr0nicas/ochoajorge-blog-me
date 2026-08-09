@@ -11,9 +11,10 @@ interface Heading {
 
 interface TableOfContentsProps {
     lang?: string;
+    variant?: "sidebar" | "mobile";
 }
 
-export function TableOfContents({ lang = "es" }: TableOfContentsProps) {
+export function TableOfContents({ lang = "es", variant = "sidebar" }: TableOfContentsProps) {
     const isSpanish = lang === "es";
     const [headings, setHeadings] = useState<Heading[]>([]);
     const [activeId, setActiveId] = useState<string>("");
@@ -64,6 +65,51 @@ export function TableOfContents({ lang = "es" }: TableOfContentsProps) {
 
     if (headings.length < 2) return null;
 
+    const list = (
+        <ol className="space-y-1.5 text-sm">
+            {headings.map(({ id, text, level }) => (
+                <li key={id}>
+                    <a
+                        href={`#${id}`}
+                        onClick={(e) => {
+                            e.preventDefault();
+                            document
+                                .getElementById(id)
+                                ?.scrollIntoView({ behavior: "smooth" });
+                        }}
+                        className={cn(
+                            "block truncate rounded py-1 transition-colors duration-150 no-underline",
+                            level === 2 && "pl-0",
+                            level === 3 && "pl-3",
+                            level === 4 && "pl-6",
+                            activeId === id
+                                ? "text-[var(--brand-light)] font-medium"
+                                : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                        )}
+                    >
+                        {text}
+                    </a>
+                </li>
+            ))}
+        </ol>
+    );
+
+    if (variant === "mobile") {
+        return (
+            <details className="card-glass mb-8 p-4 xl:hidden">
+                <summary className="cursor-pointer select-none text-xs font-semibold uppercase tracking-widest text-[var(--text-muted)]">
+                    {isSpanish ? "En esta página" : "On this page"}
+                </summary>
+                <nav
+                    aria-label={isSpanish ? "Tabla de contenidos" : "Table of contents"}
+                    className="mt-4"
+                >
+                    {list}
+                </nav>
+            </details>
+        );
+    }
+
     return (
         <nav
             aria-label={isSpanish ? "Tabla de contenidos" : "Table of contents"}
@@ -72,32 +118,7 @@ export function TableOfContents({ lang = "es" }: TableOfContentsProps) {
             <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-[var(--text-muted)]">
                 {isSpanish ? "En esta página" : "On this page"}
             </p>
-            <ol className="space-y-1.5 text-sm">
-                {headings.map(({ id, text, level }) => (
-                    <li key={id}>
-                        <a
-                            href={`#${id}`}
-                            onClick={(e) => {
-                                e.preventDefault();
-                                document
-                                    .getElementById(id)
-                                    ?.scrollIntoView({ behavior: "smooth" });
-                            }}
-                            className={cn(
-                                "block truncate rounded py-1 transition-colors duration-150 no-underline",
-                                level === 2 && "pl-0",
-                                level === 3 && "pl-3",
-                                level === 4 && "pl-6",
-                                activeId === id
-                                    ? "text-[var(--brand-light)] font-medium"
-                                    : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-                            )}
-                        >
-                            {text}
-                        </a>
-                    </li>
-                ))}
-            </ol>
+            {list}
         </nav>
     );
 }

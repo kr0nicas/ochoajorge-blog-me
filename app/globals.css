@@ -1,7 +1,15 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
-/* ─── Google Fonts are loaded via next/font in layout.tsx ─── */
+@theme inline {
+    --font-sans: var(--font-archivo), system-ui, sans-serif;
+    --font-display: var(--font-space-grotesk), system-ui, sans-serif;
+    --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+}
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ─── Fonts: Space Grotesk / Archivo / JetBrains Mono via next/font (layout.tsx) ─── */
 
 /* ══════════════════════════════════════════════════════════════
    DESIGN TOKEN SYSTEM — Blog Personal Jorge Ochoa
@@ -17,15 +25,6 @@
 
 /* ─── Primitive Design Tokens (always available) ─────────────── */
 :root {
-  --font-inter: "Inter", system-ui, sans-serif;
-  --font-outfit: "Outfit", system-ui, sans-serif;
-  --font-jetbrains-mono: "JetBrains Mono", ui-monospace, monospace;
-
-  /* Typeface */
-  --font-sans: var(--font-inter), system-ui, sans-serif;
-  --font-display: var(--font-outfit), system-ui, sans-serif;
-  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
-
   /* Radii */
   --radius-sm: 0.375rem;
   --radius-md: 0.625rem;
@@ -195,7 +194,7 @@ html {
 body {
   background-color: var(--bg-base);
   color: var(--text-primary);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background-color 0.3s ease, color 0.2s ease;
