@@ -8,7 +8,6 @@ import { Footer } from "@/components/layout/Footer";
 import { siteConfig } from "@/lib/utils";
 import { Space_Grotesk, Archivo, JetBrains_Mono } from "next/font/google";
 import "../globals.css";
-import "highlight.js/styles/github-dark.css";
 
 const spaceGrotesk = Space_Grotesk({
     subsets: ["latin"],

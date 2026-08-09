@@ -240,6 +240,147 @@ h1, h2, h3 {
   color: var(--brand);
 }
 
+/* ─── Terminal: ventana macOS para code blocks MDX ───────────── */
+/* El cuerpo es SIEMPRE oscuro (#0f0f10), también en tema claro:
+   el código es protagonista visual y flota con sombra. */
+.terminal {
+  margin: 1.5rem 0;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  box-shadow: 0 12px 32px rgba(10, 10, 10, 0.18);
+}
+
+.dark .terminal {
+  border-color: #232326;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+}
+
+.terminal-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  background: #1b1b1e;
+}
+
+.terminal-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: block;
+}
+
+.terminal-dot-red { background: #ff5f57; }
+.terminal-dot-yellow { background: #febc2e; }
+.terminal-dot-green { background: #28c840; }
+
+.terminal-name {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: #8f8f8f;
+  margin-left: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.terminal-copy {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: #8f8f8f;
+  border: 1px solid #333;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.terminal-copy:hover {
+  color: #fafafa;
+  border-color: #555;
+}
+
+.terminal pre {
+  margin: 0;
+  background: #0f0f10;
+  padding: 1rem 1.125rem;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  line-height: 1.75;
+  color: #d4d4d6;
+}
+
+.terminal pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* ─── Syntax highlighting (highlight.js) sobre #0f0f10 ───────── */
+/* Paleta alineada a la identidad: azul / naranja / verde */
+.hljs {
+  color: #d4d4d6;
+  background: transparent;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-type {
+  color: #6b8cff;
+}
+
+.hljs-title,
+.hljs-title.function_,
+.hljs-title.class_,
+.hljs-function {
+  color: #9db4ff;
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-addition {
+  color: #7bd88f;
+}
+
+.hljs-number,
+.hljs-literal,
+.hljs-symbol,
+.hljs-attr,
+.hljs-attribute,
+.hljs-deletion {
+  color: #ff7857;
+}
+
+.hljs-comment,
+.hljs-quote,
+.hljs-meta {
+  color: #6f6f75;
+  font-style: italic;
+}
+
+.hljs-variable,
+.hljs-template-variable,
+.hljs-name,
+.hljs-selector-class,
+.hljs-selector-id,
+.hljs-params,
+.hljs-property {
+  color: #d4d4d6;
+}
+
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 700; }
+
 /* ══════════════════════════════════════════════════════════════
    PROSE — MDX Content Overrides
    ══════════════════════════════════════════════════════════════ */

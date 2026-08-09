@@ -5,6 +5,8 @@ import rehypeAutolinkHeadings from "rehype-autolink-headings";
 import rehypeHighlight from "rehype-highlight";
 import type { ReactElement } from "react";
 import { FileTree } from "@/components/mdx/FileTree";
+import { Terminal } from "@/components/mdx/Terminal";
+import { rehypeCodeMeta } from "@/lib/rehype-code-meta";
 import {
     Callout,
     ComparisonTable,
@@ -29,6 +31,8 @@ const mdxComponents = {
     Steps,
     Step,
     CodeComparison,
+    // Every fenced code block renders inside a Terminal window
+    pre: Terminal,
 };
 
 /**
@@ -46,6 +50,7 @@ export async function compileMDXContent(source: string): Promise<MDXResult> {
                 rehypePlugins: [
                     rehypeSlug,
                     [rehypeAutolinkHeadings, { behavior: "wrap", properties: { className: ["anchor"] } }],
+                    rehypeCodeMeta,
                     rehypeHighlight,
                 ],
             },
