@@ -112,7 +112,7 @@ export default async function AboutPage({ params }: { params: Promise<{ lang: st
             {/* ── Headline ────────────────────────────────────────── */}
             <div className="mb-20">
                 <h1 className="font-display text-4xl font-extrabold text-[var(--text-primary)] sm:text-5xl lg:text-6xl">
-                    {isSpanish ? "Arquitecto de Tecnología para" : "Technology Architect for"}{" "}<span className="gradient-text">{isSpanish ? "sistemas a escala" : "systems at scale"}</span>.
+                    {isSpanish ? "Arquitecto de Tecnología para" : "Technology Architect for"}{" "}<span className="text-[var(--brand)]">{isSpanish ? "sistemas a escala" : "systems at scale"}</span>.
                 </h1>
                 <p className="mt-8 text-lg leading-relaxed text-[var(--text-secondary)] max-w-3xl">
                     {isSpanish ? (
@@ -200,7 +200,7 @@ export default async function AboutPage({ params }: { params: Promise<{ lang: st
                     <div className="space-y-12">
                         {currentExp.map((item, i) => (
                             <div key={i} className="relative pl-8 before:absolute before:left-0 before:top-1.5 before:h-[calc(100%-8px)] before:w-px before:bg-[var(--border)]">
-                                <div className="absolute left-[-4px] top-1.5 h-2 w-2 rounded-full border border-[var(--brand)] bg-[var(--bg-base)] shadow-[0_0_8px_rgba(99,102,241,0.5)]" />
+                                <div className="absolute left-[-4px] top-1.5 h-2 w-2 rounded-full border border-[var(--brand)] bg-[var(--bg-base)]" />
                                 <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
                                     <h3 className="text-lg font-bold text-[var(--text-primary)]">{item.title}</h3>
                                     <span className="text-sm font-medium text-[var(--brand-light)] tabular-nums">{item.period}</span>
@@ -219,7 +219,7 @@ export default async function AboutPage({ params }: { params: Promise<{ lang: st
                     <div className="space-y-6">
                         {currentEdu.map((item, i) => (
                             <div key={i} className="relative pl-8 before:absolute before:left-0 before:top-1.5 before:h-[calc(100%-8px)] before:w-px before:bg-[var(--border)]">
-                                <div className="absolute left-[-4px] top-1.5 h-2 w-2 rounded-full border border-[var(--brand)] bg-[var(--bg-base)] shadow-[0_0_8px_rgba(99,102,241,0.5)]" />
+                                <div className="absolute left-[-4px] top-1.5 h-2 w-2 rounded-full border border-[var(--brand)] bg-[var(--bg-base)]" />
                                 <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
                                     <h3 className="text-base font-bold text-[var(--text-primary)]">{item.degree}</h3>
                                     <span className="text-sm font-medium text-[var(--brand-light)] tabular-nums">{item.period}</span>
@@ -251,7 +251,7 @@ export default async function AboutPage({ params }: { params: Promise<{ lang: st
                         </div>
 
                         {/* Social Links */}
-                        <div className="card-glass p-6">
+                        <div className="card p-6">
                             <h3 className="font-display font-bold text-[var(--text-primary)] mb-4">{isSpanish ? "Conectar" : "Connect"}</h3>
                             <div className="space-y-3">
                                 <a href={siteConfig.author.github} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 rounded-xl border border-[var(--border)] p-3 text-sm text-[var(--text-secondary)] transition-all hover:border-[var(--brand)] hover:text-[var(--text-primary)]">
@@ -273,7 +273,7 @@ export default async function AboutPage({ params }: { params: Promise<{ lang: st
                         </div>
 
                         {/* Tech Stack */}
-                        <div className="card-glass p-6">
+                        <div className="card p-6">
                             <h3 className="font-display font-bold text-[var(--text-primary)] mb-4 uppercase text-xs tracking-widest">{isSpanish ? "Arsenal Técnico" : "Technical Arsenal"}</h3>
                             <div className="flex flex-wrap gap-2">
                                 {["Go", "Python", "Java", "Spring Boot", "FastAPI", "Next.js", "Docker", "Kubernetes", "Google Cloud", "PostgreSQL", "Solution Architecture", "Clean Architecture", "DevOps"].map(tech => (
@@ -285,7 +285,7 @@ export default async function AboutPage({ params }: { params: Promise<{ lang: st
                         </div>
 
                         {/* Certifications */}
-                        <div className="card-glass p-6">
+                        <div className="card p-6">
                             <h3 className="font-display font-bold text-[var(--text-primary)] mb-4 uppercase text-xs tracking-widest">
                                 {isSpanish ? "Certificaciones" : "Certifications"}
                             </h3>

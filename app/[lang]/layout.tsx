@@ -8,7 +8,6 @@ import { Footer } from "@/components/layout/Footer";
 import { siteConfig } from "@/lib/utils";
 import { Space_Grotesk, Archivo, JetBrains_Mono } from "next/font/google";
 import "../globals.css";
-import "highlight.js/styles/github-dark.css";
 
 const spaceGrotesk = Space_Grotesk({
     subsets: ["latin"],
@@ -19,7 +18,7 @@ const spaceGrotesk = Space_Grotesk({
 
 const archivo = Archivo({
     subsets: ["latin"],
-    weight: ["400", "500", "600"],
+    weight: ["400", "500", "600", "700"],
     variable: "--font-archivo",
     display: "swap",
 });
@@ -164,7 +163,7 @@ export default async function RootLayout({
   return (
       <html lang={lang} suppressHydrationWarning className={`${spaceGrotesk.variable} ${archivo.variable} ${jetbrainsMono.variable}`}>
       <body className="min-h-screen antialiased transition-colors duration-300">
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange={false}>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange={false}>
           {/* JSON-LD Person Schema Global */}
           <script
             type="application/ld+json"

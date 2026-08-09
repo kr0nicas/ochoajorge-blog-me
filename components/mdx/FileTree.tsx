@@ -119,7 +119,7 @@ function TreeNodeView({ node }: { node: TreeNode }) {
 
                 {/* Highlight badge */}
                 {node.highlight && (
-                    <span className="ml-auto rounded-full bg-[var(--brand)] px-1.5 py-px text-[9px] font-bold text-white">
+                    <span className="ml-auto rounded-full bg-[var(--brand)] px-1.5 py-px text-[9px] font-bold text-[var(--text-on-brand)]">
                         •
                     </span>
                 )}

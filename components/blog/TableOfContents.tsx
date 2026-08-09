@@ -96,7 +96,7 @@ export function TableOfContents({ lang = "es", variant = "sidebar" }: TableOfCon
 
     if (variant === "mobile") {
         return (
-            <details className="card-glass mb-8 p-4 xl:hidden">
+            <details className="card mb-8 p-4 xl:hidden">
                 <summary className="cursor-pointer select-none text-xs font-semibold uppercase tracking-widest text-[var(--text-muted)]">
                     {isSpanish ? "En esta página" : "On this page"}
                 </summary>
@@ -113,7 +113,7 @@ export function TableOfContents({ lang = "es", variant = "sidebar" }: TableOfCon
     return (
         <nav
             aria-label={isSpanish ? "Tabla de contenidos" : "Table of contents"}
-            className="card-glass hidden p-5 xl:block"
+            className="card hidden p-5 xl:block"
         >
             <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-[var(--text-muted)]">
                 {isSpanish ? "En esta página" : "On this page"}
