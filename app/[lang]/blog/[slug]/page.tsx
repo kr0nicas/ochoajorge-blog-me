@@ -157,6 +157,10 @@ export default async function PostPage({ params }: PostPageProps) {
                         <div className="mx-auto max-w-3xl">
                             <PostHeader post={post} lang={lang} />
 
+                            <div className="mb-8 xl:hidden">
+                                <TableOfContents lang={lang} variant="mobile" />
+                            </div>
+
                             {/* MDX Content */}
                             <div
                                 id="article-content"
