@@ -16,7 +16,7 @@ function SubmitButton({ lang }: { lang: string }) {
             type="submit"
             disabled={pending}
             id="newsletter-submit-btn"
-            className="group flex h-11 shrink-0 items-center gap-2 rounded-xl bg-[var(--brand)] px-5 text-sm font-semibold text-white shadow-[var(--shadow-brand-sm)] transition-all duration-200 hover:bg-[var(--brand-dark)] hover:shadow-[var(--shadow-brand)] disabled:cursor-not-allowed disabled:opacity-60"
+            className="group flex h-11 shrink-0 items-center gap-2 rounded-xl bg-[var(--brand)] px-5 text-sm font-semibold text-[var(--text-on-brand)] shadow-[var(--shadow-brand-sm)] transition-all duration-200 hover:bg-[var(--brand-dark)] hover:shadow-[var(--shadow-brand)] disabled:cursor-not-allowed disabled:opacity-60"
         >
             {pending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

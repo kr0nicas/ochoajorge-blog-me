@@ -24,6 +24,6 @@ export function middleware(request) {
 
 export const config = {
     matcher: [
-        "/((?!api|_next|favicon.ico|feed.xml|icon.png|og.png).*)",
+        "/((?!api|_next|favicon.ico|feed.xml|icon.png|og.png|opengraph-image|robots.txt|sitemap.xml).*)",
     ],
 };

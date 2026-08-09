@@ -131,7 +131,7 @@ export function ComparisonTable({
                                 )}
                             >
                                 {i === highlight && (
-                                    <span className="mr-1.5 rounded-full bg-[var(--brand)] px-1.5 py-px text-[9px] font-bold text-white">
+                                    <span className="mr-1.5 rounded-full bg-[var(--brand)] px-1.5 py-px text-[9px] font-bold text-[var(--text-on-brand)]">
                                         ✓
                                     </span>
                                 )}
@@ -207,7 +207,7 @@ export function Step({
 
     return (
         <div className="flex gap-4 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-5">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--brand)] text-xs font-bold text-white shadow-[var(--shadow-brand-sm)]">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--brand)] text-xs font-bold text-[var(--text-on-brand)] shadow-[var(--shadow-brand-sm)]">
                 {num}
             </div>
             <div className="min-w-0 flex-1">
@@ -269,7 +269,7 @@ export function CodeComparison({
                             className={cn(
                                 "rounded-md px-3 py-1 text-xs font-semibold transition-all duration-150",
                                 tab === t
-                                    ? "bg-[var(--brand)] text-white"
+                                    ? "bg-[var(--brand)] text-[var(--text-on-brand)]"
                                     : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                             )}
                         >

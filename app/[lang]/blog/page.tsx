@@ -53,7 +53,7 @@ export default async function BlogPage({
             )}
 
             {posts.length === 0 ? (
-                <div className="card-glass flex flex-col items-center justify-center py-24 text-center">
+                <div className="card flex flex-col items-center justify-center py-24 text-center">
                     <p className="text-3xl">✍️</p>
                     <p className="mt-4 text-[var(--text-secondary)]">
                         {isSpanish ? "El primer post llegará pronto..." : "First post coming soon..."}

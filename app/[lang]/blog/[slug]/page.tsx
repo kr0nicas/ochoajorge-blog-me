@@ -146,7 +146,7 @@ export default async function PostPage({ params }: PostPageProps) {
             <ReadingProgress />
 
             {/* Reader mode toggle — floating top-right */}
-            <div className="fixed right-4 top-20 z-40 hidden xl:block" data-reader-control>
+            <div className="fixed right-4 top-20 z-40" data-reader-control>
                 <ReaderMode lang={lang} />
             </div>
 
@@ -156,6 +156,10 @@ export default async function PostPage({ params }: PostPageProps) {
                     <article className="min-w-0">
                         <div className="mx-auto max-w-3xl">
                             <PostHeader post={post} lang={lang} />
+
+                            <div className="xl:hidden" data-reader-hide>
+                                <TableOfContents lang={lang} variant="mobile" />
+                            </div>
 
                             {/* MDX Content */}
                             <div

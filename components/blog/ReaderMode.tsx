@@ -52,7 +52,7 @@ export function ReaderMode({ lang = "es" }: { lang?: string }) {
             }
             aria-label={isSpanish ? "Alternar modo lector" : "Toggle reader mode"}
             className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-all duration-200 ${active
-                    ? "border-[var(--brand)] bg-[var(--brand)] text-white shadow-[var(--shadow-brand-sm)]"
+                    ? "border-[var(--brand)] bg-[var(--brand)] text-[var(--text-on-brand)] shadow-[var(--shadow-brand-sm)]"
                     : "border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:border-[var(--border-brand)] hover:text-[var(--brand-light)]"
                 }`}
         >

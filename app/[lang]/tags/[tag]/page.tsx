@@ -79,7 +79,7 @@ export default async function TagPage({ params }: TagPageProps) {
 
                 {/* ── Sidebar: all tags ──────────────────────────── */}
                 <aside className="mt-12 lg:mt-0">
-                    <div className="card-glass p-5">
+                    <div className="card p-5">
                         <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-[var(--text-muted)]">
                             {isSpanish ? "Todos los temas" : "All topics"}
                         </p>

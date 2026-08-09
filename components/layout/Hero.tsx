@@ -95,7 +95,7 @@ export function Hero({ githubUrl, linkedinUrl, blueskyUrl, lang, dict }: HeroPro
                                 className="font-display text-2xl font-extrabold leading-tight tracking-tight text-[var(--text-primary)] sm:text-4xl"
                             >
                                 {lang === 'es' ? 'Soy ' : "I'm "}
-                                <span className="gradient-text">Jorge Ochoa</span>
+                                <span className="text-[var(--brand)]">Jorge Ochoa</span>
                             </motion.h1>
                             <motion.div variants={itemVariants} className="mt-1">
                                 <div className="inline-flex items-center gap-1.5 text-[10px] font-medium text-[var(--brand-light)]">

@@ -13,6 +13,9 @@ export default function AdminUploadPage() {
     const [copied, setCopied] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [secret, setSecret] = useState(
+        () => (typeof window !== "undefined" ? sessionStorage.getItem("upload-secret") ?? "" : "")
+    );
 
     const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         if (!event.target.files?.[0]) return;
@@ -26,6 +29,7 @@ export default function AdminUploadPage() {
         try {
             const response = await fetch(`/api/upload?filename=${encodeURIComponent(file.name)}`, {
                 method: "POST",
+                headers: { Authorization: `Bearer ${secret}` },
                 body: file,
             });
 
@@ -60,10 +64,22 @@ export default function AdminUploadPage() {
                 Back to home
             </Link>
 
-            <div className="card-glass p-8 space-y-8">
+            <input
+                type="password"
+                value={secret}
+                aria-label="Upload secret"
+                onChange={(e) => {
+                    setSecret(e.target.value);
+                    sessionStorage.setItem("upload-secret", e.target.value);
+                }}
+                placeholder="Upload secret"
+                className="mb-6 w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-2 text-sm text-[var(--text-primary)]"
+            />
+
+            <div className="card p-8 space-y-8">
                 <div>
                     <h1 className="font-display text-3xl font-bold text-[var(--text-primary)]">
-                        Upload to <span className="gradient-text">Vercel Blob</span>
+                        Upload to <span className="text-[var(--brand)]">Vercel Blob</span>
                     </h1>
                     <p className="mt-2 text-[var(--text-secondary)]">
                         Use this tool to upload images for your blog posts without committing them to Git.
@@ -84,6 +100,7 @@ export default function AdminUploadPage() {
                         ref={fileInputRef}
                         onChange={handleUpload}
                         accept="image/*"
+                        aria-label="Select image to upload"
                     />
 
                     {isLoading ? (
