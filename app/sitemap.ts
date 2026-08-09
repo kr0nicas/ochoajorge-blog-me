@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { getAllPosts, getAllTags, getAllSeries } from "@/lib/posts";
 import { siteConfig } from "@/lib/utils";
 import { slugify } from "@/lib/utils";
+import { PILLARS } from "@/lib/pillars";
 
 const BASE_URL = siteConfig.url;
 const LOCALES = ["es", "en"] as const;
@@ -67,5 +68,24 @@ export default function sitemap(): MetadataRoute.Sitemap {
         }))
     );
 
-    return [...staticRoutes, ...postRoutes, ...tagRoutes, ...seriesRoutes];
+    // ── Pillar (section) pages ────────────────────────────────────
+    const pillarRoutes: MetadataRoute.Sitemap = LOCALES.flatMap((lang) => {
+        const base = lang === "es" ? "temas" : "topics";
+        return [
+            {
+                url: `${BASE_URL}/${lang}/${base}`,
+                lastModified: now,
+                changeFrequency: "weekly" as const,
+                priority: 0.8,
+            },
+            ...Object.values(PILLARS).map((pillar) => ({
+                url: `${BASE_URL}/${lang}/${base}/${pillar.routeSlug[lang]}`,
+                lastModified: now,
+                changeFrequency: "weekly" as const,
+                priority: 0.75,
+            })),
+        ];
+    });
+
+    return [...staticRoutes, ...postRoutes, ...tagRoutes, ...seriesRoutes, ...pillarRoutes];
 }

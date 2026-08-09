@@ -65,6 +65,7 @@ title: "${title}"
 description: "Write a 150-160 character summary for SEO and social preview."
 date: "${date}"
 tags: ["architecture", "software-engineering"]
+pillar: "construir-con-ia" # one of: construir-con-ia | agentes-en-produccion | arquitectura | seguridad
 lang: "${locale}"
 draft: true
 featured: false
