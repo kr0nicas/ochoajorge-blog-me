@@ -355,7 +355,7 @@ export default async function UsesPage({
                 </p>
                 <h1 className="font-display text-4xl font-extrabold text-[var(--text-primary)] sm:text-5xl">
                     {isSpanish ? "Mi Stack &" : "My Stack &"}{" "}
-                    <span className="gradient-text">
+                    <span className="text-[var(--brand)]">
                         {isSpanish ? "Herramientas" : "Tools"}
                     </span>
                 </h1>
@@ -393,7 +393,7 @@ export default async function UsesPage({
                                 {section.items.map((item) => (
                                     <div
                                         key={item.name}
-                                        className="group card-glass p-5 transition-all duration-200 hover:border-[var(--border-brand)]"
+                                        className="group card p-5 transition-all duration-200 hover:border-[var(--border-strong)]"
                                     >
                                         <div className="flex items-start justify-between gap-3">
                                             <h3 className="font-display text-sm font-semibold text-[var(--text-primary)] leading-snug">

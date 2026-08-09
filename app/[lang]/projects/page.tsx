@@ -73,7 +73,7 @@ export default async function ProjectsPage({ params }: { params: Promise<{ lang:
                     <FolderCode className="h-6 w-6" />
                 </div>
                 <h1 className="font-display text-4xl font-extrabold text-[var(--text-primary)] sm:text-5xl lg:text-6xl tracking-tight">
-                    {isSpanish ? "Proyectos &" : "Projects &"} <span className="gradient-text">{isSpanish ? "Creaciones" : "Creations"}</span>
+                    {isSpanish ? "Proyectos &" : "Projects &"} <span className="text-[var(--brand)]">{isSpanish ? "Creaciones" : "Creations"}</span>
                 </h1>
                 <p className="mt-8 text-lg leading-relaxed text-[var(--text-secondary)] max-w-2xl">
                     {isSpanish

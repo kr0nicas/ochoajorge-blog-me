@@ -17,7 +17,7 @@ export function PostCard({ post, featured = false, className, lang = "es" }: Pos
     return (
         <div
             className={cn(
-                "card-glass group relative flex flex-col p-6 transition-all duration-300",
+                "card group relative flex flex-col p-6 transition-all duration-300",
                 featured && "lg:p-8",
                 className
             )}
