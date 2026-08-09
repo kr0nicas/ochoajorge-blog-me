@@ -12,11 +12,15 @@ import { motion, AnimatePresence } from "framer-motion";
  * and the article expands to a comfortable reading width.
  */
 export function ReaderMode({ lang = "es" }: { lang?: string }) {
-    const [active, setActive] = useState<boolean>(() => {
-        if (typeof window === "undefined") return false;
-        return localStorage.getItem("reader-mode") === "true";
-    });
+    const [active, setActive] = useState(false);
     const isSpanish = lang === "es";
+
+    // Read persisted preference after mount — the initializer ran on the
+    // server with `false`, so reading localStorage there would desync
+    // server and client HTML (hydration mismatch).
+    useEffect(() => {
+        setActive(localStorage.getItem("reader-mode") === "true");
+    }, []);
 
     useEffect(() => {
         document.body.classList.toggle("reader-mode", active);
