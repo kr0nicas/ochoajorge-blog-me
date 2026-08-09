@@ -30,7 +30,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
-    "feed": "^5.2.0",
+    "feed": "^5.2.1",
     "framer-motion": "^12.34.3",
     "fuse.js": "^7.1.0",
     "gray-matter": "^4.0.3",
