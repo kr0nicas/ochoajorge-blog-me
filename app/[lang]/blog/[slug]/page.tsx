@@ -157,7 +157,7 @@ export default async function PostPage({ params }: PostPageProps) {
                         <div className="mx-auto max-w-3xl">
                             <PostHeader post={post} lang={lang} />
 
-                            <div className="mb-8 xl:hidden">
+                            <div className="xl:hidden" data-reader-hide>
                                 <TableOfContents lang={lang} variant="mobile" />
                             </div>
 

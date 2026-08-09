@@ -96,7 +96,7 @@ export function TableOfContents({ lang = "es", variant = "sidebar" }: TableOfCon
 
     if (variant === "mobile") {
         return (
-            <details className="card-glass p-4 xl:hidden">
+            <details className="card-glass mb-8 p-4 xl:hidden">
                 <summary className="cursor-pointer select-none text-xs font-semibold uppercase tracking-widest text-[var(--text-muted)]">
                     {isSpanish ? "En esta página" : "On this page"}
                 </summary>
