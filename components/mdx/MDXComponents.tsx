@@ -258,9 +258,9 @@ export function CodeComparison({
     };
 
     return (
-        <div className="not-prose my-6 overflow-hidden rounded-xl border border-[var(--border)]">
+        <div className="not-prose my-6 overflow-hidden rounded-xl border border-[var(--border)] shadow-lg">
             {/* Tabs */}
-            <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2">
+            <div className="flex items-center justify-between border-b border-[#232326] bg-[#1a1a1c] px-3 py-2">
                 <div className="flex gap-1">
                     {(["before", "after"] as const).map((t) => (
                         <button
@@ -270,7 +270,7 @@ export function CodeComparison({
                                 "rounded-md px-3 py-1 text-xs font-semibold transition-all duration-150",
                                 tab === t
                                     ? "bg-[var(--brand)] text-[var(--text-on-brand)]"
-                                    : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                                    : "text-[#a8a8a8] hover:text-[#fafafa]"
                             )}
                         >
                             {t === "before" ? beforeObj.label : afterObj.label}
@@ -279,7 +279,7 @@ export function CodeComparison({
                 </div>
                 <button
                     onClick={copy}
-                    className="flex items-center gap-1 rounded-md border border-[var(--border)] px-2 py-1 text-[10px] text-[var(--text-muted)] transition-all duration-150 hover:border-[var(--border-brand)] hover:text-[var(--brand-light)]"
+                    className="flex items-center gap-1 rounded-md border border-[#232326] px-2 py-1 text-[10px] text-[#a8a8a8] transition-all duration-150 hover:border-[#6b8cff] hover:text-[#6b8cff]"
                 >
                     <AnimatePresence mode="wait" initial={false}>
                         {copied ? (
@@ -303,7 +303,7 @@ export function CodeComparison({
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.15 }}
-                    className="overflow-x-auto bg-[var(--bg-elevated)] p-4 text-xs leading-relaxed text-[var(--text-primary)]"
+                    className="overflow-x-auto bg-[#0f0f10] p-4 text-xs leading-relaxed text-[#fafafa]"
                     style={{ fontFamily: "var(--font-mono)" }}
                 >
                     <span className="font-mono whitespace-pre">{currentCode}</span>
