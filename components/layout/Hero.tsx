@@ -1,9 +1,7 @@
 "use client";
 
-import Image from "next/image";
-import { useRef } from "react";
-import { motion, useScroll, useTransform } from "framer-motion";
-import { Github, Linkedin, Sparkles } from "lucide-react";
+import { motion } from "framer-motion";
+import { Github, Linkedin } from "lucide-react";
 
 interface HeroProps {
     githubUrl: string;
@@ -18,19 +16,18 @@ interface HeroProps {
 
 const containerVariants = {
     hidden: {},
-    visible: { transition: { staggerChildren: 0.12, delayChildren: 0.1 } },
+    visible: { transition: { staggerChildren: 0.1, delayChildren: 0.05 } },
 } as const;
 
 const itemVariants = {
-    hidden: { opacity: 0, y: 24 },
+    hidden: { opacity: 0, y: 16 },
     visible: {
         opacity: 1,
         y: 0,
-        transition: { duration: 0.6, ease: "easeOut" as const },
+        transition: { duration: 0.5, ease: "easeOut" as const },
     },
 } as const;
 
-// Bluesky SVG Icon
 const BlueskyIcon = ({ className }: { className?: string }) => (
     <svg
         viewBox="0 0 24 24"
@@ -42,124 +39,89 @@ const BlueskyIcon = ({ className }: { className?: string }) => (
     </svg>
 );
 
+const SOCIAL_LINK_CLASSES =
+    "flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)] transition-all duration-300 hover:border-[var(--brand-light)] hover:text-[var(--text-primary)]";
+
 export function Hero({ githubUrl, linkedinUrl, blueskyUrl, lang, dict }: HeroProps) {
-    const ref = useRef<HTMLElement>(null);
-    const { scrollYProgress } = useScroll({
-        target: ref,
-        offset: ["start start", "end start"],
-    });
-
-    const y = useTransform(scrollYProgress, [0, 1], ["0%", "20%"]);
-    const opacity = useTransform(scrollYProgress, [0, 0.7], [1, 0]);
-
     return (
-        <section ref={ref} className="relative overflow-hidden">
-            {/* ── Minimalist Background ──────────────────────────── */}
-            <div className="absolute inset-0 bg-[var(--bg-base)]" />
-
-            {/* ── Content ─────────────────────────────────────────── */}
+        <section className="relative overflow-hidden bg-[var(--bg-base)]">
             <motion.div
-                style={{ y, opacity }}
-                className="relative mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8"
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+                className="mx-auto max-w-5xl px-4 py-14 sm:px-6 sm:py-20 lg:px-8"
             >
-                <motion.div
-                    variants={containerVariants}
-                    initial="hidden"
-                    animate="visible"
-                    className="flex flex-col gap-4"
+                {/* Prompt */}
+                <motion.p
+                    variants={itemVariants}
+                    className="font-mono text-sm text-[var(--brand)]"
+                    aria-hidden="true"
                 >
-                    {/* Header Row: Photo + Name */}
-                    <div className="flex items-center gap-4 sm:gap-6">
-                        {/* Profile Photo */}
-                        <motion.div
-                            variants={itemVariants}
-                            className="relative group shrink-0"
-                        >
-                            <div className="relative h-20 w-20 sm:h-[100px] sm:w-[100px] overflow-hidden rounded-full border-2 border-[var(--border)] bg-[var(--bg-elevated)] shadow-2xl">
-                                <Image
-                                    src="https://6pxof7rpjdk6gkca.public.blob.vercel-storage.com/foto-perfil-blog.webp"
-                                    alt="Jorge Ochoa"
-                                    fill
-                                    priority
-                                    className="object-cover grayscale group-hover:grayscale-0 transition-all duration-700 scale-110 group-hover:scale-100"
-                                    sizes="(max-width: 640px) 80px, 100px"
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-60 pointer-events-none" />
-                            </div>
-                        </motion.div>
+                    $ whoami
+                </motion.p>
 
-                        {/* Name */}
-                        <div className="flex flex-col items-start">
-                            <motion.h1
-                                variants={itemVariants}
-                                className="font-display text-2xl font-extrabold leading-tight tracking-tight text-[var(--text-primary)] sm:text-4xl"
-                            >
-                                {lang === 'es' ? 'Soy ' : "I'm "}
-                                <span className="text-[var(--brand)]">Jorge Ochoa</span>
-                            </motion.h1>
-                            <motion.div variants={itemVariants} className="mt-1">
-                                <div className="inline-flex items-center gap-1.5 text-[10px] font-medium text-[var(--brand-light)]">
-                                    <Sparkles className="h-2.5 w-2.5" />
-                                    Software Architect · Builder
-                                </div>
-                            </motion.div>
-                        </div>
-                    </div>
+                {/* Headline */}
+                <motion.h1
+                    variants={itemVariants}
+                    className="mt-4 font-display text-4xl font-bold leading-[1.05] tracking-tight text-[var(--text-primary)] sm:text-6xl lg:text-7xl"
+                >
+                    Jorge Ochoa
+                    <span className="text-[var(--brand)]">.</span>
+                </motion.h1>
 
-                    {/* Bio & Socials Row */}
-                    <div className="max-w-2xl space-y-4">
-                        {/* Subheading */}
-                        <motion.p
-                            variants={itemVariants}
-                            className="text-base leading-relaxed text-[var(--text-secondary)] sm:text-lg font-medium"
-                        >
-                            {dict.subtitle}
-                        </motion.p>
+                {/* Role line */}
+                <motion.p
+                    variants={itemVariants}
+                    className="mt-3 font-mono text-sm text-[var(--text-muted)]"
+                >
+                    {dict.title}
+                </motion.p>
 
-                        {/* Social Links */}
-                        <motion.div
-                            variants={itemVariants}
-                            className="flex flex-wrap items-center gap-3"
-                        >
-                            <a
-                                href={githubUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                title="GitHub"
-                                className="group flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)] transition-all duration-300 hover:border-[var(--brand-light)] hover:text-[var(--text-primary)] hover:bg-[var(--brand)]/5"
-                            >
-                                <Github className="h-3.5 w-3.5" />
-                                GH
-                            </a>
+                {/* Subtitle */}
+                <motion.p
+                    variants={itemVariants}
+                    className="mt-6 max-w-2xl text-base leading-relaxed text-[var(--text-secondary)] sm:text-lg"
+                >
+                    {dict.subtitle}
+                </motion.p>
 
-                            <a
-                                href={linkedinUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                title="LinkedIn"
-                                className="group flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)] transition-all duration-300 hover:border-[var(--brand-light)] hover:text-[var(--text-primary)] hover:bg-[var(--brand)]/5"
-                            >
-                                <Linkedin className="h-3.5 w-3.5" />
-                                LI
-                            </a>
-
-                            <a
-                                href={blueskyUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                title="Bluesky"
-                                className="group flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)] transition-all duration-300 hover:border-[#0285FF] hover:text-[var(--text-primary)] hover:bg-[#0285FF]/5"
-                            >
-                                <BlueskyIcon className="h-3.5 w-3.5" />
-                                BS
-                            </a>
-                        </motion.div>
-                    </div>
+                {/* Socials */}
+                <motion.div
+                    variants={itemVariants}
+                    className="mt-8 flex flex-wrap items-center gap-3"
+                >
+                    <a
+                        href={githubUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="GitHub"
+                        className={SOCIAL_LINK_CLASSES}
+                    >
+                        <Github className="h-3.5 w-3.5" />
+                        GH
+                    </a>
+                    <a
+                        href={linkedinUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="LinkedIn"
+                        className={SOCIAL_LINK_CLASSES}
+                    >
+                        <Linkedin className="h-3.5 w-3.5" />
+                        LI
+                    </a>
+                    <a
+                        href={blueskyUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Bluesky"
+                        className={SOCIAL_LINK_CLASSES}
+                    >
+                        <BlueskyIcon className="h-3.5 w-3.5" />
+                        BS
+                    </a>
                 </motion.div>
             </motion.div>
-
-            {/* Bottom fade to body */}
-            <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-[var(--bg-base)] to-transparent" />
         </section>
     );
 }
