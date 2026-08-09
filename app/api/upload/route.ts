@@ -1,5 +1,12 @@
 import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
+
+function safeEqual(a: string, b: string): boolean {
+    const bufA = Buffer.from(a);
+    const bufB = Buffer.from(b);
+    return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
+}
 
 export async function POST(request: Request): Promise<NextResponse> {
     const secret = process.env.UPLOAD_SECRET;
@@ -9,7 +16,7 @@ export async function POST(request: Request): Promise<NextResponse> {
             { status: 500 }
         );
     }
-    if (request.headers.get("authorization") !== `Bearer ${secret}`) {
+    if (!safeEqual(request.headers.get("authorization") ?? "", `Bearer ${secret}`)) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const { searchParams } = new URL(request.url);
