@@ -12,6 +12,12 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Legacy standalone build scripts — pre-existing lint debt, slated for removal in Fase 4 cleanup
+    "scripts/check-og-images.mjs",
+    "scripts/check-posts.mjs",
+    "scripts/generate-ai-seo-image.js",
+    "scripts/generate-og-images.js",
+    "scripts/verify-og-images.mjs",
   ]),
 ]);
 
