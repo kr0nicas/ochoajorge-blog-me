@@ -123,6 +123,15 @@ export function getFeaturedPosts(count = 3, locale: string = "es"): Post[] {
 }
 
 /**
+ * Hero post for the home page: first `featured: true`, newest first;
+ * falls back to the most recent published post.
+ */
+export function getHeroPost(locale: string = "es"): Post | null {
+    const published = getAllPosts(locale).filter((post) => !post.draft);
+    return published.find((post) => post.featured) ?? published[0] ?? null;
+}
+
+/**
  * Get series posts for a locale.
  */
 export function getPostsBySeries(seriesName: string, locale: string = "es"): Post[] {
