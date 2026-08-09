@@ -50,7 +50,7 @@ export function Header({ lang }: HeaderProps) {
                         className="group flex items-center gap-2.5 font-display font-semibold text-[var(--text-primary)] transition-opacity hover:opacity-90"
                     >
                         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--brand)] shadow-[0_0_20px_rgba(99,102,241,0.45)] transition-shadow duration-300 group-hover:shadow-[0_0_28px_rgba(99,102,241,0.65)]">
-                            <Code2 className="h-4 w-4 text-white" />
+                            <Code2 className="h-4 w-4 text-[var(--text-on-brand)]" />
                         </div>
                         <span className="hidden sm:inline">Jorge Ochoa</span>
                     </Link>
@@ -93,7 +93,7 @@ export function Header({ lang }: HeaderProps) {
                                 className={cn(
                                     "px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all",
                                     lang === "es"
-                                        ? "bg-[var(--brand)] text-white shadow-lg shadow-[var(--brand)]/20"
+                                        ? "bg-[var(--brand)] text-[var(--text-on-brand)] shadow-lg shadow-[var(--brand)]/20"
                                         : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                                 )}
                             >
@@ -105,7 +105,7 @@ export function Header({ lang }: HeaderProps) {
                                 className={cn(
                                     "px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all",
                                     lang === "en"
-                                        ? "bg-[var(--brand)] text-white shadow-lg shadow-[var(--brand)]/20"
+                                        ? "bg-[var(--brand)] text-[var(--text-on-brand)] shadow-lg shadow-[var(--brand)]/20"
                                         : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                                 )}
                             >
@@ -124,7 +124,7 @@ export function Header({ lang }: HeaderProps) {
                                 onClick={() => setMobileOpen(false)}
                                 className={cn(
                                     "px-1.5 py-1 text-[10px] font-bold uppercase rounded-md",
-                                    lang === "es" ? "bg-[var(--brand)] text-white" : "text-[var(--text-muted)]"
+                                    lang === "es" ? "bg-[var(--brand)] text-[var(--text-on-brand)]" : "text-[var(--text-muted)]"
                                 )}
                             >
                                 ES
@@ -134,7 +134,7 @@ export function Header({ lang }: HeaderProps) {
                                 onClick={() => setMobileOpen(false)}
                                 className={cn(
                                     "px-1.5 py-1 text-[10px] font-bold uppercase rounded-md",
-                                    lang === "en" ? "bg-[var(--brand)] text-white" : "text-[var(--text-muted)]"
+                                    lang === "en" ? "bg-[var(--brand)] text-[var(--text-on-brand)]" : "text-[var(--text-muted)]"
                                 )}
                             >
                                 EN

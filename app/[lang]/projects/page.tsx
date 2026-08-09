@@ -95,7 +95,7 @@ export default async function ProjectsPage({ params }: { params: Promise<{ lang:
 
                             <div className="absolute top-4 left-4">
                                 {project.featured && (
-                                    <span className="inline-flex rounded-full bg-[var(--brand)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-white shadow-lg">
+                                    <span className="inline-flex rounded-full bg-[var(--brand)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-[var(--text-on-brand)] shadow-lg">
                                         {isSpanish ? "Destacado" : "Featured"}
                                     </span>
                                 )}

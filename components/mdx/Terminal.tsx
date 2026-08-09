@@ -10,7 +10,7 @@ interface TerminalProps extends React.HTMLAttributes<HTMLPreElement> {
 
 /**
  * Terminal — macOS-style window wrapper for MDX code blocks.
- * Dark body always (#0f0f10 via .terminal-body), even in light theme.
+ * Dark body always (#0f0f10 via `.terminal pre`), even in light theme.
  * Filename comes from the fence meta (```python title="worker.py")
  * injected by lib/rehype-code-meta.ts as data attributes.
  */
@@ -22,7 +22,7 @@ export function Terminal({
 }: TerminalProps) {
     const preRef = useRef<HTMLPreElement>(null);
     const [copied, setCopied] = useState(false);
-    const label = title ?? (language ? `${language}` : "terminal");
+    const label = title ?? language ?? "terminal";
 
     const handleCopy = async () => {
         const text = preRef.current?.textContent ?? "";
