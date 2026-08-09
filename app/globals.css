@@ -308,6 +308,7 @@ h1, h2, h3 {
 
 .terminal pre {
   margin: 0;
+  border-radius: 0;
   background: #0f0f10;
   padding: 1rem 1.125rem;
   overflow-x: auto;
