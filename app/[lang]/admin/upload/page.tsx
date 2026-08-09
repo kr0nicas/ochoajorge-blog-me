@@ -13,6 +13,9 @@ export default function AdminUploadPage() {
     const [copied, setCopied] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [secret, setSecret] = useState(
+        () => (typeof window !== "undefined" ? sessionStorage.getItem("upload-secret") ?? "" : "")
+    );
 
     const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         if (!event.target.files?.[0]) return;
@@ -26,6 +29,7 @@ export default function AdminUploadPage() {
         try {
             const response = await fetch(`/api/upload?filename=${encodeURIComponent(file.name)}`, {
                 method: "POST",
+                headers: { Authorization: `Bearer ${secret}` },
                 body: file,
             });
 
@@ -59,6 +63,17 @@ export default function AdminUploadPage() {
                 <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
                 Back to home
             </Link>
+
+            <input
+                type="password"
+                value={secret}
+                onChange={(e) => {
+                    setSecret(e.target.value);
+                    sessionStorage.setItem("upload-secret", e.target.value);
+                }}
+                placeholder="Upload secret"
+                className="mb-6 w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-2 text-sm text-[var(--text-primary)]"
+            />
 
             <div className="card-glass p-8 space-y-8">
                 <div>

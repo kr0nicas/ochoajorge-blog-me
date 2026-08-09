@@ -2,6 +2,16 @@ import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request): Promise<NextResponse> {
+    const secret = process.env.UPLOAD_SECRET;
+    if (!secret) {
+        return NextResponse.json(
+            { error: "Upload secret not configured" },
+            { status: 500 }
+        );
+    }
+    if (request.headers.get("authorization") !== `Bearer ${secret}`) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const { searchParams } = new URL(request.url);
     const filename = searchParams.get("filename") || "image.png";
 
