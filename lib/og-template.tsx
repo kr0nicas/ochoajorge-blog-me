@@ -42,6 +42,13 @@ export async function renderOgImage({ title, pillar, readingTime, hue: hueOverri
             : "radial-gradient(circle, rgba(255,92,57,0.4), transparent 65%)";
     // Kicker uses the opposite accent so it always pops against the glow
     const kickerColor = hue === "blue" ? "#ff7857" : "#6b8cff";
+    const MAX_TITLE_CHARS = 120;
+    const displayTitle =
+        title.length > MAX_TITLE_CHARS
+            ? `${title.slice(0, MAX_TITLE_CHARS - 1).trimEnd()}…`
+            : title;
+    const titleFontSize =
+        displayTitle.length > 90 ? "44px" : displayTitle.length > 60 ? "56px" : "68px";
 
     return new ImageResponse(
         (
@@ -114,14 +121,14 @@ export async function renderOgImage({ title, pillar, readingTime, hue: hueOverri
                         position: "relative",
                         fontFamily: "Space Grotesk",
                         fontWeight: 700,
-                        fontSize: title.length > 60 ? "56px" : "68px",
+                        fontSize: titleFontSize,
                         lineHeight: 1.08,
                         letterSpacing: "-0.02em",
                         color: "#fafafa",
                         maxWidth: "980px",
                     }}
                 >
-                    {title}
+                    {displayTitle}
                 </div>
 
                 {/* Reading time */}
