@@ -3,6 +3,7 @@ import path from "path";
 import matter from "gray-matter";
 import readingTime from "reading-time";
 import type { Post, PostWithContent } from "./types";
+import { isPillarId, type PillarId } from "./pillars";
 
 const BASE_POSTS_DIR = path.join(process.cwd(), "content/posts");
 
@@ -53,6 +54,7 @@ export function getPostBySlug(slug: string, locale: string = "es"): PostWithCont
         date: data.date ?? new Date().toISOString().split("T")[0],
         tags: Array.isArray(data.tags) ? data.tags : [],
         draft: data.draft ?? false,
+        pillar: isPillarId(data.pillar) ? data.pillar : undefined,
         coverImage: data.coverImage,
         readingTime: Math.ceil(stats.minutes),
         content,
@@ -137,4 +139,11 @@ export function getAllSeries(locale: string = "es"): string[] {
         .map((post) => post.series?.name)
         .filter((name): name is string => !!name);
     return [...new Set(allSeries)].sort();
+}
+
+/**
+ * Get posts belonging to a canonical pillar (section) for a locale.
+ */
+export function getPostsByPillar(pillarId: PillarId, locale: string = "es"): Post[] {
+    return getAllPosts(locale).filter((post) => post.pillar === pillarId);
 }
