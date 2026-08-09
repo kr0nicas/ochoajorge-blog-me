@@ -24,33 +24,43 @@ npm run lint
 
 ## Deploy a Producción
 
-El deploy es automático al hacer push a `main` en Vercel. El workflow es:
+> ⛔ **NUNCA hacer `git push origin main`.** `main` solo se mueve con un PR
+> desde `develop` (ver `AGENTS.md`, reglas de oro).
+
+El deploy a producción es la fusión del PR `develop` → `main`; Vercel construye
+y despliega automáticamente al mergearse (solo construye en `main`):
 
 ```bash
-# 1. Asegurarse que todo está commiteado
-git status
+# 1. Verificar que develop tiene todo lo que se quiere publicar
+git fetch origin
+git log --oneline origin/main..origin/develop
 
-# 2. Push a main (Vercel detecta automáticamente)
-git push origin main
+# 2. Abrir el PR de release (solo cuando el usuario pida deploy)
+gh pr create --base main --head develop \
+  --title "release: deploy develop to production" --fill
 ```
 
-Vercel construirá y desplegará automáticamente. El sitio estará live en ~60 segundos.
+Al mergear ese PR, el sitio estará live en ~60 segundos.
 
-## Deploy Preview (para revisión antes de merge)
+## Flujo normal de trabajo (todo cambio, posts incluidos)
 
 ```bash
-# Crear rama de feature/post
-git checkout -b content/nuevo-post
+# Crear rama desde develop
+git fetch origin
+git switch -c content/nuevo-post origin/develop
 
 # Hacer cambios y commit
-git add .
+git add content/posts/es/nuevo-post.mdx
 git commit -m "content(posts): add new post"
 
-# Push genera Preview URL automáticamente
-git push origin content/nuevo-post
+# Push y PR con base develop
+git push -u origin HEAD
+gh pr create --base develop --fill
 ```
 
-Vercel genera una URL de preview única por branch. Ideal para revisar antes de publicar.
+Nota: Vercel solo construye `main` (ver `vercel.json`), así que las ramas no
+generan preview automático; la revisión se hace en el PR y con `npm run dev`
+o `npm run build` local.
 
 ## Variables de Entorno en Vercel
 

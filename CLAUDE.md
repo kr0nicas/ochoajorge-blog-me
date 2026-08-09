@@ -3,6 +3,15 @@
 This file provides practical guidance for AI coding agents working in this repository.
 All code identifiers must be in English.
 
+## Git Workflow (mandatory — read AGENTS.md)
+
+- **Never push to `main` or `develop` directly.** Not for code, not for posts.
+- All changes: branch off `develop` → PR with base `develop`.
+- `main` is production (Vercel deploys only from `main`); it moves only via a
+  reviewed PR from `develop`.
+- Full rules for every agent: [AGENTS.md](AGENTS.md). If another doc in this
+  repo contradicts it, AGENTS.md wins.
+
 ## Project Snapshot
 
 - Framework: Next.js 16 (App Router)
@@ -89,6 +98,8 @@ For new entries, follow this sequence:
 3. Keep `draft: true` until content is ready.
 4. Run `npm run seo:audit` and `npm run build`.
 5. Set `draft: false` only when publishing.
+6. Publish via `content/<slug>` branch + PR with base `develop` (see AGENTS.md).
+   Never push the post to `main`.
 
 Detailed writing workflow lives at `.agent/workflows/new_post.md`.
 

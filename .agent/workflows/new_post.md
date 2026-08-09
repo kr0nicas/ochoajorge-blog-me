@@ -20,7 +20,7 @@ Responder antes de escribir una línea:
 | **Descripción** | Exactamente 150-160 caracteres |
 | **Tags** | 2-5 tags en el idioma del post. Tag slug: `arquitectura-limpia` |
 | **Serie** | ¿Pertenece a una serie existente? Verificar con `getAllSeries(lang)` en `lib/posts.ts` |
-| **Pillar** | Arquitectura / Python & Backend / Frontend / IA Aplicada / ERP SaaS |
+| **Pillar** | Uno de los 4 canónicos: `construir-con-ia`, `agentes-en-produccion`, `arquitectura`, `seguridad` (ver `lib/pillars.ts`) |
 
 ---
 
@@ -38,6 +38,7 @@ title: "Título con Keyword al Inicio"
 description: "Descripción de exactamente 150-160 caracteres optimizada para SEO y legible para humanos. Revisa el contador."
 date: "2026-03-04"
 tags: ["arquitectura", "python", "fastapi"]
+pillar: "arquitectura"
 lang: "es"
 draft: true
 featured: false
@@ -180,15 +181,22 @@ Antes de cambiar `draft: false`, verificar:
 
 ## Paso 7 — Publicar
 
+> ⛔ **NUNCA `git push origin main`.** Publicar = PR con base `develop`
+> (ver `AGENTS.md`). El post llega a producción con el PR de release
+> `develop` → `main`.
+
 ```bash
 # 1. Cambiar draft: false en el frontmatter
 # 2. Verificar build limpio
-npm run build
+npm run seo:audit && npm run build
 
-# 3. Commit y push (Vercel despliega automáticamente)
+# 3. Rama desde develop, commit y PR
+git fetch origin
+git switch -c content/{slug} origin/develop
 git add content/posts/es/{slug}.mdx
 git commit -m "content(posts): add {slug} post"
-git push origin main
+git push -u origin HEAD
+gh pr create --base develop --fill
 ```
 
 ---
