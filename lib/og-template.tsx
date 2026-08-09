@@ -24,6 +24,8 @@ interface OgOptions {
     title: string;
     pillar: string;
     readingTime?: number;
+    /** Fixed glow hue; falls back to a deterministic hash of `pillar` */
+    hue?: "blue" | "orange";
 }
 
 /**
@@ -31,9 +33,9 @@ interface OgOptions {
  * (blue or orange alternating by pillar), mono kicker `// pillar`,
  * Space Grotesk title, ochoajorge.me brand mark.
  */
-export async function renderOgImage({ title, pillar, readingTime }: OgOptions) {
+export async function renderOgImage({ title, pillar, readingTime, hue: hueOverride }: OgOptions) {
     const { spaceGrotesk, jetbrainsMono } = await loadOgFonts();
-    const hue = pillarHue(pillar);
+    const hue = hueOverride ?? pillarHue(pillar);
     const glow =
         hue === "blue"
             ? "radial-gradient(circle, rgba(13,64,245,0.45), transparent 65%)"

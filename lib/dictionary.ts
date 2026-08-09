@@ -1,6 +1,7 @@
 export const dictionaries = {
     es: {
         nav: {
+            topics: "Temas",
             blog: "Blog",
             projects: "Proyectos",
             about: "Sobre mí",
@@ -35,6 +36,7 @@ export const dictionaries = {
     },
     en: {
         nav: {
+            topics: "Topics",
             blog: "Blog",
             projects: "Projects",
             about: "About",

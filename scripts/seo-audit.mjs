@@ -13,6 +13,9 @@ import siteMetadata from "../config/site-metadata.json" with { type: "json" };
 const POSTS_DIR = path.join(process.cwd(), "content/posts");
 const SUPPORTED_LOCALES = ["es", "en"];
 
+// Keep in sync with lib/pillars.ts (scripts cannot import TS modules)
+const PILLAR_IDS = ["construir-con-ia", "agentes-en-produccion", "arquitectura", "seguridad"];
+
 const localeArg = process.argv[2];
 const targetLocales = localeArg
     ? SUPPORTED_LOCALES.includes(localeArg)
@@ -67,6 +70,13 @@ for (const locale of targetLocales) {
         } else if (data.description.length < 130 || data.description.length > 170) {
             console.warn(
                 `Warning: ${locale}/${file} description length is ${data.description.length} (ideal: 150-160).`
+            );
+            warnings++;
+        }
+
+        if (!PILLAR_IDS.includes(data.pillar)) {
+            console.warn(
+                `Warning: ${locale}/${file} missing or non-canonical "pillar" (got: ${data.pillar ?? "none"}).`
             );
             warnings++;
         }

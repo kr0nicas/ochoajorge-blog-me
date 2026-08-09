@@ -1,3 +1,5 @@
+import type { PillarId } from "./pillars";
+
 export interface Post {
     slug: string;
     title: string;
@@ -21,6 +23,8 @@ export interface Post {
         label: string;
         url: string;
     }>;
+    /** Canonical section (see lib/pillars.ts); absent = unassigned */
+    pillar?: PillarId;
 }
 
 export interface PostWithContent extends Post {
