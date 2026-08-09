@@ -86,7 +86,7 @@ export default async function ProjectsPage({ params }: { params: Promise<{ lang:
                 {projects.map((project, i) => (
                     <div key={i} className="group relative flex flex-col">
                         {/* Image / Thumbnail */}
-                        <div className="relative aspect-[16/9] mb-6 overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--bg-elevated)] transition-all duration-500 group-hover:-translate-y-1 group-hover:border-[var(--brand)]/30 group-hover:shadow-[0_20px_50px_rgba(99,102,241,0.15)]">
+                        <div className="relative aspect-[16/9] mb-6 overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--bg-elevated)] transition-all duration-500 group-hover:-translate-y-1 group-hover:border-[var(--brand)]/30 group-hover:shadow-[var(--shadow-lg)]">
                             <div
                                 className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110"
                                 style={{ backgroundImage: `url(${project.image})` }}

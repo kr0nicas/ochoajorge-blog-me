@@ -49,7 +49,7 @@ export function Header({ lang }: HeaderProps) {
                         href={`/${lang}`}
                         className="group flex items-center gap-2.5 font-display font-semibold text-[var(--text-primary)] transition-opacity hover:opacity-90"
                     >
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--brand)] shadow-[0_0_20px_rgba(99,102,241,0.45)] transition-shadow duration-300 group-hover:shadow-[0_0_28px_rgba(99,102,241,0.65)]">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--brand)]">
                             <Code2 className="h-4 w-4 text-[var(--text-on-brand)]" />
                         </div>
                         <span className="hidden sm:inline">Jorge Ochoa</span>
@@ -76,7 +76,7 @@ export function Header({ lang }: HeaderProps) {
                                         {isActive && (
                                             <motion.span
                                                 layoutId="nav-active"
-                                                className="absolute inset-0 rounded-lg bg-[rgba(99,102,241,0.15)]"
+                                                className="absolute inset-0 rounded-lg bg-[rgba(var(--brand-rgb),0.15)]"
                                                 transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
                                             />
                                         )}
@@ -189,7 +189,7 @@ export function Header({ lang }: HeaderProps) {
                                         className={cn(
                                             "block rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
                                             pathname === href || (href !== `/${lang}` && pathname.startsWith(href))
-                                                ? "bg-[rgba(99,102,241,0.15)] text-[var(--brand-light)]"
+                                                ? "bg-[rgba(var(--brand-rgb),0.15)] text-[var(--brand-light)]"
                                                 : "text-[var(--text-secondary)] hover:bg-[var(--border)] hover:text-[var(--text-primary)]"
                                         )}
                                     >

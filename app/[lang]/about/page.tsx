@@ -200,7 +200,7 @@ export default async function AboutPage({ params }: { params: Promise<{ lang: st
                     <div className="space-y-12">
                         {currentExp.map((item, i) => (
                             <div key={i} className="relative pl-8 before:absolute before:left-0 before:top-1.5 before:h-[calc(100%-8px)] before:w-px before:bg-[var(--border)]">
-                                <div className="absolute left-[-4px] top-1.5 h-2 w-2 rounded-full border border-[var(--brand)] bg-[var(--bg-base)] shadow-[0_0_8px_rgba(99,102,241,0.5)]" />
+                                <div className="absolute left-[-4px] top-1.5 h-2 w-2 rounded-full border border-[var(--brand)] bg-[var(--bg-base)]" />
                                 <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
                                     <h3 className="text-lg font-bold text-[var(--text-primary)]">{item.title}</h3>
                                     <span className="text-sm font-medium text-[var(--brand-light)] tabular-nums">{item.period}</span>
@@ -219,7 +219,7 @@ export default async function AboutPage({ params }: { params: Promise<{ lang: st
                     <div className="space-y-6">
                         {currentEdu.map((item, i) => (
                             <div key={i} className="relative pl-8 before:absolute before:left-0 before:top-1.5 before:h-[calc(100%-8px)] before:w-px before:bg-[var(--border)]">
-                                <div className="absolute left-[-4px] top-1.5 h-2 w-2 rounded-full border border-[var(--brand)] bg-[var(--bg-base)] shadow-[0_0_8px_rgba(99,102,241,0.5)]" />
+                                <div className="absolute left-[-4px] top-1.5 h-2 w-2 rounded-full border border-[var(--brand)] bg-[var(--bg-base)]" />
                                 <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
                                     <h3 className="text-base font-bold text-[var(--text-primary)]">{item.degree}</h3>
                                     <span className="text-sm font-medium text-[var(--brand-light)] tabular-nums">{item.period}</span>
