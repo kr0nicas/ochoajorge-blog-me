@@ -119,6 +119,6 @@ Ingeniería de software en la era de IA no es sobre reemplazar desarrolladores c
 
 La clave: responsible AI coding + testing + code review + metrics.
 
-Leer el análisis completo: https://ochoajorge.me/es/blog/ingenieria-software-era-ia-mas-alla-vibe-coding
+Leer el análisis completo: https://www.ochoajorge.me/es/blog/ingenieria-software-era-ia-mas-alla-vibe-coding
 
 #IngenieriaSoftware #IA #DeudaTecnica #BestPractices #VibeCoding #ResponsibleAI

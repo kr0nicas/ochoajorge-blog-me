@@ -2,12 +2,21 @@ import type { Metadata } from "next";
 import { getAllPosts, getAllTags } from "@/lib/posts";
 import { Tag } from "@/components/shared/Tag";
 import { PostGrid } from "@/components/blog/PostGrid";
+import { localizedAlternates } from "@/lib/utils";
 
-export const metadata: Metadata = {
-    title: "Blog",
-    description:
-        "Articles on software architecture, Python, Next.js, AI systems, and building production-grade software.",
-};
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+    const { lang } = await params;
+    return {
+        title: "Blog",
+        description:
+            "Articles on software architecture, Python, Next.js, AI systems, and building production-grade software.",
+        alternates: localizedAlternates(lang, { es: "/blog", en: "/blog" }),
+    };
+}
 
 export default async function BlogPage({
     params,

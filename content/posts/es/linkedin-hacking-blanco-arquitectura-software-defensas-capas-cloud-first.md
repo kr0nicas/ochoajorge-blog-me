@@ -128,6 +128,6 @@ Con STRIDE, defensas en capas, y telemetry de seguridad first class, puedes cons
 
 La clave: anticipar amenazas, no solo defenderse de ellas.
 
-Leer el análisis completo: https://ochoajorge.me/es/blog/hacking-blanco-arquitectura-software-defensas-capas-cloud-first
+Leer el análisis completo: https://www.ochoajorge.me/es/blog/hacking-blanco-arquitectura-software-defensas-capas-cloud-first
 
 #HackingBlanco #Seguridad #Kubernetes #DevSecOps #CloudArchitecture #STRIDE

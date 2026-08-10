@@ -72,7 +72,6 @@ export function getPostBySlug(slug: string, locale: string = "es"): PostWithCont
                   }))
                   .filter((item) => item.label && item.url)
             : undefined,
-        canonical: data.canonical,
         ogTitle: data.ogTitle,
         ogDescription: data.ogDescription,
         ogImage: data.ogImage ?? data.coverImage,

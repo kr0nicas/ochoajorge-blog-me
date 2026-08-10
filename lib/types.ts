@@ -15,7 +15,6 @@ export interface Post {
     };
     featured?: boolean;
     lang?: "es" | "en";
-    canonical?: string;
     ogTitle?: string;
     ogDescription?: string;
     ogImage?: string;

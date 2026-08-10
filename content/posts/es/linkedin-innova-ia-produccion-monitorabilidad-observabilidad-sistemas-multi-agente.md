@@ -254,6 +254,6 @@ Monitorabilidad de sistemas multi-agente requiere observabilidad de primera clas
 
 La clave: observabilidad no es un nice-to-have, es un must-have para producción.
 
-Leer el análisis completo: https://ochoajorge.me/es/blog/innova-ia-produccion-monitorabilidad-observabilidad-sistemas-multi-agente
+Leer el análisis completo: https://www.ochoajorge.me/es/blog/innova-ia-produccion-monitorabilidad-observabilidad-sistemas-multi-agente
 
 #Observabilidad #OpenTelemetry #GCP #MultiAgent #InnovaIA #DevOps

@@ -143,6 +143,6 @@ La clave: usar IA con consciousness. Documentación, reviews arquitectónicos, d
 
 IA acelera, arquitecto guía. Sin arquitecto, solo velocidad sin dirección.
 
-🔗 Análisis completo: https://ochoajorge.me/es/blog/deuda-tecnica-en-la-era-de-la-ia-mitos-y-realidades
+🔗 Análisis completo: https://www.ochoajorge.me/es/blog/deuda-tecnica-en-la-era-de-la-ia-mitos-y-realidades
 
 #AI #SoftwareArchitecture #Engineering #TechLeadership #CleanArchitecture #DebtTechnical

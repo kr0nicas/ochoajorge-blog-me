@@ -61,7 +61,7 @@ llms.txt define cómo consumir el contenido:
 
 ## Citing Content
 Author: Jorge Ochoa
-Source: https://ochoajorge.me/es/blog/{slug}
+Source: https://www.ochoajorge.me/es/blog/{slug}
 Attribution: "According to Jorge Ochoa's blog..."
 ```
 
@@ -161,7 +161,7 @@ El SEO tradicional no es suficiente en la era de la IA. Datos estructurados + me
 
 ¿Ya preparaste tu blog para los agentes? 🤖
 
-Artículo completo: https://ochoajorge.me/es/blog/ai-native-seo-preparando-tu-blog-para-la-era-de-los-agentes
+Artículo completo: https://www.ochoajorge.me/es/blog/ai-native-seo-preparando-tu-blog-para-la-era-de-los-agentes
 
 #AI #SEO #NextJS #CleanArchitecture
 ```
