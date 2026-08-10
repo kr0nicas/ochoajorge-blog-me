@@ -7,7 +7,6 @@ interface HeroProps {
     githubUrl: string;
     linkedinUrl: string;
     blueskyUrl: string;
-    lang: string;
     dict: {
         title: string;
         subtitle: string;
@@ -42,7 +41,7 @@ const BlueskyIcon = ({ className }: { className?: string }) => (
 const SOCIAL_LINK_CLASSES =
     "flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)] transition-all duration-300 hover:border-[var(--brand-light)] hover:text-[var(--text-primary)]";
 
-export function Hero({ githubUrl, linkedinUrl, blueskyUrl, lang, dict }: HeroProps) {
+export function Hero({ githubUrl, linkedinUrl, blueskyUrl, dict }: HeroProps) {
     return (
         <section className="relative overflow-hidden bg-[var(--bg-base)]">
             <motion.div

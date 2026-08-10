@@ -19,6 +19,7 @@ export function ReaderMode({ lang = "es" }: { lang?: string }) {
     // server with `false`, so reading localStorage there would desync
     // server and client HTML (hydration mismatch).
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional one-time post-hydration sync from localStorage
         setActive(localStorage.getItem("reader-mode") === "true");
     }, []);
 

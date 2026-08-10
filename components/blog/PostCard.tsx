@@ -87,9 +87,7 @@ export function PostCard({
                     {post.readingTime && (
                         <>
                             <span aria-hidden="true">·</span>
-                            <span>
-                                {post.readingTime} {isSpanish ? "min" : "min"}
-                            </span>
+                            <span>{post.readingTime} min</span>
                         </>
                     )}
                 </div>
