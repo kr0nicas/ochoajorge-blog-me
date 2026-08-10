@@ -25,6 +25,8 @@ export function middleware(request) {
 
 export const config = {
     matcher: [
-        "/((?!api|_next|favicon.ico|feed.xml|icon.png|og.png|opengraph-image|robots.txt|sitemap.xml).*)",
+        // Locale-agnostic files must be excluded here, or the middleware prefixes
+        // them with /es and they 404. llms.txt was missing and did exactly that.
+        "/((?!api|_next|favicon.ico|feed.xml|icon.png|llms.txt|og.png|opengraph-image|robots.txt|sitemap.xml).*)",
     ],
 };
