@@ -4,6 +4,8 @@ import { PILLAR_IDS, PILLARS, pillarByRouteSlug } from "@/lib/pillars";
 import { PillarLanding } from "@/components/pillars/PillarLanding";
 import { localizedAlternates } from "@/lib/utils";
 
+export const revalidate = 60;
+
 interface Props {
     params: Promise<{ lang: string; slug: string }>;
 }

@@ -10,6 +10,7 @@ interface PostGridProps {
   lang: string;
   initialCount?: number;
   loadStep?: number;
+  reactionCounts?: Record<string, number>;
 }
 
 export function PostGrid({
@@ -17,6 +18,7 @@ export function PostGrid({
   lang,
   initialCount = 8,
   loadStep = 6,
+  reactionCounts,
 }: PostGridProps) {
   const total = posts.length;
   const [visibleCount, setVisibleCount] = useState(() =>
@@ -59,7 +61,12 @@ export function PostGrid({
         {visiblePosts.map((post, index) => (
           <li key={post.slug}>
             <AnimatedSection delay={(index % 6) * 0.08}>
-              <PostCard post={post} lang={lang} priority={index < 2} />
+              <PostCard
+                post={post}
+                lang={lang}
+                priority={index < 2}
+                reactions={reactionCounts?.[post.slug]}
+              />
             </AnimatedSection>
           </li>
         ))}
