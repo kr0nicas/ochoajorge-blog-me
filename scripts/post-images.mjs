@@ -22,6 +22,12 @@ try {
 const TIMEOUT_MS = 5 * 60 * 1000;
 const MAX_INLINE_IMAGES = 3;
 
+// ── Sanitizers for hostile webhook strings ──────────────────────────
+const singleLine = (value) => String(value ?? "").replace(/\s+/g, " ").trim();
+const yamlValue = (value) => singleLine(value).replaceAll('"', "'");
+const markdownAlt = (value) => singleLine(value).replace(/[[\]{}<>`]/g, "");
+const isSafeUrl = (value) => typeof value === "string" && /^https:\/\/[^\s"()]+$/.test(value);
+
 const args = process.argv.slice(2).filter((a) => a !== "--force");
 const force = process.argv.includes("--force");
 const [slug, lang = "es"] = args;
@@ -96,20 +102,23 @@ try {
 let updated = raw;
 
 // ── Cover → frontmatter ─────────────────────────────────────────────
-if (response.cover?.url) {
-    const coverLines = `coverImage: "${response.cover.url}"\ncoverImageAlt: "${(response.cover.alt ?? "").replaceAll('"', "'")}"`;
+if (response.cover?.url && isSafeUrl(response.cover.url)) {
+    const altSanitized = yamlValue(response.cover.alt);
+    const coverLines = `coverImage: "${response.cover.url}"\ncoverImageAlt: "${altSanitized}"`;
     if (/^coverImage:/m.test(updated)) {
         updated = updated
-            .replace(/^coverImage:.*$/m, `coverImage: "${response.cover.url}"`)
-            .replace(/^coverImageAlt:.*$/m, `coverImageAlt: "${(response.cover.alt ?? "").replaceAll('"', "'")}"`);
+            .replace(/^coverImage:.*$/m, () => `coverImage: "${response.cover.url}"`)
+            .replace(/^coverImageAlt:.*$/m, () => `coverImageAlt: "${altSanitized}"`);
         if (!/^coverImageAlt:/m.test(updated)) {
-            updated = updated.replace(/^coverImage:.*$/m, (line) => `${line}\ncoverImageAlt: "${(response.cover.alt ?? "").replaceAll('"', "'")}"`);
+            updated = updated.replace(/^coverImage:.*$/m, (line) => `${line}\ncoverImageAlt: "${altSanitized}"`);
         }
     } else {
         // Insert right before the closing --- of the frontmatter block
         updated = updated.replace(/^---\n([\s\S]*?)\n---/, (_, fm) => `---\n${fm}\n${coverLines}\n---`);
     }
     console.log(`[post:images] coverImage set: ${response.cover.url}`);
+} else if (response.cover?.url) {
+    console.log(`[post:images] skipping unsafe url: ${singleLine(response.cover.url)}`);
 } else {
     console.log("[post:images] no cover in response — frontmatter untouched.");
 }
@@ -117,6 +126,10 @@ if (response.cover?.url) {
 // ── Inline → after exact heading match ──────────────────────────────
 const orphans = [];
 for (const image of response.inline ?? []) {
+    if (!isSafeUrl(image.url)) {
+        console.log(`[post:images] skipping unsafe url: ${singleLine(image.url)}`);
+        continue;
+    }
     const heading = (image.afterHeading ?? "").trim();
     const lines = updated.split("\n");
     const index = heading ? lines.findIndex((l) => l.trim() === heading) : -1;
@@ -124,7 +137,8 @@ for (const image of response.inline ?? []) {
         orphans.push(image);
         continue;
     }
-    lines.splice(index + 1, 0, "", `![${image.alt ?? ""}](${image.url})`);
+    const altMarkdown = markdownAlt(image.alt);
+    lines.splice(index + 1, 0, "", `![${altMarkdown}](${image.url})`);
     updated = lines.join("\n");
     console.log(`[post:images] inserted after "${heading}": ${image.url}`);
 }
@@ -134,7 +148,8 @@ writeFileSync(filePath, updated);
 if (orphans.length > 0) {
     console.log("\n[post:images] headings not found — place these manually:");
     for (const image of orphans) {
-        console.log(`\n  # after: ${image.afterHeading}\n  ![${image.alt ?? ""}](${image.url})`);
+        const altMarkdown = markdownAlt(image.alt);
+        console.log(`\n  # after: ${image.afterHeading}\n  ![${altMarkdown}](${image.url})`);
     }
 }
 

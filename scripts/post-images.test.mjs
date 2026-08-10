@@ -6,6 +6,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import matter from "gray-matter";
 
 const execFileP = promisify(execFile);
 
@@ -135,7 +136,7 @@ await withMockServer(RESPONSE, async (url, requests) => {
 // 3. --force: regenera (reemplaza coverImage y vuelve a llamar)
 await withMockServer(RESPONSE, async (url, requests) => {
     const root = makeContentRoot();
-    runScript(root, url);
+    await runScript(root, url);
     await runScript(root, url, ["--force"]);
     const patched = readFileSync(path.join(root, "es", "post-prueba.mdx"), "utf8");
     assert.equal(requests.length, 2);
@@ -185,5 +186,38 @@ await withMockServer(RESPONSE, async (url) => {
     assert.equal(code, 1);
     rmSync(root, { recursive: true, force: true });
 });
+
+// 8. Strings hostiles del webhook: nunca corrompen el MDX
+await withMockServer(
+    {
+        cover: {
+            url: "https://blob.example/posts/post-prueba/cover.png",
+            alt: 'Línea1\nLínea2 "comillas" y $& patrón',
+        },
+        inline: [
+            {
+                url: "javascript:alert(1)",
+                alt: "URL insegura",
+                afterHeading: "## El problema",
+            },
+            {
+                url: "https://blob.example/posts/post-prueba/inline-1.png",
+                alt: "Alt con [brackets] {llaves} `backticks`",
+                afterHeading: "## El problema",
+            },
+        ],
+    },
+    async (url) => {
+        const root = makeContentRoot();
+        await runScript(root, url);
+        const patched = readFileSync(path.join(root, "es", "post-prueba.mdx"), "utf8");
+        const parsed = matter(patched); // no lanza → YAML sigue válido
+        assert.equal(parsed.data.coverImage, "https://blob.example/posts/post-prueba/cover.png");
+        assert.ok(!parsed.data.coverImageAlt.includes("\n"), "alt en una sola línea");
+        assert.ok(!patched.includes("javascript:alert"), "URL insegura fuera");
+        assert.match(patched, /!\[Alt con brackets llaves backticks\]/);
+        rmSync(root, { recursive: true, force: true });
+    }
+);
 
 console.log("post-images tests passed.");
