@@ -113,6 +113,6 @@ Es sobre usar LLMs como amplificadores de productividad mientras mantienes disci
 La clave: responsible AI coding + testing + code review + metrics.
 
 13/13
-🔗 Análisis completo: https://ochoajorge.me/es/blog/ingenieria-software-era-ia-mas-alla-vibe-coding
+🔗 Análisis completo: https://www.ochoajorge.me/es/blog/ingenieria-software-era-ia-mas-alla-vibe-coding
 
 #IngenieriaSoftware #IA #DeudaTecnica #BestPractices #VibeCoding #ResponsibleAI

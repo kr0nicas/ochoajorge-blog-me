@@ -1,11 +1,20 @@
 import type { Metadata } from "next";
 import { FolderCode, Github, ExternalLink, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
+import { localizedAlternates } from "@/lib/utils";
 
-export const metadata: Metadata = {
-    title: "Projects | Jorge Ochoa",
-    description: "A showcase of technical projects and open-source contributions by Jorge Ochoa.",
-};
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+    const { lang } = await params;
+    return {
+        title: "Projects | Jorge Ochoa",
+        description: "A showcase of technical projects and open-source contributions by Jorge Ochoa.",
+        alternates: localizedAlternates(lang, { es: "/projects", en: "/projects" }),
+    };
+}
 
 interface Project {
     title: string;

@@ -126,6 +126,6 @@ No puedes testear con LLMs reales. Mock the MCP injector.
 ✅ Error boundaries en MCP injection
 
 12/12
-🔗 Análisis completo: https://ochoajorge.me/es/blog/arquitectura-hexagonal-agentes-ia-patrones-mcp
+🔗 Análisis completo: https://www.ochoajorge.me/es/blog/arquitectura-hexagonal-agentes-ia-patrones-mcp
 
 #ArquitecturaHexagonal #AgentesIA #MCP #FastAPI #pgvector #CleanArchitecture

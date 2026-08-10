@@ -118,6 +118,6 @@ Métricas de seguridad (intentos fallidos, accesos anómalos) deben estar en das
 - Security telemetry first class
 
 13/13
-🔗 Análisis completo: https://ochoajorge.me/es/blog/hacking-blanco-arquitectura-software-defensas-capas-cloud-first
+🔗 Análisis completo: https://www.ochoajorge.me/es/blog/hacking-blanco-arquitectura-software-defensas-capas-cloud-first
 
 #HackingBlanco #Seguridad #Kubernetes #DevSecOps #CloudArchitecture #STRIDE
