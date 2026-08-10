@@ -18,8 +18,9 @@ export function middleware(request) {
     const url = request.nextUrl.clone();
     url.pathname = `/${locale}${pathname}`;
 
-    // URL transformation for localized routes
-    return NextResponse.redirect(url);
+    // 308 (permanent) so search engines consolidate signals onto the localized
+    // URL instead of treating /es as a temporary destination.
+    return NextResponse.redirect(url, 308);
 }
 
 export const config = {

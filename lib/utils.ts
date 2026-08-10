@@ -1,6 +1,7 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import siteMetadata from "@/config/site-metadata.json";
+import type { Locale } from "@/lib/dictionary";
 
 /**
  * Utility to merge Tailwind CSS classes safely.
@@ -76,6 +77,36 @@ export const siteConfig = {
 };
 
 export type SiteConfig = typeof siteConfig;
+
+/** Narrow an arbitrary route param to a supported locale, defaulting to "es". */
+export function toLocale(lang: string): Locale {
+    return lang === "en" ? "en" : "es";
+}
+
+/**
+ * Build `canonical` + `hreflang` alternates for a route that exists in both
+ * locales. Pass the localized path per locale — some routes differ by more than
+ * the prefix (e.g. /es/temas vs /en/topics).
+ *
+ * Only use this where a genuine translated counterpart exists. Blog posts are
+ * deliberately excluded: ES and EN posts are independent pieces with unrelated
+ * slugs, and declaring them as translations of each other would be a lie to
+ * search engines.
+ */
+export function localizedAlternates(
+    lang: string,
+    paths: Record<Locale, string>
+): { canonical: string; languages: Record<string, string> } {
+    const href = (locale: Locale) => `${siteConfig.url}/${locale}${paths[locale]}`;
+    return {
+        canonical: href(toLocale(lang)),
+        languages: {
+            es: href("es"),
+            en: href("en"),
+            "x-default": href("es"),
+        },
+    };
+}
 
 /**
  * Format a date string for display.

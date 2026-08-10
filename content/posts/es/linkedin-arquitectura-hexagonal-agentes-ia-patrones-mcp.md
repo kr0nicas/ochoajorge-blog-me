@@ -167,6 +167,6 @@ Arquitectura hexagonal con agentes IA no requiere romper el patrón. Con MCP inj
 
 La clave: inyección de MCP, no inyección en cada port.
 
-Leer el análisis completo: https://ochoajorge.me/es/blog/arquitectura-hexagonal-agentes-ia-patrones-mcp
+Leer el análisis completo: https://www.ochoajorge.me/es/blog/arquitectura-hexagonal-agentes-ia-patrones-mcp
 
 #ArquitecturaHexagonal #AgentesIA #MCP #FastAPI #pgvector #CleanArchitecture

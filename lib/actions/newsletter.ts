@@ -1,6 +1,7 @@
 "use server";
 
 import { Resend } from "resend";
+import { siteConfig } from "@/lib/utils";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -72,7 +73,7 @@ export async function subscribeToNewsletter(
                             Promesa: sin spam, sin contenido de relleno. Solo cosas que valen tu tiempo.
                         </p>
                         <p style="margin-top: 32px; font-size: 14px; color: #86888a;">
-                            — Jorge Ochoa · <a href="https://ochoajorge.me" style="color: #0a66c2;">ochoajorge.me</a>
+                            — Jorge Ochoa · <a href="${siteConfig.url}" style="color: #0a66c2;">ochoajorge.me</a>
                         </p>
                     </div>
                 `
@@ -86,7 +87,7 @@ export async function subscribeToNewsletter(
                             Promise: no spam, no filler content. Only things worth your time.
                         </p>
                         <p style="margin-top: 32px; font-size: 14px; color: #86888a;">
-                            — Jorge Ochoa · <a href="https://ochoajorge.me" style="color: #0a66c2;">ochoajorge.me</a>
+                            — Jorge Ochoa · <a href="${siteConfig.url}" style="color: #0a66c2;">ochoajorge.me</a>
                         </p>
                     </div>
                 `,

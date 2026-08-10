@@ -1,3 +1,5 @@
+import { siteConfig } from "@/lib/utils";
+
 export interface JsonLdProps {
   schema: Record<string, unknown>;
 }
@@ -61,7 +63,7 @@ export function BlogPostingJsonLd({
     publisher: {
       "@type": "Organization",
       name: "Jorge Ochoa",
-      url: "https://ochoajorge.me",
+      url: siteConfig.url,
     },
     mainEntityOfPage: {
       "@type": "WebPage",

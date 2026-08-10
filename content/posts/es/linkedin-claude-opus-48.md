@@ -124,6 +124,6 @@ Anthropic está jugando un juego largo. Opus 4.8 es una pieza de rompecabezas en
 
 ---
 
-📖 Artículo completo: [Claude Opus 4.8: El puente hacia Mythos y el futuro del agentic coding](https://ochoajorge.me/es/blog/claude-opus-48-el-puente-hacia-mythos-y-el-futuro-del-agentic-coding)
+📖 Artículo completo: [Claude Opus 4.8: El puente hacia Mythos y el futuro del agentic coding](https://www.ochoajorge.me/es/blog/claude-opus-48-el-puente-hacia-mythos-y-el-futuro-del-agentic-coding)
 
 #AI #Anthropic #ClaudeOpus #LLM #AgenticCoding #SoftwareArchitecture
