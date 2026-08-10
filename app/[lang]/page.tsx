@@ -66,9 +66,12 @@ export default async function HomePage({
       />
 
       {/* ── Featured post — big OG artwork ──────────────────────── */}
+      {/* Rendered statically (no AnimatedSection): this is the page's LCP
+          element — entrance animations (initial opacity 0) make its paint
+          time flaky */}
       {heroPost && (
         <section className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-          <AnimatedSection>
+          <div>
             <p className="mb-4 font-mono text-xs uppercase tracking-widest text-[var(--brand)]">
               {isSpanish ? "// destacado" : "// featured"}
             </p>
@@ -113,7 +116,7 @@ export default async function HomePage({
                 </div>
               </div>
             </article>
-          </AnimatedSection>
+          </div>
         </section>
       )}
 
