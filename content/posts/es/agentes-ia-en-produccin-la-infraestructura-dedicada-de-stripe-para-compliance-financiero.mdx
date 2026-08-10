@@ -1,0 +1,124 @@
+---
+title: "Agentes IA en Producción: La Infraestructura Dedicada de Stripe para Compliance Financiero"
+description: "Cómo Stripe despliega más de 100 agentes IA en producción para compliance financiero con infraestructura dedicada, ReAct y caching que recorta costos 60%."
+date: "2026-08-11"
+pillar: "agentes-en-produccion"
+canonical: "https://ochoajorge.me/es/blog/agentes-ia-en-produccin-la-infraestructura-dedicada-de-stripe-para-compliance-financiero"
+tags: ["agentes-ia", "produccion", "infraestructura", "compliance", "observabilidad"]
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Construyendo con IA: Lo que nadie te dice"
+  part: 9
+resources:
+  - label: "Production-grade AI agents for financial compliance: Lessons from Stripe — AWS"
+    url: "https://aws.amazon.com/blogs/machine-learning/production-grade-ai-agents-for-financial-compliance-lessons-from-stripe/"
+  - label: "Amazon Bedrock"
+    url: "https://aws.amazon.com/bedrock/"
+---
+
+# Agentes IA en Producción: La Infraestructura Dedicada de Stripe para Compliance Financiero
+
+> **Serie: Construyendo con IA — Parte 9.** La mayoría habla de qué modelo usar. Pocos
+> hablan de la infraestructura que rodea al modelo. El caso de Stripe en compliance
+> financiero es el ejemplo más claro de por qué los agentes necesitan su propio serving
+> layer, distinto del de los modelos de ML tradicionales.
+
+## El contexto: compliance a escala planetaria
+
+Stripe procesa aproximadamente **USD 1.4 billones en volumen de pagos anual** across 50
+países, atendiendo a millones de empresas — incluyendo el 62% de la Fortune 500. Eso
+representa cerca del 1.3% del PIB global. Esa escala pone a Stripe en el cruce entre
+innovación tecnológica y marcos regulatorios duros.
+
+El dolor era concreto: los analistas de compliance pasaban **hasta el 80% de su tiempo
+navegando sistemas fragmentados** para reunir documentación, en lugar de hacer
+evaluaciones de riesgo de alto valor. Cada día se revisan miles de transacciones. El
+reto no era "hacer un agente", era escalar compliance sin crecer headcount proporcionalmente
+ni sacrificar auditabilidad.
+
+## El insight que nadie te dice: los agentes no son modelos de ML
+
+La lección central de la arquitectura de Stripe es que **un agente en producción tiene un
+perfil de recursos fundamentalmente distinto al de un sistema de inferencia
+tradicional**:
+
+| Sistema ML tradicional | Agente en producción |
+|---|---|
+| Compute-bound | **Network-bound** |
+| Optimizado para respuestas en ms | Espera **minutos** en llamadas LLM + tools |
+| GPU cara, latencia predecible | Latencia impredecible, I/O dominante |
+
+Por eso Stripe levantó un **agent service dedicado**. Empezó pareciéndose a un endpoint
+de inferencia síncrono y stateless; hoy maneja también agentes conversacionales
+stateful multi-turno. Creció de **unos pocos agentes a más de 100 en menos de un año**.
+
+```python
+# Patrón: ejecución async para no bloquear threads en llamadas LLM/tool de larga latencia
+import asyncio
+
+class AgentService:
+    async def run_review(self, review_id: str, context: dict):
+        # Un thread maneja muchas sesiones concurrentes sin bloquearse en I/O externo
+        async with self.semaphore:  # control de concurrencia por sesión
+            plan = await self.orchestrator.decompose(review_id, context)
+            results = await asyncio.gather(*[
+                self._run_step(step) for step in plan.steps
+            ])
+            return self.orchestrator.synthesize(review_id, results)
+```
+
+## Los tres componentes de la arquitectura
+
+1. **Task decomposition + orchestration** — el review se descompone en sub-tareas
+   "bite-sized". Los agentes se confinan a las áreas acotadas donde pueden tener éxito.
+2. **ReAct agent framework** — razonamiento + acción en loop: el agente decide qué tool
+   llamar, observa el resultado y continúa.
+3. **Agent service + LLM Proxy** — hosting del agente, ejecución, y enrutamiento de
+   modelos con signals internos expuestos como agent tools.
+
+## El control de costos que sí importa: prompt caching
+
+El workload de agentes está dominado por **input tokens** (contexto, historia,
+documentos). Stripe reutiliza los prefijos comunes de prompt entre turns del agente en
+vez de reprocesar toda la conversación en cada paso:
+
+- **Token caching reduce costos un 60%**.
+- **Cost instrumentation por invocación de agente**: permite forecast de gasto y
+  detectar oportunidades de optimización antes de que impacten el budget.
+
+> Esto es lo que separa un demo de un servicio: la contabilidad por agente, no por
+> request.
+
+## Resultados (métricas reales en producción)
+
+- **26% de reducción** en el tiempo mediano de manejo de revisiones.
+- **96%+ de helpfulness** mantenido por los revisores humanos.
+- **Humanos firmemente en control** de la decisión final — no es automatización total.
+- **Audit trails completos** que cumplen estándares de examen regulatorio.
+
+## Lecciones para tu stack
+
+1. **No reutilices tu infra de inferencia ML para agentes.** Son workloads distintos;
+   necesitas un servicio que maneje sesiones stateful, async, de larga latencia.
+2. **Confina al agente a sub-tareas pequeñas.** El éxito viene de construir rieles, no
+   de soltar al modelo sobre todo el problema.
+3. **Instrumenta costo por agente desde el día uno.** El 60% de ahorro de Stripe no es
+   magia de modelo, es caching de prefijos + visibilidad.
+4. **Human-in-the-loop no es debilidad, es auditabilidad.** En regulado, el agente
+   acelera; el humano decide.
+
+## Conclusión
+
+El caso de Stripe confirma una idea que repetimos en esta serie: **lo que lleva un agente
+a producción no es un mejor modelo, es un mejor harness**. La infraestructura dedicada,
+el caching de tokens y la contabilidad por invocación son lo que transformó un prototipo
+experimental en un servicio con 100+ agentes sosteniendo compliance a escala global.
+
+En la próxima entrega veremos el otro extremo del espectro: agentes de ingeniería que
+escriben y merguean código solos, y cómo monday.com orquestó ese riesgo.
+
+---
+*Fuentes y detalles en los enlaces de recursos arriba. Métricas citadas del reporte
+oficial de Stripe en AWS Machine Learning Blog.*

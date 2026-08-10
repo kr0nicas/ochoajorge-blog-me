@@ -1,0 +1,84 @@
+name: Publish Weekly Posts
+
+# Publicación programada de los posts del batch semanal.
+# Cada job, en su fecha, cambia `draft: true` -> `draft: false` del post que le toca
+# y abre un PR hacia `develop` (NUNCA hacia main, ni push directo a develop).
+# Reglas doradas de AGENTS.md: el flujo es siempre vía PR.
+
+on:
+  schedule:
+    # 08:00 CST (America/El_Salvador, UTC-6) = 14:00 UTC
+    - cron: '0 14 11 8 *'   # Post 1: Stripe        — Martes 2026-08-11
+    - cron: '0 14 13 8 *'   # Post 2: monday.com    — Jueves 2026-08-13
+    - cron: '0 14 15 8 *'   # Post 3: UNACEM       — Sábado 2026-08-15
+  workflow_dispatch:
+    inputs:
+      post:
+        description: 'Slug del archivo .mdx a publicar (sin extensión)'
+        required: true
+        default: 'agentes-ia-en-produccin-la-infraestructura-dedicada-de-stripe-para-compliance-financiero'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  publish:
+    name: Publish scheduled post
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout develop
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      - name: Resolve target post slug
+        id: slug
+        run: |
+          SLUG="${{ inputs.post }}"
+          if [ -z "$SLUG" ]; then
+            # Modo schedule: elige el slug según el día del calendario
+            DAY=$(date -u +%d)
+            MONTH=$(date -u +%m)
+            case "${MONTH}-${DAY}" in
+              08-11) SLUG="agentes-ia-en-produccin-la-infraestructura-dedicada-de-stripe-para-compliance-financiero" ;;
+              08-13) SLUG="agentes-de-ingeniera-autnomos-cmo-mondaycom-corre-morphex-en-produccin" ;;
+              08-15) SLUG="agentic-ai-operacional-con-pgvector-la-arquitectura-de-unacem-sobre-watsonx-orchestrate" ;;
+              *) echo "No post scheduled for ${MONTH}-${DAY}"; exit 0 ;;
+            esac
+          fi
+          echo "slug=$SLUG" >> "$GITHUB_OUTPUT"
+          echo "Publishing: $SLUG"
+
+      - name: Flip draft to false
+        if: steps.slug.outputs.slug != ''
+        run: |
+          FILE="content/posts/es/${{ steps.slug.outputs.slug }}.mdx"
+          if [ ! -f "$FILE" ]; then echo "File not found: $FILE"; exit 1; fi
+          python3 - <<'PY'
+          import re, sys
+          f = "content/posts/es/" + sys.argv[1] + ".mdx"
+          s = open(f, encoding="utf-8").read()
+          s2 = re.sub(r'(^draft:\s*)true', r'\1false', s, count=1, flags=re.M)
+          if s == s2:
+              print("draft already false or not found — no change"); sys.exit(0)
+          open(f, "w", encoding="utf-8").write(s2)
+          print("draft flipped to false in", f)
+          PY
+
+      - name: Create PR to develop
+        if: steps.slug.outputs.slug != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BR="content/publish-${{ steps.slug.outputs.slug }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BR"
+          git add -A
+          git commit -m "content(posts): publish ${{ steps.slug.outputs.slug }}"
+          git push -u origin "$BR"
+          gh pr create --base develop --title "content(posts): publish ${{ steps.slug.outputs.slug }}" \
+            --body "Publicación programada del post de la semana del 2026-08-10. Cambia \`draft: true\` → \`draft: false\`. Generado por el workflow de contenido semanal." \
+            --label "content"
