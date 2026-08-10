@@ -1,11 +1,14 @@
 import type { MetadataRoute } from "next";
-import { getAllPosts, getAllTags, getAllSeries } from "@/lib/posts";
+import { getAllPosts, getAllTags, getAllSeries, getPostsByTag } from "@/lib/posts";
 import { siteConfig } from "@/lib/utils";
 import { slugify } from "@/lib/utils";
 import { PILLARS } from "@/lib/pillars";
 
 const BASE_URL = siteConfig.url;
 const LOCALES = ["es", "en"] as const;
+
+/** Minimum posts a tag archive needs before it earns a place in the sitemap. */
+const MIN_POSTS_PER_TAG = 2;
 
 export default function sitemap(): MetadataRoute.Sitemap {
     const now = new Date();
@@ -49,13 +52,19 @@ export default function sitemap(): MetadataRoute.Sitemap {
     );
 
     // ── Tag pages ─────────────────────────────────────────────────
+    // A sitemap is a list of URLs worth indexing, and a tag archive holding a
+    // single post is a near-duplicate of that post. Advertising dozens of them
+    // spends crawl budget on pages that compete with the articles themselves.
+    // The pages stay reachable and indexable — they are simply not submitted.
     const tagRoutes: MetadataRoute.Sitemap = LOCALES.flatMap((lang) =>
-        getAllTags(lang).map((tag) => ({
-            url: `${BASE_URL}/${lang}/tags/${encodeURIComponent(tag.toLowerCase())}`,
-            lastModified: now,
-            changeFrequency: "weekly" as const,
-            priority: 0.6,
-        }))
+        getAllTags(lang)
+            .filter((tag) => getPostsByTag(tag, lang).length >= MIN_POSTS_PER_TAG)
+            .map((tag) => ({
+                url: `${BASE_URL}/${lang}/tags/${encodeURIComponent(tag.toLowerCase())}`,
+                lastModified: now,
+                changeFrequency: "weekly" as const,
+                priority: 0.6,
+            }))
     );
 
     // ── Series pages ──────────────────────────────────────────────

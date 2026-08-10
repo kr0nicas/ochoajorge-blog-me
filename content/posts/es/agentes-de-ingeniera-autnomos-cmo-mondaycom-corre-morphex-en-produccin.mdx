@@ -1,0 +1,166 @@
+---
+title: "Agentes de Ingeniería Autónomos: Cómo monday.com Corre Morphex en Producción"
+description: "Cómo monday.com corre agentes de ingeniería autónomos en producción sobre EKS: Guardrails como reviewer automático, evals y auto-merge con 19 de 20 PRs."
+date: "2026-08-13"
+pillar: "construir-con-ia"
+canonical: "https://ochoajorge.me/es/blog/agentes-de-ingeniera-autnomos-cmo-mondaycom-corre-morphex-en-produccin"
+tags: ["agentes-ia", "ingenieria-software", "automatizacion", "kubernetes", "observabilidad"]
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Arquitectura de Software Avanzada"
+  part: 13
+resources:
+  - label: "AI Teammates: how monday.com runs production AI agents on Amazon Bedrock — AWS"
+    url: "https://aws.amazon.com/blogs/machine-learning/ai-teammates-how-monday-com-runs-production-ai-agents-on-amazon-bedrock/"
+  - label: "Amazon EKS + KEDA"
+    url: "https://keda.sh/"
+---
+
+# Agentes de Ingeniería Autónomos: Cómo monday.com Corre Morphex en Producción
+
+> **Serie: Arquitectura de Software Avanzada — Parte 13.** Los greenfield demos son
+> fáciles. Correr agentes dentro de un SaaS enterprise con on-call real, millones de
+> usuarios y compliance es el trabajo real. Este es el playbook operativo de monday.com.
+
+## El escenario: una década de código, millones de usuarios
+
+monday.com es un codebase de **una década**, con **millones de usuarios pagos**,
+cientos de microfrontends y microservicios, y cientos de Builders (ingenieros, PMs,
+analistas, diseñadores). Cada PR que un agente abre entra a un sistema que millones de
+usuarios esperan que siga funcionando en el próximo deploy. Esa es la diferencia con un
+demo: aquí hay on-call, clientes y compliance.
+
+## Los tres niveles de adopción (L1 → L3)
+
+- **L1 — Asistente.** El ingeniero usa IA como pair programmer (Cursor para lo rápido,
+  Claude Code para lo pesado). Adopción casi se duplicó año a año.
+- **L2 — Skills y sub-agentes.** Equipos construyen agentes reutilizables para trabajo
+  repetitivo, con el ingeniero al volante. Aquí corre la mayor parte de monday hoy, y
+  donde el throughput de PR por desarrollador subió **más del 50%**.
+- **L3 — Multi-agente.** Totalmente agéntico: los agentes son dueños del delivery
+  end-to-end mientras los ingenieros orquestan.
+
+## La infraestructura: un pod por sesión, escalado por concurrencia
+
+El compute fleet es **Amazon EKS**, **un pod por sesión de agente activa**, montando el
+workspace del agente en **EFS**. Decisiones clave:
+
+- **Crash isolation por sesión.** Si una sesión falla, no arrastra a las demás.
+- **Autoscaling con KEDA** sobre el promedio de sesiones activas por pod, medido con
+  Datadog. Un solo worker image; repos cacheados en EFS y reutilizados entre sesiones.
+- **Sin service mesh, sin orchestrator-of-orchestrators.** EKS + SQS + la capa de cache
+  cargan todo. `monday-agent-sdk` corre dentro de cada pod runner.
+
+```yaml
+# KEDA ScaledObject: escalar pods de agente por sesiones activas, no por CPU
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: agent-runner
+spec:
+  scaleTargetRef:
+    name: agent-runner
+  minReplicaCount: 0          # scale-to-zero cuando no hay sesiones
+  maxReplicaCount: 100
+  triggers:
+    - type: datadog
+      metadata:
+        metricName: avg_active_agent_sessions
+        query: "avg:agent.sessions.active{*}"
+        threshold: "5"         # 1 replica por cada ~5 sesiones activas
+```
+
+Servicios AWS usados: **SNS, SQS, EKS, RDS, ElastiCache, EFS, S3**; **Secrets Manager**
+para secretos por sesión; **Amazon Bedrock** para llamadas de modelo (un audit trail
+único por cada llamada, failover cross-region, cost tracking centralizado).
+
+## Guardrails: el reviewer automático que reemplaza al humano en lo repetitivo
+
+El cuello de botella dejó de ser generar código y pasó a ser la **revisión humana**. La
+solución fue convertir cada estándar de ingeniería de monday en un **reviewer
+automatizado**: tagging de métricas, higiene de feature flags, uso de Datadog, límites
+de seguridad, convenciones de DB y microservicios, calidad de tests, documentación. Un
+subconjunto son **bloqueantes** y se conectan al conocimiento interno vía los **MCP
+servers** de monday, así el reviewer ve el mismo contexto que el equipo owner del
+estándar.
+
+- **~1 de cada 5 PRs** falla al menos un estándar y regresa.
+- Las **override humanas** están en **bajos dígitos simples**.
+- A escala: **decenas de miles de PRs evaluados por mes**, cientos de miles de checks.
+
+## Evals en dos capas (lo que movió los scores)
+
+Atlas (un agente) rompía en CI cuando el volumen subió: tests pasaban local pero fallaban
+en real. Dos capas de eval lo arreglaron:
+
+1. **Determinísticas** por agente: PRs mergeados, revert rate, zero-touch merge rate.
+2. **LLM-scored** en 5 dimensiones por PR: *Intent & Decision*, *Execution & Artifact*,
+   *Completeness & Usefulness*, *Instruction & Boundary*, *Efficiency*.
+
+Ambas retroalimentan el harness. A lo largo de versiones sucesivas de Atlas **no
+cambiaron modelo, ni prompts, ni nudges humanos — solo los evals — y los scores se
+movieron en todas las dimensiones.**
+
+## Morphex: 19 de 20 PRs se mergean solos
+
+Morphex es el primer agente **totalmente autónomo** de monday: trabaja en el mismo repo,
+CI, Guardrails y protocolos de revert que cualquier Builder.
+
+- **19 de cada 20 PRs de Morphex se mergean automáticamente** — no saltando revisión,
+  sino pasando todos los gates. Un PR aprobado **shipa a producción sin humano en el loop**.
+- Abre más PRs por mes que la mayoría de ingenieros. Un PR rechazado falla por las mismas
+  razones que el de cualquiera: tests flaky, specs ambiguas, edge cases.
+
+### La decisión de auto-merge no es un "confía y ya"
+
+Combina cuatro señales:
+
+1. **Outcome de Guardrails deterministas** — todo estándar bloqueante debe pasar.
+2. **Trayectoria de evals por agente** — ventana reciente de scores de esta versión.
+3. **Revert rate histórico por (agente × repo × clase de cambio)** — near-zero reverts
+   en dependency bumps de un servicio low-risk ≠ revert rate alto en migraciones de
+   monolith.
+4. **Outcome del sandbox** — verde desde el retrofit es necesario, no suficiente.
+
+> **Sobre el umbral → auto-merge. Bajo → ruta a humano con la señal fallando marcada.**
+> Esa es la transición L2→L3: no es quitar humanos, es quitar humanos de los casos donde
+> la señal del sistema es suficientemente fuerte.
+
+### Métricas reales de los top agentes generadores de PR
+
+- ~**3 de cada 10** PRs se mergean.
+- ~**3/4 de esos** mergeados con **cero ediciones humanas**.
+- **Revert rate en bajos dígitos simples**.
+- ~**1/4 de los PRs** fueron **cazados y declinados por Guardrails** antes de llegar a
+  un humano — la población de merges ya viene pre-filtrada.
+
+## CoWORK: accountability en el mismo board
+
+El failure mode más caro era agentes en silos abriendo PRs que ningún equipo owns. La
+solución: el workspace CoWORK — tasks, status, blockers y handoffs del agente viven en
+el **mismo board de monday** que el del equipo. La accountability dejó de ser un
+problema de sistema: monday ya lo había resuelto para humanos.
+
+## Lecciones arquitectónicas
+
+1. **Un pod por sesión + KEDA por concurrencia.** Los agentes escalan por sesiones
+   activas, no por CPU; el scale-to-zero apaga costo cuando no hay trabajo.
+2. **El reviewer automatizado es el verdadero cuello de botella a resolver.** Sin
+   Guardrails, el humano se vuelve el limitante en cuanto el agente produce suficiente.
+3. **Los evals mueven los scores, no los modelos.** Invierte en el harness de evaluación
+   antes que en cambiar de LLM.
+4. **Auto-merge por confianza compuesta**, no por fe. Cuatro señales independientes
+   deciden; el humano recibe el caso borderline con la razón específica.
+
+## Conclusión
+
+monday.com demuestra que correr agentes autónomos en un SaaS enterprise no es un problema
+de modelo, es un problema de **orquestación, guardrails y evaluación continua**. El L3
+no se alcanza quitando humanos: se alcanza cuando la señal del sistema es lo
+suficientemente fuerte como para que agregar un humano no mejore el resultado.
+
+---
+*Fuentes y métricas en los enlaces de recursos. Todos los datos provienen del reporte
+oficial de monday.com en AWS Machine Learning Blog.*

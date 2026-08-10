@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getAllPosts, getAllTags } from "@/lib/posts";
 import { Tag } from "@/components/shared/Tag";
 import { PostGrid } from "@/components/blog/PostGrid";
+import { getReactionCounts } from "@/lib/reactions";
 import { localizedAlternates } from "@/lib/utils";
 
 export async function generateMetadata({
@@ -18,6 +19,8 @@ export async function generateMetadata({
     };
 }
 
+export const revalidate = 60;
+
 export default async function BlogPage({
     params,
 }: {
@@ -27,6 +30,10 @@ export default async function BlogPage({
     const isSpanish = lang === "es";
     const posts = getAllPosts(lang);
     const tags = getAllTags(lang);
+    const reactionCounts = await getReactionCounts(
+        lang,
+        posts.map((post) => post.slug)
+    );
 
     const tagCounts: Record<string, number> = {};
     for (const tag of tags) {
@@ -69,7 +76,13 @@ export default async function BlogPage({
                     </p>
                 </div>
             ) : (
-                <PostGrid posts={posts} lang={lang} initialCount={8} loadStep={6} />
+                <PostGrid
+                    posts={posts}
+                    lang={lang}
+                    initialCount={8}
+                    loadStep={6}
+                    reactionCounts={reactionCounts}
+                />
             )}
         </div>
     );

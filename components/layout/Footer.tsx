@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Github, Linkedin, Twitter, Rss } from "lucide-react";
 import { siteConfig } from "@/lib/utils";
 import { getDictionary, Locale } from "@/lib/dictionary";
+import { NewsletterForm } from "@/components/shared/NewsletterForm";
 
 interface FooterProps {
     lang: string;
@@ -43,6 +44,22 @@ export function Footer({ lang }: FooterProps) {
     return (
         <footer className="border-t border-[var(--border)] bg-[var(--bg-base)]">
             <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-10">
+                <div className="mb-8 flex flex-col gap-4 border-b border-[var(--border)] pb-8 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                        <p className="font-mono text-xs text-[var(--brand)]">
+                            {"// newsletter"}
+                        </p>
+                        <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                            {lang === "es"
+                                ? "Nuevos artículos en tu inbox. Sin spam."
+                                : "New articles in your inbox. No spam."}
+                        </p>
+                    </div>
+                    <div className="w-full sm:max-w-sm">
+                        <NewsletterForm lang={lang} variant="compact" />
+                    </div>
+                </div>
+
                 <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-between">
                     {/* Brand */}
                     <div className="text-center sm:text-left">

@@ -150,7 +150,26 @@ Cierre directo. ¿Qué sigue? ¿Hay otro post de la serie? → link.
 
 ---
 
-## Paso 5 — Imágenes
+## Paso 5 — Imágenes generadas (opcional pero recomendado)
+
+Con el contenido terminado y aún `draft: true`:
+
+```bash
+npm run post:images -- {slug} {lang}
+```
+
+- Llama al n8n de esta máquina (env `N8N_IMAGES_WEBHOOK_URL/SECRET`), que genera
+  cover + ilustraciones con Gemini/Nano Banana y las sube a Vercel Blob.
+- El script parchea `coverImage` y las inline solo; si algún heading no casa,
+  imprime el bloque para colocarlo a mano.
+- **Nunca bloquea:** si el webhook falla o no hay config, el post sigue sin
+  imágenes (el warning de `seo:audit` lo recuerda). No reintentes en bucle.
+- Regenerar: `npm run post:images -- {slug} {lang} --force`.
+- Contrato y detalles: `docs/automation/n8n-post-images.md`.
+
+---
+
+## Paso 6 — Imágenes
 
 **NUNCA** subir imágenes al repo Git.
 
@@ -163,7 +182,7 @@ Cierre directo. ¿Qué sigue? ¿Hay otro post de la serie? → link.
 
 ---
 
-## Paso 6 — Checklist SEO Pre-Publicación
+## Paso 7 — Checklist SEO Pre-Publicación
 
 Antes de cambiar `draft: false`, verificar:
 
@@ -179,7 +198,7 @@ Antes de cambiar `draft: false`, verificar:
 
 ---
 
-## Paso 7 — Publicar
+## Paso 8 — Publicar
 
 > ⛔ **NUNCA `git push origin main`.** Publicar = PR con base `develop`
 > (ver `AGENTS.md`). El post llega a producción con el PR de release

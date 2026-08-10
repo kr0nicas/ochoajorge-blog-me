@@ -1,0 +1,169 @@
+---
+title: "Agentic AI Operacional con pgvector: La Arquitectura de UNACEM sobre watsonx Orchestrate"
+description: "UNACEM redujo 40% el tiempo de espera con agentes IA en WhatsApp sobre watsonx Orchestrate y pgvector: arquitectura agéntica operacional para la industria."
+date: "2026-08-15"
+pillar: "arquitectura"
+canonical: "https://ochoajorge.me/es/blog/agentic-ai-operacional-con-pgvector-la-arquitectura-de-unacem-sobre-watsonx-orchestrate"
+tags: ["agentes-ia", "pgvector", "watsonx-orchestrate", "arquitectura", "latam"]
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Arquitectura de Software Avanzada"
+  part: 14
+resources:
+  - label: "How an industrial powerhouse, UNACEM, modernized operations with agentic AI — IBM"
+    url: "https://www.ibm.com/new/product-blog/how-an-industrial-powerhouse-unacem-modernized-operations-with-agentic-ai"
+  - label: "pgvector — vector similarity search for PostgreSQL"
+    url: "https://github.com/pgvector/pgvector"
+  - label: "IBM watsonx Orchestrate"
+    url: "https://www.ibm.com/products/watsonx-orchestrate"
+---
+
+# Agentic AI Operacional con pgvector: La Arquitectura de UNACEM sobre watsonx Orchestrate
+
+> **Serie: Arquitectura de Software Avanzada — Parte 14.** Un caso LATAM raro en la
+> literatura de agentes: una empresa industrial peruana que resolvió un bottleneck
+> logístico real con agentes IA — no con un dashboard, sino con un "compañero digital"
+> en WhatsApp, grounded en su propio conocimiento con pgvector.
+
+## El contexto: UNACEM, industria pesada en LATAM
+
+UNACEM es un grupo industrial peruano con operaciones en **5 países** (Perú, Ecuador,
+Chile, Colombia y EE. UU.) y **más de 40 subsidiarias** en cemento, agregados, concreto
+y generación eléctrica. El bottleneck era tan visible como costoso: en la planta de
+Lima, los conductores de camión esperaban **3 horas o más** durante el picking y la
+preparación de pedidos — colas largas, throughput diario limitado y ETAs rotos para
+los clientes de construcción.
+
+El mandato del VP de IT, Roy Pérez, fue claro: **reducir latencia sin agregar fricción
+al usuario de frontline**. Eso exigía repensar cómo las decisiones y acciones fluían
+entre sistemas.
+
+## El reframing: no otra app, un compañero digital
+
+La pregunta que se hizo el equipo de GBS fue: ¿y si cada operador tuviera un
+**compañero digital** que planifica, razona y ejecuta trabajo entre sistemas — a través
+de una conversación natural? Eso llevó a la IA agéntica y a **watsonx Orchestrate** como
+backbone de orquestación, junto a IBM y EXISOFT.
+
+Principios de diseño:
+
+- **Encontrar al usuario donde trabaja.** Los conductores no necesitaban otra app.
+  Exponer el asistente logístico por **WhatsApp y web chat** mantuvo la experiencia
+  familiar y movió el trabajo pesado a los agentes detrás.
+- **Automatizar decisiones, no solo tareas.** Orchestrate habilita agentes que planifican,
+  rutean, reflexionan y llaman tools para ejecutar trabajo multi-step — más allá de
+  scripts frágiles.
+- **Construir una vez, escalar entre casos de uso.** La misma base sirve para soporte
+  de TI, procurement, resúmenes de clientes y más.
+- **Responsable donde importa.** Los agentes recuperan respuestas grounded en los
+  manuales y documentos propios de UNACEM — no output de modelo sin verificar.
+
+## La arquitectura: el blueprint agéntico
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Canales: Web  +  WhatsApp  (channel adapters)              │
+├─────────────────────────────────────────────────────────────┤
+│  watsonx Orchestrate  (pensar, planear, rutear, reflexionar) │
+│   ├─ low-code Agent Builder                                 │
+│   └─ pro-code Agent Development Kit (ADK)                   │
+├─────────────────────────────────────────────────────────────┤
+│  watsonx.ai  (LLMs + embeddings)                            │
+│  pgvector on IBM Databases for PostgreSQL  (vector search)  │
+│  IBM Cloud Object Storage (SharePoint/OneDrive/Excel)       │
+├─────────────────────────────────────────────────────────────┤
+│  Code Engine microservices                                  │
+│   (embeddings, conversation storage, channel adapters,     │
+│    API hooks → order status + plant queues)                 │
+├─────────────────────────────────────────────────────────────┤
+│  AgentOps: monitoreo, gobernanza, lifecycle                 │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## El corazón: grounding en conocimiento enterprise con pgvector
+
+Para nosotros los que usamos **pgvector** en proyectos de IA, este es el punto más
+relevante. UNACEM no confía en el parametric knowledge del LLM: **toma los manuales de
+SharePoint/OneDrive y los assets Excel (como "Club Ferretero")**, los convierte en
+embeddings y los sirve con **vector search sobre pgvector en IBM Databases for
+PostgreSQL**, con el contenido persistido en IBM Cloud Object Storage.
+
+```sql
+-- Patrón de retrieval grounded que UNACEM aplica (esquemático)
+WITH query_embedding AS (
+  SELECT embedding FROM embed(:user_question)   -- watsonx.ai embeddings
+)
+SELECT d.id, d.content, d.source,
+       (d.embedding <=> (SELECT embedding FROM query_embedding)) AS distance
+FROM documents d
+WHERE d.domain = 'logistics'                     -- filtro de dominio primero
+ORDER BY d.embedding <=> (SELECT embedding FROM query_embedding)
+LIMIT 5;                                         -- re-ranking y poda agresiva
+```
+
+El principio es el mismo que aplicamos en proyectos propios: **"what to say" (LLM)
+se separa de "what is true" (retrieval sobre tu propio conocimiento)**. En contextos
+safety-critical y customer-facing, la respuesta refleja conocimiento aprobado, no
+alucinación del modelo.
+
+## Runtime de integración: Code Engine, no un monolito
+
+**IBM Code Engine** (microservices serverless) maneja:
+
+- Generación de embeddings.
+- Almacenamiento de conversaciones.
+- Channel adapters (WhatsApp + web).
+- Hooks de API a sistemas operacionales: **estado de pedidos** y **colas de planta**.
+
+Esto es lo que hace que el agente sea transaccional, no solo conversacional: puede leer
+el estado del pedido en tiempo real y actuar sobre la cola de la planta.
+
+## Resultados y métricas
+
+El primer agente logístico — expuesto por **WhatsApp** — **redujo el tiempo de espera
+de los conductores en la puerta de la planta hasta un 40%** durante el retiro de
+cemento. Eso descongestionó el sitio, aumentó los load-outs diarios y mejoró la
+fiabilidad de los ETAs para los clientes.
+
+Pero la lección más profunda es **arquitectónica**: la victoria no es el asistente o el
+bot, es el **blueprint**. Con Orchestrate, el equipo de GBS puede replicar valor a
+través de un pipeline de agentes: solicitudes de acceso de TI, procurement y licitaciones,
+resúmenes automatizados de órdenes y compras, help desk, y más.
+
+## Ask Safety (EHS): el mismo blueprint, distinto dominio
+
+El caso de seguridad (Environment, Health & Safety) reutiliza la misma arquitectura:
+
+- Manuales y procedimientos de seguridad en OneDrive/SharePoint → embebidos en
+  PostgreSQL/**pgvector** → storage en IBM Cloud Object Storage.
+- watsonx.ai para retrieval semántico.
+- Code Engine para embeddings, conversation storage e integración con sistemas de
+  seguridad internos.
+- **AgentOps** gobierna el comportamiento del agente — crítico cuando la guía impacta
+  el bienestar del trabajador.
+
+## Lecciones para arquitectos en LATAM
+
+1. **Empieza por un bottleneck de alto impacto, no por un moonshot.** UNACEM eligió la
+   cadena de entrega de cemento — visible, medible, doloroso. El primer win financia el
+   siguiente.
+2. **El canal importa más que el modelo.** WhatsApp (donde ya está el usuario) supera a
+   "descarga esta app" en frontline operativo.
+3. **Grounding con pgvector > parametric knowledge.** En industria, la respuesta debe
+   reflejar el manual aprobado. pgvector + PostgreSQL es la capa de verdad.
+4. **Construye el blueprint, no el bot.** El ROI real está en replicar la base de
+   orquestación a través de un portfolio de agentes.
+
+## Conclusión
+
+UNACEM es evidencia de que la IA agéntica está dejando de ser un experimento de
+laboratorios del norte global para convertirse en el **sistema operativo de la
+productividad enterprise** — también en LATAM. La receta: un bottleneck de alto impacto,
+un canal familiar, una capa de orquestación abierta y respuestas grounded en el
+conocimiento propio con pgvector.
+
+---
+*Fuentes y métricas en los enlaces de recursos. Datos del reporte oficial de IBM sobre
+UNACEM y watsonx Orchestrate.*

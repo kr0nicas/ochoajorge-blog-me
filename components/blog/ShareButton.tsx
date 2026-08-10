@@ -49,16 +49,57 @@ export function ShareButton({ title, url, lang }: ShareButtonProps) {
     },
   ];
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(url);
+  const copyToClipboard = async (text: string): Promise<boolean> => {
+    if (
+      typeof navigator !== "undefined" &&
+      navigator.clipboard &&
+      window.isSecureContext
+    ) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch {
+        // fall through to the legacy path
+      }
+    }
+    // Legacy fallback for non-secure contexts (e.g. LAN preview over http)
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+      return document.execCommand("copy");
+    } catch {
+      return false;
+    } finally {
+      document.body.removeChild(textarea);
+    }
+  };
+
+  const handleCopy = async () => {
+    const ok = await copyToClipboard(url);
+    if (!ok) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleShareClick = () => {
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      // Native share sheet (mobile & some desktop browsers). A rejected promise
+      // just means the user dismissed the sheet — no fallback menu needed.
+      navigator.share({ title, url }).catch(() => undefined);
+      return;
+    }
+    setShowMenu((prev) => !prev);
   };
 
   return (
     <div className="relative">
       <button
-        onClick={() => setShowMenu((prev) => !prev)}
+        onClick={handleShareClick}
         className="inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-2 text-sm text-[var(--text-secondary)] transition-all duration-200 hover:border-[var(--brand)] hover:text-[var(--brand-light)]"
         title={lang === "es" ? "Compartir" : "Share"}
       >

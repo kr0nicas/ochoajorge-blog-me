@@ -23,5 +23,6 @@ export default async function Image({ params }: Props) {
         pillar: pillarDef?.name[locale] ?? post?.tags?.[0] ?? "blog",
         hue: pillarDef?.hue,
         readingTime: post?.readingTime,
+        coverUrl: post?.coverImage,
     });
 }

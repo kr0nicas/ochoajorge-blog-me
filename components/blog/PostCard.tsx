@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Layers } from "lucide-react";
+import { Layers, Star } from "lucide-react";
 import type { Post } from "@/lib/types";
 import { cn, formatDate, slugify } from "@/lib/utils";
 
@@ -11,6 +11,8 @@ interface PostCardProps {
     lang?: string;
     /** Above-the-fold cards: load the OG thumbnail eagerly */
     priority?: boolean;
+    /** Reaction count, read server-side in batch by the listing page */
+    reactions?: number;
 }
 
 export function PostCard({
@@ -19,6 +21,7 @@ export function PostCard({
     className,
     lang = "es",
     priority = false,
+    reactions,
 }: PostCardProps) {
     const isSpanish = lang === "es";
 
@@ -88,6 +91,18 @@ export function PostCard({
                         <>
                             <span aria-hidden="true">·</span>
                             <span>{post.readingTime} min</span>
+                        </>
+                    )}
+                    {typeof reactions === "number" && reactions > 0 && (
+                        <>
+                            <span aria-hidden="true">·</span>
+                            <span className="flex items-center gap-1">
+                                <Star
+                                    className="h-3 w-3 fill-[var(--accent)] text-[var(--accent)]"
+                                    aria-hidden="true"
+                                />
+                                <span className="tabular-nums">{reactions}</span>
+                            </span>
                         </>
                     )}
                 </div>

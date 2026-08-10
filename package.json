@@ -9,9 +9,11 @@
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "type-check": "tsc --noEmit",
     "post:new": "node scripts/new-post.mjs",
+    "post:images": "node scripts/post-images.mjs",
     "seo:audit": "node scripts/seo-audit.mjs",
     "check:host": "node scripts/check-canonical-host.mjs",
     "test:e2e": "node scripts/e2e-check.mjs",
+    "test:images": "node scripts/post-images.test.mjs",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -25,6 +27,8 @@
     "@mdx-js/react": "^3.1.1",
     "@next/mdx": "^16.3.0",
     "@tailwindcss/typography": "^0.5.20",
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.38.2",
     "@vercel/analytics": "^1.6.1",
     "@vercel/blob": "^2.7.0",
     "@vercel/speed-insights": "^1.3.1",
@@ -46,7 +50,7 @@
     "rehype-highlight": "^7.0.2",
     "rehype-slug": "^6.0.0",
     "remark-gfm": "^4.0.1",
-    "resend": "^6.9.3",
+    "resend": "^6.18.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0"
   },
