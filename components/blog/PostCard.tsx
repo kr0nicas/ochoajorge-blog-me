@@ -96,8 +96,11 @@ export function PostCard({
                     {typeof reactions === "number" && reactions > 0 && (
                         <>
                             <span aria-hidden="true">·</span>
-                            <span className="flex items-center gap-1 text-[var(--accent)]">
-                                <Star className="h-3 w-3 fill-current" aria-hidden="true" />
+                            <span className="flex items-center gap-1">
+                                <Star
+                                    className="h-3 w-3 fill-[var(--accent)] text-[var(--accent)]"
+                                    aria-hidden="true"
+                                />
                                 <span className="tabular-nums">{reactions}</span>
                             </span>
                         </>
