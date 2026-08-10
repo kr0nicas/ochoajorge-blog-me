@@ -22,6 +22,7 @@ export function ReactionButton({ slug, lang }: ReactionButtonProps) {
 
     useEffect(() => {
         let cancelled = false;
+        setStatus("loading");
         try {
             setReacted(window.localStorage.getItem(storageKey) === "1");
         } catch {
