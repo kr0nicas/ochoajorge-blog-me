@@ -35,6 +35,35 @@ async function runChecks() {
     const res = await fetch(`${BASE_URL}${route}`);
     if (!res.ok) throw new Error(`Route ${route} responded ${res.status}`);
   }
+
+  // Reactions API — 200 with numeric count when Upstash is configured, 503 otherwise
+  const reactionsRes = await fetch(`${BASE_URL}/api/reactions/${firstSlug}?lang=es`);
+  if (reactionsRes.status === 200) {
+    const { count } = await reactionsRes.json();
+    if (typeof count !== "number") {
+      throw new Error("Reactions GET returned a non-numeric count");
+    }
+  } else if (reactionsRes.status !== 503) {
+    throw new Error(
+      `Reactions GET responded ${reactionsRes.status} (expected 200 or 503)`
+    );
+  }
+
+  // Invalid lang must be rejected
+  const badLangRes = await fetch(`${BASE_URL}/api/reactions/${firstSlug}?lang=xx`);
+  if (badLangRes.status !== 400) {
+    throw new Error(
+      `Reactions GET with invalid lang responded ${badLangRes.status} (expected 400)`
+    );
+  }
+
+  // Unknown slug must be rejected
+  const badSlugRes = await fetch(`${BASE_URL}/api/reactions/not-a-real-post?lang=es`);
+  if (badSlugRes.status !== 404) {
+    throw new Error(
+      `Reactions GET with unknown slug responded ${badSlugRes.status} (expected 404)`
+    );
+  }
 }
 
 async function main() {
