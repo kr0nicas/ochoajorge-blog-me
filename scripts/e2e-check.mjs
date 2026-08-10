@@ -66,15 +66,10 @@ async function runChecks() {
       throw new Error(`Reactions count did not persist (${after} -> ${persisted})`);
     }
 
-    // Restore the original count so e2e runs don't inflate real data
+    // Undo exactly this test's own +1 atomically — never clobbers concurrent real reactions
     const { Redis } = await import("@upstash/redis");
     const redis = Redis.fromEnv();
-    const key = `reactions:es:${firstSlug}`;
-    if (before === 0) {
-      await redis.del(key);
-    } else {
-      await redis.set(key, before);
-    }
+    await redis.decr(`reactions:es:${firstSlug}`);
   } else if (reactionsRes.status !== 503) {
     throw new Error(
       `Reactions GET responded ${reactionsRes.status} (expected 200 or 503)`
