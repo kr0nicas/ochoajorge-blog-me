@@ -33,20 +33,19 @@ export async function subscribeToNewsletter(
         };
     }
 
-    if (!process.env.RESEND_API_KEY) {
-        console.warn("[Newsletter] RESEND_API_KEY not set — skipping.");
+    if (!process.env.RESEND_API_KEY || !AUDIENCE_ID) {
+        console.error(
+            "[Newsletter] RESEND_API_KEY / RESEND_AUDIENCE_ID not configured"
+        );
         return {
-            success: true,
-            message: isSpanish
-                ? "¡Suscrito! (modo demo — configura RESEND_API_KEY en producción)"
-                : "Subscribed! (demo mode — set RESEND_API_KEY in production)",
+            success: false,
+            error: isSpanish
+                ? "El newsletter no está disponible en este momento. Inténtalo más tarde."
+                : "The newsletter is unavailable right now. Please try again later.",
         };
     }
 
     try {
-        if (!AUDIENCE_ID) {
-            throw new Error("RESEND_AUDIENCE_ID not configured");
-        }
 
         await resend.contacts.create({
             email,
