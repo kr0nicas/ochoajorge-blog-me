@@ -39,12 +39,16 @@ export async function generateMetadata({
     const metadataCanonical =
         override?.canonical ?? `${siteConfig.url}/${lang}/blog/${post.slug}`;
 
-    // Prefer explicit override, then post coverImage (frontmatter), then legacy post.ogImage, then site default.
-    const ogImage = override?.ogImage ?? post.coverImage ?? post.ogImage ?? siteConfig.ogImage;
+    // Only an explicit human override keeps emitting og/twitter images here.
+    // Otherwise the file-convention `opengraph-image.tsx` (the hybrid OG
+    // template) supplies og:image, and X falls back to og:image when no
+    // twitter:image is present — the raw AI-generated cover must never
+    // hijack the share image.
+    const explicitOgImage = override?.ogImage;
     const normalizedOgImage =
-        ogImage && !ogImage.startsWith("http")
-            ? new URL(ogImage.startsWith("/") ? ogImage : `/${ogImage}`, siteConfig.url).toString()
-            : ogImage;
+        explicitOgImage && !explicitOgImage.startsWith("http")
+            ? new URL(explicitOgImage.startsWith("/") ? explicitOgImage : `/${explicitOgImage}`, siteConfig.url).toString()
+            : explicitOgImage;
     const ogTitle = override?.ogTitle ?? metadataTitle;
     const ogDescription = override?.ogDescription ?? metadataDescription;
 
@@ -77,7 +81,7 @@ export async function generateMetadata({
             card: "summary_large_image",
             title: ogTitle,
             description: ogDescription,
-            images: normalizedOgImage ? [normalizedOgImage] : [],
+            ...(normalizedOgImage ? { images: [normalizedOgImage] } : {}),
         },
     };
 }

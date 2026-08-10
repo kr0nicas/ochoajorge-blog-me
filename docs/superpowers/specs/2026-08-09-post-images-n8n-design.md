@@ -49,7 +49,7 @@ Response `200` (síncrona, hasta ~5 min):
 ```
 
 - `alt` en el idioma del post. `afterHeading` es el heading EXACTO del `content` tras el cual va la imagen.
-- Errores: `401` secreto inválido, `422` payload inválido (campos faltantes, pillar desconocido), `5xx` fallo upstream. Fallos parciales dentro de n8n (una inline falla): responder `200` con lo que haya — `cover` puede ser `null` si solo ella falló.
+- Errores: `401` secreto inválido, `422` payload inválido (campos faltantes, o `pillar` no-vacío que no está en el set de pilares — `pillar` ausente o `""` es VÁLIDO: el estilo se infiere de tags/título), `5xx` fallo upstream. Fallos parciales dentro de n8n (una inline falla): responder `200` con lo que haya — `cover` puede ser `null` si solo ella falló.
 - Estilo de marca fijo en los prompts de imagen (lo redacta Gemini dentro de n8n, con bloque de estilo obligatorio): editorial Grotesk Suizo, paleta blanco/negro con acentos azul eléctrico `#0d40f5` y naranja señal `#ff5c39`, sin texto renderizado dentro de la imagen, composición limpia tipo revista de diseño.
 - Naming en Blob: `posts/<slug>/cover.png`, `posts/<slug>/inline-N.png`.
 

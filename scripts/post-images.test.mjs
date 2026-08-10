@@ -141,6 +141,7 @@ await withMockServer(RESPONSE, async (url, requests) => {
     const patched = readFileSync(path.join(root, "es", "post-prueba.mdx"), "utf8");
     assert.equal(requests.length, 2);
     assert.equal(patched.match(/coverImage:/g).length, 1, "sin duplicar coverImage");
+    assert.equal(patched.match(/inline-1\.png/g).length, 1, "sin duplicar inline en --force (URL determinista)");
     rmSync(root, { recursive: true, force: true });
 });
 
@@ -192,7 +193,7 @@ await withMockServer(
     {
         cover: {
             url: "https://blob.example/posts/post-prueba/cover.png",
-            alt: 'Línea1\nLínea2 "comillas" y $& patrón',
+            alt: 'Línea1\nLínea2 "comillas" C:\\ruta y $& patrón',
         },
         inline: [
             {
@@ -219,5 +220,42 @@ await withMockServer(
         rmSync(root, { recursive: true, force: true });
     }
 );
+
+// 9. El patch de cover solo toca el bloque de frontmatter, nunca el cuerpo
+await withMockServer(RESPONSE, async (url) => {
+    const root = mkdtempSync(path.join(tmpdir(), "post-images-test-"));
+    mkdirSync(path.join(root, "es"), { recursive: true });
+    const fixtureWithFencedCover = `---
+title: "Post de prueba"
+description: "Descripción de prueba para el test del script de imágenes generadas."
+date: "2026-08-09"
+tags: ["arquitectura"]
+pillar: "arquitectura"
+lang: "es"
+draft: true
+---
+
+Intro del post.
+
+## El problema
+
+Ejemplo de frontmatter en un fence, no debe tocarse:
+
+\`\`\`yaml
+coverImage: "fake"
+\`\`\`
+
+## Una sección sin imagen
+
+Más texto.
+`;
+    writeFileSync(path.join(root, "es", "post-prueba.mdx"), fixtureWithFencedCover);
+    await runScript(root, url);
+    const patched = readFileSync(path.join(root, "es", "post-prueba.mdx"), "utf8");
+    assert.match(patched, /```yaml\ncoverImage: "fake"\n```/, "el coverImage dentro del fence del cuerpo queda intacto");
+    const parsed = matter(patched);
+    assert.equal(parsed.data.coverImage, "https://blob.example/posts/post-prueba/cover.png", "el frontmatter sí recibe el coverImage real");
+    rmSync(root, { recursive: true, force: true });
+});
 
 console.log("post-images tests passed.");

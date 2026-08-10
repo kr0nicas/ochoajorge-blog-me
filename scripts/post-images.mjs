@@ -24,9 +24,9 @@ const MAX_INLINE_IMAGES = 3;
 
 // ── Sanitizers for hostile webhook strings ──────────────────────────
 const singleLine = (value) => String(value ?? "").replace(/\s+/g, " ").trim();
-const yamlValue = (value) => singleLine(value).replaceAll('"', "'");
+const yamlValue = (value) => singleLine(value).replaceAll('"', "'").replaceAll("\\", "");
 const markdownAlt = (value) => singleLine(value).replace(/[[\]{}<>`]/g, "");
-const isSafeUrl = (value) => typeof value === "string" && /^https:\/\/[^\s"()]+$/.test(value);
+const isSafeUrl = (value) => typeof value === "string" && /^https:\/\/[^\s"()\\]+$/.test(value);
 
 const args = process.argv.slice(2).filter((a) => a !== "--force");
 const force = process.argv.includes("--force");
@@ -92,6 +92,12 @@ try {
         process.exit(0);
     }
     response = await res.json();
+    if (!response || typeof response !== "object") {
+        console.log(
+            "[post:images] webhook returned an invalid body — skipping. The post ships without images."
+        );
+        process.exit(0);
+    }
 } catch (err) {
     console.log(
         `[post:images] webhook unreachable (${err.name ?? "error"}) — skipping. The post ships without images.`
@@ -105,17 +111,23 @@ let updated = raw;
 if (response.cover?.url && isSafeUrl(response.cover.url)) {
     const altSanitized = yamlValue(response.cover.alt);
     const coverLines = `coverImage: "${response.cover.url}"\ncoverImageAlt: "${altSanitized}"`;
-    if (/^coverImage:/m.test(updated)) {
-        updated = updated
+    // Patch only the frontmatter block — a body containing a column-0
+    // `coverImage:` line (e.g. inside a yaml code fence) must not be touched.
+    const FM_RE = /^---\n[\s\S]*?\n---/;
+    const fmMatch = updated.match(FM_RE);
+    let fmBlock = fmMatch[0]; // guaranteed: gray-matter already parsed this file
+    if (/^coverImage:/m.test(fmBlock)) {
+        fmBlock = fmBlock
             .replace(/^coverImage:.*$/m, () => `coverImage: "${response.cover.url}"`)
             .replace(/^coverImageAlt:.*$/m, () => `coverImageAlt: "${altSanitized}"`);
-        if (!/^coverImageAlt:/m.test(updated)) {
-            updated = updated.replace(/^coverImage:.*$/m, (line) => `${line}\ncoverImageAlt: "${altSanitized}"`);
+        if (!/^coverImageAlt:/m.test(fmBlock)) {
+            fmBlock = fmBlock.replace(/^coverImage:.*$/m, (line) => `${line}\ncoverImageAlt: "${altSanitized}"`);
         }
     } else {
         // Insert right before the closing --- of the frontmatter block
-        updated = updated.replace(/^---\n([\s\S]*?)\n---/, (_, fm) => `---\n${fm}\n${coverLines}\n---`);
+        fmBlock = fmBlock.replace(/^---\n([\s\S]*?)\n---/, (_, fm) => `---\n${fm}\n${coverLines}\n---`);
     }
+    updated = updated.replace(FM_RE, () => fmBlock);
     console.log(`[post:images] coverImage set: ${response.cover.url}`);
 } else if (response.cover?.url) {
     console.log(`[post:images] skipping unsafe url: ${singleLine(response.cover.url)}`);
@@ -128,6 +140,10 @@ const orphans = [];
 for (const image of response.inline ?? []) {
     if (!isSafeUrl(image.url)) {
         console.log(`[post:images] skipping unsafe url: ${singleLine(image.url)}`);
+        continue;
+    }
+    if (updated.includes(image.url)) {
+        console.log(`[post:images] already present, skipping: ${image.url}`);
         continue;
     }
     const heading = (image.afterHeading ?? "").trim();

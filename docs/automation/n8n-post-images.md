@@ -43,13 +43,15 @@ El cliente canónico es `npm run post:images -- <slug> [es|en]`
   inserta con igualdad estricta tras `trim()`).
 - Fallo parcial: responder `200` con lo que haya. `cover` puede ser `null`;
   `inline` puede ser `[]`.
+- `coverImageAlt` se guarda en el frontmatter como forward-compat: aún sin
+  consumidor en el sitio.
 
 ## Errores
 
 | Código | Cuándo |
 |---|---|
 | `401` | `x-webhook-secret` ausente o inválido |
-| `422` | payload inválido: falta `slug`/`title`/`content`, `lang` ∉ {es,en}, o `pillar` ∉ {construir-con-ia, agentes-en-produccion, arquitectura, seguridad} |
+| `422` | payload inválido: falta `slug`/`title`/`content`, `lang` ∉ {es,en}, o `pillar` no-vacío ∉ {construir-con-ia, agentes-en-produccion, arquitectura, seguridad} (`pillar` ausente o `""` es VÁLIDO — el post no tiene pilar asignado y el estilo se infiere de tags/título) |
 | `5xx` | fallo total upstream (Gemini caído, Blob caído) |
 
 Ante cualquier no-200 el cliente publica sin imágenes. No hay reintentos.

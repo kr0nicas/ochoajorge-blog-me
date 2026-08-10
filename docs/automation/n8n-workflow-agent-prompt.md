@@ -26,17 +26,24 @@ cliente ya desplegado (`scripts/post-images.mjs`) depende de él.
 `{ "cover": { "url", "alt" } | null, "inline": [ { "url", "alt", "afterHeading" } ] }`
 
 **Errores:** `401` secreto inválido · `422` payload inválido (falta
-slug/title/content, lang fuera de {es,en}, pillar fuera de
-{construir-con-ia, agentes-en-produccion, arquitectura, seguridad}) ·
-`5xx` solo ante fallo total. **Fallo parcial → 200 con lo que haya**
-(`cover: null` y/o menos inline de las pedidas).
+slug/title/content, lang fuera de {es,en}, o pillar no-vacío fuera de
+{construir-con-ia, agentes-en-produccion, arquitectura, seguridad} —
+`pillar` ausente o `""` es VÁLIDO: el post no tiene pilar asignado y el
+estilo se infiere de tags/título) · `5xx` solo ante fallo total.
+**Fallo parcial → 200 con lo que haya** (`cover: null` y/o menos inline
+de las pedidas).
 
 ## Secuencia de nodos sugerida
 
 1. **Webhook** (POST, response mode "Using Respond to Webhook node").
 2. **Validación**: si `x-webhook-secret` ≠ `WEBHOOK_SECRET` → Respond 401
    `{"error":"unauthorized"}`. Si payload inválido → Respond 422
-   `{"error":"invalid_payload","detail":"…"}`.
+   `{"error":"invalid_payload","detail":"…"}`. Payload inválido = falta
+   slug/title/content, o `lang` fuera de {es,en}, o `pillar` no-vacío fuera
+   de {construir-con-ia, agentes-en-produccion, arquitectura, seguridad}.
+   `pillar` ausente o `""` es VÁLIDO (el post no tiene pilar asignado; NO
+   respondas 422 en ese caso) — el estilo de las imágenes se infiere de
+   `tags`/`title` en su lugar.
 3. **Gemini texto** (modelo tipo `gemini-2.5-flash`): a partir de
    `title/description/content/pillar`, redactar los prompts de imagen:
    1 para la cover + hasta `maxInlineImages` para secciones. Pedir salida
@@ -48,9 +55,9 @@ slug/title/content, lang fuera de {es,en}, pillar fuera de
 4. **Loop por imagen → Nano Banana** (modelo de imagen de Gemini, p.ej.
    `gemini-2.5-flash-image`): generar. Si una imagen falla, continuar con
    las demás (Continue On Fail) — nunca abortar el workflow entero.
-5. **Subida por imagen**: `POST https://www.ochoajorge.me/api/upload?pathname=posts/{{slug}}/{{file}}`
+5. **Subida por imagen**: `POST https://www.ochoajorge.me/api/upload?pathname=posts/<slug>/<file>`
    con header `Authorization: Bearer {UPLOAD_SECRET}` y el binario como
-   body. `{file}` = `cover.png` / `inline-1.png` / `inline-2.png` /
+   body. `<file>` = `cover.png` / `inline-1.png` / `inline-2.png` /
    `inline-3.png`. Guardar el campo `url` de la respuesta.
 6. **Respond to Webhook**: montar el JSON del contrato con las imágenes
    que sobrevivieron.
