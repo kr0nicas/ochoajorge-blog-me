@@ -3,6 +3,7 @@ import type { PillarDef } from "@/lib/pillars";
 import { getPostsByPillar } from "@/lib/posts";
 import { PostCard } from "@/components/blog/PostCard";
 import { slugify } from "@/lib/utils";
+import { getReactionCounts } from "@/lib/reactions";
 
 interface PillarLandingProps {
     lang: "es" | "en";
@@ -10,8 +11,12 @@ interface PillarLandingProps {
 }
 
 /** Landing page of one section: pain intro + its posts + related series. */
-export function PillarLanding({ lang, pillar }: PillarLandingProps) {
+export async function PillarLanding({ lang, pillar }: PillarLandingProps) {
     const posts = getPostsByPillar(pillar.id, lang);
+    const reactionCounts = await getReactionCounts(
+        lang,
+        posts.map((post) => post.slug)
+    );
     const isSpanish = lang === "es";
 
     // Series with 2+ posts inside this section
@@ -45,7 +50,7 @@ export function PillarLanding({ lang, pillar }: PillarLandingProps) {
                 <ul className="mt-10 grid gap-5 sm:grid-cols-2" role="list">
                     {posts.map((post) => (
                         <li key={post.slug}>
-                            <PostCard post={post} lang={lang} />
+                            <PostCard post={post} lang={lang} reactions={reactionCounts[post.slug]} />
                         </li>
                     ))}
                 </ul>

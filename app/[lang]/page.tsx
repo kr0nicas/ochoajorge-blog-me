@@ -15,11 +15,14 @@ import { NewsletterForm } from "@/components/shared/NewsletterForm";
 import { formatDate, siteConfig } from "@/lib/utils";
 import { getDictionary, Locale } from "@/lib/dictionary";
 import { TopicHighlights } from "@/components/blog/TopicHighlights";
+import { getReactionCounts } from "@/lib/reactions";
 
 export const metadata: Metadata = {
   title: siteConfig.title,
   description: siteConfig.description,
 };
+
+export const revalidate = 60;
 
 export default async function HomePage({
   params,
@@ -34,6 +37,10 @@ export default async function HomePage({
   const recentPosts = allPosts
     .filter((post) => post.slug !== heroPost?.slug)
     .slice(0, 6);
+  const reactionCounts = await getReactionCounts(
+    lang,
+    recentPosts.map((post) => post.slug)
+  );
   const tagCounts = allPosts.reduce<Record<string, number>>((acc, post) => {
     post.tags.forEach((tag) => {
       const normalized = tag.toLowerCase();
@@ -152,7 +159,7 @@ export default async function HomePage({
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {recentPosts.map((post, i) => (
               <AnimatedSection key={post.slug} delay={i * 0.06}>
-                <PostCard post={post} lang={lang} />
+                <PostCard post={post} lang={lang} reactions={reactionCounts[post.slug]} />
               </AnimatedSection>
             ))}
           </div>

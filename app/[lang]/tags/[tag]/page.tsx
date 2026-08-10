@@ -3,6 +3,9 @@ import { notFound } from "next/navigation";
 import { getPostsByTag, getAllTags, getAllPosts } from "@/lib/posts";
 import { PostCard } from "@/components/blog/PostCard";
 import { Tag } from "@/components/shared/Tag";
+import { getReactionCounts } from "@/lib/reactions";
+
+export const revalidate = 60;
 
 interface TagPageProps {
     params: Promise<{ tag: string; lang: string }>;
@@ -41,6 +44,11 @@ export default async function TagPage({ params }: TagPageProps) {
 
     if (posts.length === 0) notFound();
 
+    const reactionCounts = await getReactionCounts(
+        lang,
+        posts.map((post) => post.slug)
+    );
+
     // Build a map of tag → post count for the sidebar
     const tagCounts: Record<string, number> = {};
     for (const t of allTags) {
@@ -71,7 +79,7 @@ export default async function TagPage({ params }: TagPageProps) {
                     <ul className="grid gap-5 sm:grid-cols-2" role="list">
                         {posts.map((post) => (
                             <li key={post.slug}>
-                                <PostCard post={post} lang={lang} />
+                                <PostCard post={post} lang={lang} reactions={reactionCounts[post.slug]} />
                             </li>
                         ))}
                     </ul>

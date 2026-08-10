@@ -5,6 +5,9 @@ import { PostCard } from "@/components/blog/PostCard";
 import { Layers, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { slugify } from "@/lib/utils";
+import { getReactionCounts } from "@/lib/reactions";
+
+export const revalidate = 60;
 
 interface SeriesPageProps {
     params: Promise<{ slug: string; lang: string }>;
@@ -46,6 +49,10 @@ export default async function SeriesPage({ params }: SeriesPageProps) {
     if (!seriesName) notFound();
 
     const posts = getPostsBySeries(seriesName, lang);
+    const reactionCounts = await getReactionCounts(
+        lang,
+        posts.map((post) => post.slug)
+    );
     const isSpanish = lang === "es";
 
     return (
@@ -106,7 +113,7 @@ export default async function SeriesPage({ params }: SeriesPageProps) {
 
                         {/* Post content */}
                         <div className="flex-1 pb-12">
-                            <PostCard post={post} lang={lang} />
+                            <PostCard post={post} lang={lang} reactions={reactionCounts[post.slug]} />
                         </div>
                     </div>
                 ))}
