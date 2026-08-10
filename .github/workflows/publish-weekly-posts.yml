@@ -53,12 +53,14 @@ jobs:
 
       - name: Flip draft to false
         if: steps.slug.outputs.slug != ''
+        env:
+          SLUG: ${{ steps.slug.outputs.slug }}
         run: |
-          FILE="content/posts/es/${{ steps.slug.outputs.slug }}.mdx"
+          FILE="content/posts/es/${SLUG}.mdx"
           if [ ! -f "$FILE" ]; then echo "File not found: $FILE"; exit 1; fi
-          python3 - <<'PY'
+          python3 - "$FILE" <<'PY'
           import re, sys
-          f = "content/posts/es/" + sys.argv[1] + ".mdx"
+          f = sys.argv[1]
           s = open(f, encoding="utf-8").read()
           s2 = re.sub(r'(^draft:\s*)true', r'\1false', s, count=1, flags=re.M)
           if s == s2:
@@ -71,14 +73,22 @@ jobs:
         if: steps.slug.outputs.slug != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SLUG: ${{ steps.slug.outputs.slug }}
         run: |
-          BR="content/publish-${{ steps.slug.outputs.slug }}"
+          # El post ya podía estar en draft: false (publicado a mano, o un re-run del
+          # mismo cron). Sin este guard, `git commit` sin nada staged sale 1 y el job
+          # queda en rojo por algo que en realidad ya está hecho.
+          if git diff --quiet; then
+            echo "Sin cambios que publicar — el post ya estaba en draft: false."
+            exit 0
+          fi
+          BR="content/publish-${SLUG}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$BR"
           git add -A
-          git commit -m "content(posts): publish ${{ steps.slug.outputs.slug }}"
+          git commit -m "content(posts): publish ${SLUG}"
           git push -u origin "$BR"
-          gh pr create --base develop --title "content(posts): publish ${{ steps.slug.outputs.slug }}" \
+          gh pr create --base develop --title "content(posts): publish ${SLUG}" \
             --body "Publicación programada del post de la semana del 2026-08-10. Cambia \`draft: true\` → \`draft: false\`. Generado por el workflow de contenido semanal." \
             --label "content"

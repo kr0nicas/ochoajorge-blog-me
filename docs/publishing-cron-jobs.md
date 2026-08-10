@@ -55,12 +55,34 @@
 
 También se puede disparar manualmente (`workflow_dispatch`) pasando el slug del post.
 
+## Requisito previo: el workflow tiene que vivir en la rama por defecto
+
+**GitHub Actions solo dispara los triggers `schedule` desde la rama por defecto del
+repositorio** — aquí `main`. Un workflow que solo existe en una rama de feature o en
+`develop` no genera ninguna ejecución programada: no falla, simplemente nunca corre.
+Lo mismo aplica a `workflow_dispatch`, que solo aparece en la UI si el fichero está en
+la rama por defecto.
+
+Consecuencia para este batch: los crons del 11, 13 y 15 de agosto **no existirán** hasta
+que `.github/workflows/publish-weekly-posts.yml` esté mergeado en `main`. La cadena
+completa es:
+
+```
+content/agentes-produccion-2026-08  →  PR a develop  →  PR de develop a main
+```
+
+Ese segundo PR es un deploy a producción según las reglas doradas de `AGENTS.md`, así
+que solo se abre cuando Jorge lo pida. Mientras el workflow no esté en `main`, la
+publicación de cada post hay que hacerla a mano: flipear `draft: true` → `false` en una
+rama `content/<slug>` y abrir el PR a `develop`.
+
 ## Quality gates cumplidos
 
 - ✅ Todos los posts tienen frontmatter completo (title, description, date, tags, pillar, lang, draft, series, canonical, resources)
 - ✅ Descripciones de 150-160 caracteres exactos (154 / 152 / 155)
 - ✅ Tags en español, kebab-case
-- ✅ `seo:audit` pasa (41 posts, sin warnings en los nuevos)
+- ✅ `seo:audit es` pasa (34 posts, 1 warning y es de otro post: falta ogImage en
+  `construir-software-seguro-con-llms-el-frontier-de-agosto-2026`)
 - ✅ Build de Next.js limpio
 - ✅ Posts asignados a series con `part` correcto (Construyendo con IA 9; Arquitectura 13, 14)
 - ✅ `draft: true` hasta aprobación
@@ -82,3 +104,5 @@ También se puede disparar manualmente (`workflow_dispatch`) pasando el slug del
   (PR de `develop` → `main`).
 - Si un post aún no está aprobado para su fecha, se puede desactivar el cron editando
   el workflow o usar `workflow_dispatch` más tarde con el slug.
+- La label `content` que usa `gh pr create --label` tiene que existir en el repo, o el
+  paso falla después de haber pusheado la rama. Creada el 2026-08-10.
