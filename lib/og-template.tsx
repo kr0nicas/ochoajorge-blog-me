@@ -42,9 +42,13 @@ export async function renderOgImage({ title, pillar, readingTime, hue: hueOverri
         try {
             const res = await fetch(coverUrl, { signal: AbortSignal.timeout(5000) });
             const type = res.headers.get("content-type") ?? "";
-            if (res.ok && type.startsWith("image/")) {
+            const MAX_COVER_BYTES = 3 * 1024 * 1024;
+            const declaredLength = Number(res.headers.get("content-length") ?? 0);
+            if (res.ok && type.startsWith("image/") && declaredLength <= MAX_COVER_BYTES) {
                 const buffer = Buffer.from(await res.arrayBuffer());
-                coverSrc = `data:${type};base64,${buffer.toString("base64")}`;
+                if (buffer.byteLength <= MAX_COVER_BYTES) {
+                    coverSrc = `data:${type};base64,${buffer.toString("base64")}`;
+                }
             }
         } catch {
             // cover unavailable — render the classic template
