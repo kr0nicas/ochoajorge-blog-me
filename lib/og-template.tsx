@@ -26,6 +26,8 @@ interface OgOptions {
     readingTime?: number;
     /** Fixed glow hue; falls back to a deterministic hash of `pillar` */
     hue?: "blue" | "orange";
+    /** Generated cover art (Vercel Blob URL) layered behind the right panel */
+    coverUrl?: string;
 }
 
 /**
@@ -33,8 +35,25 @@ interface OgOptions {
  * (blue or orange alternating by pillar), mono kicker `// pillar`,
  * Space Grotesk title, ochoajorge.me brand mark.
  */
-export async function renderOgImage({ title, pillar, readingTime, hue: hueOverride }: OgOptions) {
+export async function renderOgImage({ title, pillar, readingTime, hue: hueOverride, coverUrl }: OgOptions) {
     const { spaceGrotesk, jetbrainsMono } = await loadOgFonts();
+    let coverSrc: string | null = null;
+    if (coverUrl) {
+        try {
+            const res = await fetch(coverUrl, { signal: AbortSignal.timeout(5000) });
+            const type = res.headers.get("content-type") ?? "";
+            const MAX_COVER_BYTES = 3 * 1024 * 1024;
+            const declaredLength = Number(res.headers.get("content-length") ?? 0);
+            if (res.ok && type.startsWith("image/") && declaredLength <= MAX_COVER_BYTES) {
+                const buffer = Buffer.from(await res.arrayBuffer());
+                if (buffer.byteLength <= MAX_COVER_BYTES) {
+                    coverSrc = `data:${type};base64,${buffer.toString("base64")}`;
+                }
+            }
+        } catch {
+            // cover unavailable — render the classic template
+        }
+    }
     const hue = hueOverride ?? pillarHue(pillar);
     const glow =
         hue === "blue"
@@ -75,6 +94,35 @@ export async function renderOgImage({ title, pillar, readingTime, hue: hueOverri
                         backgroundSize: "56px 56px",
                     }}
                 />
+
+                {/* Cover art panel — right 40%, fading into the base background */}
+                {coverSrc ? (
+                    <div
+                        style={{
+                            position: "absolute",
+                            top: 0,
+                            right: 0,
+                            width: "480px",
+                            height: "100%",
+                            display: "flex",
+                        }}
+                    >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                            src={coverSrc}
+                            alt=""
+                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        />
+                        <div
+                            style={{
+                                position: "absolute",
+                                inset: 0,
+                                background:
+                                    "linear-gradient(90deg, #0c0c0d 0%, rgba(12,12,13,0.72) 30%, rgba(12,12,13,0.18) 100%)",
+                            }}
+                        />
+                    </div>
+                ) : null}
 
                 {/* Radial glow — blue or orange by pillar */}
                 <div
@@ -125,7 +173,7 @@ export async function renderOgImage({ title, pillar, readingTime, hue: hueOverri
                         lineHeight: 1.08,
                         letterSpacing: "-0.02em",
                         color: "#fafafa",
-                        maxWidth: "980px",
+                        maxWidth: coverSrc ? "660px" : "980px",
                     }}
                 >
                     {displayTitle}
