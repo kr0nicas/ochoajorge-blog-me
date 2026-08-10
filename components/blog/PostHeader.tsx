@@ -3,6 +3,7 @@ import { Calendar, Clock, ArrowLeft } from "lucide-react";
 import type { Post } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 import { PILLARS } from "@/lib/pillars";
+import { ReactionButton } from "@/components/blog/ReactionButton";
 
 interface PostHeaderProps {
     post: Post;
@@ -86,6 +87,7 @@ export function PostHeader({ post, lang }: PostHeaderProps) {
                         {post.readingTime} {isSpanish ? "min de lectura" : "min read"}
                     </span>
                 )}
+                <ReactionButton slug={post.slug} lang={lang} />
             </div>
         </header>
     );

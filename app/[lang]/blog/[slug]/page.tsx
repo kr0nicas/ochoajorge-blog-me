@@ -13,6 +13,7 @@ import { Comments } from "@/components/blog/Comments";
 import { ReferencePanel } from "@/components/blog/ReferencePanel";
 import { CitationButton } from "@/components/blog/CitationButton";
 import { ShareButton } from "@/components/blog/ShareButton";
+import { NewsletterForm } from "@/components/shared/NewsletterForm";
 import { Github } from "lucide-react";
 import { slugify } from "@/lib/utils";
 import { BlogPostingJsonLd, PersonJsonLd, OrganizationJsonLd } from "@/components/seo/JsonLd";
@@ -191,6 +192,24 @@ export default async function PostPage({ params }: PostPageProps) {
 
                             {/* Related Posts */}
                             <RelatedPosts currentPost={post} lang={lang} />
+
+                            {/* Newsletter — compact */}
+                            <section className="mt-16 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-6">
+                                <p className="mb-1 font-mono text-sm text-[var(--brand)]">
+                                    {"// newsletter"}
+                                </p>
+                                <h2 className="font-display text-xl font-bold text-[var(--text-primary)]">
+                                    {isSpanish
+                                        ? "¿Te sirvió este artículo?"
+                                        : "Was this article useful?"}
+                                </h2>
+                                <p className="mt-1 mb-4 text-sm text-[var(--text-secondary)]">
+                                    {isSpanish
+                                        ? "Recibe los siguientes en tu inbox. Sin spam, cancela cuando quieras."
+                                        : "Get the next ones in your inbox. No spam, unsubscribe anytime."}
+                                </p>
+                                <NewsletterForm lang={lang} variant="compact" />
+                            </section>
 
                             {/* Discussion */}
                             <Comments lang={lang} />
