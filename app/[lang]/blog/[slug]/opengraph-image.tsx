@@ -14,12 +14,13 @@ interface Props {
 /** Dynamic OG image for blog posts — kicker and glow hue come from the post's pillar. */
 export default async function Image({ params }: Props) {
     const { slug, lang } = await params;
+    const locale = lang === "es" ? "es" : "en";
     const post = getPostBySlug(slug, lang);
     const pillarDef = post?.pillar ? PILLARS[post.pillar] : null;
 
     return renderOgImage({
         title: post?.title ?? "Blog Post",
-        pillar: pillarDef?.id ?? post?.tags?.[0] ?? "blog",
+        pillar: pillarDef?.name[locale] ?? post?.tags?.[0] ?? "blog",
         hue: pillarDef?.hue,
         readingTime: post?.readingTime,
     });

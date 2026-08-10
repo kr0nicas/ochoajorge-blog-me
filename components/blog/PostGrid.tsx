@@ -59,7 +59,7 @@ export function PostGrid({
         {visiblePosts.map((post, index) => (
           <li key={post.slug}>
             <AnimatedSection delay={(index % 6) * 0.08}>
-              <PostCard post={post} lang={lang} />
+              <PostCard post={post} lang={lang} priority={index < 2} />
             </AnimatedSection>
           </li>
         ))}

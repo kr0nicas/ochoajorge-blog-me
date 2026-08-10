@@ -149,7 +149,7 @@ export default async function HomePage({
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {recentPosts.map((post, i) => (
               <AnimatedSection key={post.slug} delay={i * 0.06}>
-                <PostCard post={post} lang={lang} priority={i < 3} />
+                <PostCard post={post} lang={lang} />
               </AnimatedSection>
             ))}
           </div>
