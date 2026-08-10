@@ -38,7 +38,7 @@ export default async function HomePage({
     .filter((post) => post.slug !== heroPost?.slug)
     .slice(0, 6);
   const reactionCounts = await getReactionCounts(
-    lang,
+    locale,
     recentPosts.map((post) => post.slug)
   );
   const tagCounts = allPosts.reduce<Record<string, number>>((acc, post) => {

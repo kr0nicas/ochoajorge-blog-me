@@ -72,6 +72,7 @@ export async function POST(
 		return NextResponse.json({ error: "reactions_disabled" }, { status: 503 });
 	}
 
+	// Vercel overwrites x-forwarded-for at the edge; behind other proxies this header is client-spoofable.
 	const ip =
 		request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "127.0.0.1";
 

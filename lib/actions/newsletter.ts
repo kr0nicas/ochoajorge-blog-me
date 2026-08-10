@@ -2,8 +2,6 @@
 
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 // Resend Audience ID — set in .env.local and Vercel env
 const AUDIENCE_ID = process.env.RESEND_AUDIENCE_ID ?? "";
 
@@ -45,8 +43,9 @@ export async function subscribeToNewsletter(
         };
     }
 
-    try {
+    const resend = new Resend(process.env.RESEND_API_KEY);
 
+    try {
         await resend.contacts.create({
             email,
             audienceId: AUDIENCE_ID,
