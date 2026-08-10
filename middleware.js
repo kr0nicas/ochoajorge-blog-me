@@ -18,12 +18,15 @@ export function middleware(request) {
     const url = request.nextUrl.clone();
     url.pathname = `/${locale}${pathname}`;
 
-    // URL transformation for localized routes
-    return NextResponse.redirect(url);
+    // 308 (permanent) so search engines consolidate signals onto the localized
+    // URL instead of treating /es as a temporary destination.
+    return NextResponse.redirect(url, 308);
 }
 
 export const config = {
     matcher: [
-        "/((?!api|_next|favicon.ico|feed.xml|icon.png|og.png|opengraph-image|robots.txt|sitemap.xml).*)",
+        // Locale-agnostic files must be excluded here, or the middleware prefixes
+        // them with /es and they 404. llms.txt was missing and did exactly that.
+        "/((?!api|_next|favicon.ico|feed.xml|icon.png|llms.txt|og.png|opengraph-image|robots.txt|sitemap.xml).*)",
     ],
 };

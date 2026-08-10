@@ -99,6 +99,6 @@ Con Clean Architecture, MCP, y patrones de producción probados, puedes innovar 
 La clave: arquitectura disciplinada + observabilidad + patrones de producción.
 
 13/13
-🔗 Análisis completo: https://ochoajorge.me/es/blog/innova-ia-integrar-agentes-arquitecturas-enterprise-sin-romper-stack
+🔗 Análisis completo: https://www.ochoajorge.me/es/blog/innova-ia-integrar-agentes-arquitecturas-enterprise-sin-romper-stack
 
 #Arquitectura #AgentesIA #MCP #Go #Kubernetes #CleanArchitecture

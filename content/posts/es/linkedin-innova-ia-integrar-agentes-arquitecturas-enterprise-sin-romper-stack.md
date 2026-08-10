@@ -94,6 +94,6 @@ Integrar agentes IA en arquitecturas enterprise no requiere romper tu stack. Con
 
 La clave: arquitectura disciplinada + observabilidad + patrones de producción.
 
-Leer el análisis completo: https://ochoajorge.me/es/blog/innova-ia-integrar-agentes-arquitecturas-enterprise-sin-romper-stack
+Leer el análisis completo: https://www.ochoajorge.me/es/blog/innova-ia-integrar-agentes-arquitecturas-enterprise-sin-romper-stack
 
 #Arquitectura #AgentesIA #MCP #Go #Kubernetes #CleanArchitecture

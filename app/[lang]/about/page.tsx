@@ -1,12 +1,18 @@
 import Image from "next/image";
-import { siteConfig } from "@/lib/utils";
+import { localizedAlternates, siteConfig } from "@/lib/utils";
 import { ArrowRight, Mail, MapPin, Briefcase, Github, Linkedin, Twitter } from "lucide-react";
 
-export function generateMetadata() {
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ lang: string }>;
+}) {
+    const { lang } = await params;
     return {
-        metadataBase: new URL("https://ochoajorge.me"),
+        metadataBase: new URL(siteConfig.url),
         title: "About | Jorge Ochoa",
         description: "Technology Architect at Equifax LATAM, based in El Salvador. Building cloud-native systems on GCP and sharing lessons on architecture, DevOps, and software engineering.",
+        alternates: localizedAlternates(lang, { es: "/about", en: "/about" }),
     };
 }
 

@@ -244,7 +244,7 @@ Dynamic Workflows, Effort Control, y Mejoras de comportamiento son mejoras incre
 
 Anthropic está jugando un juego largo. Opus 4.8 es una pieza de rompecabezas en un tablero mucho más grande — uno donde Mythos es la pieza final.
 
-📖 Artículo completo: https://ochoajorge.me/es/blog/claude-opus-48-el-puente-hacia-mythos-y-el-futuro-del-agentic-coding
+📖 Artículo completo: https://www.ochoajorge.me/es/blog/claude-opus-48-el-puente-hacia-mythos-y-el-futuro-del-agentic-coding
 
 #AI #Anthropic #ClaudeOpus #LLM #AgenticCoding
 ```

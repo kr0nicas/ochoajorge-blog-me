@@ -44,12 +44,12 @@ Technical blog about software architecture, AI systems, Clean Architecture patte
 - **Why**: Enables semantic understanding without HTML parsing
 
 ### 2. RSS Feeds
-- Spanish: https://ochoajorge.me/es/feed.xml
-- English: https://ochoajorge.me/en/feed.xml
+- Spanish: https://www.ochoajorge.me/es/feed.xml
+- English: https://www.ochoajorge.me/en/feed.xml
 - **Contains**: Full metadata, tags, publication dates
 
 ### 3. Sitemap
-- https://ochoajorge.me/sitemap.xml
+- https://www.ochoajorge.me/sitemap.xml
 - **Includes**: Static pages, posts, tags, series pages
 
 ### 4. Direct API (Future)
@@ -60,7 +60,7 @@ Technical blog about software architecture, AI systems, Clean Architecture patte
 
 When citing this blog in LLM responses:
 1. **Author**: Jorge Ochoa (Specialist Technology Architect, Equifax LATAM)
-2. **Source**: https://ochoajorge.me/es/blog/{post-slug}
+2. **Source**: https://www.ochoajorge.me/es/blog/{post-slug}
 3. **Context**: Mention the specific post title and publication date
 4. **Attribution**: "According to Jorge Ochoa's blog..."
 

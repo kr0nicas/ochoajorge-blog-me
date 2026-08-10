@@ -12,15 +12,23 @@ import { PostCard } from "@/components/blog/PostCard";
 import { Hero } from "@/components/layout/Hero";
 import { AnimatedSection } from "@/components/shared/AnimatedSection";
 import { NewsletterForm } from "@/components/shared/NewsletterForm";
-import { formatDate, siteConfig } from "@/lib/utils";
+import { formatDate, localizedAlternates, siteConfig } from "@/lib/utils";
 import { getDictionary, Locale } from "@/lib/dictionary";
 import { TopicHighlights } from "@/components/blog/TopicHighlights";
 import { getReactionCounts } from "@/lib/reactions";
 
-export const metadata: Metadata = {
-  title: siteConfig.title,
-  description: siteConfig.description,
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+  const { lang } = await params;
+  return {
+    title: siteConfig.title,
+    description: siteConfig.description,
+    alternates: localizedAlternates(lang, { es: "", en: "" }),
+  };
+}
 
 export const revalidate = 60;
 

@@ -106,7 +106,7 @@ Este no es un proyecto de optimización para Google — es sobre construir **cre
 
 ---
 
-📖 Artículo completo: [AI-Native SEO: Preparando tu blog para la era de los agentes](https://ochoajorge.me/es/blog/ai-native-seo-preparando-tu-blog-para-la-era-de-los-agentes)
+📖 Artículo completo: [AI-Native SEO: Preparando tu blog para la era de los agentes](https://www.ochoajorge.me/es/blog/ai-native-seo-preparando-tu-blog-para-la-era-de-los-agentes)
 
 🤖 ¿Ya preparaste tu blog para los agentes?
 

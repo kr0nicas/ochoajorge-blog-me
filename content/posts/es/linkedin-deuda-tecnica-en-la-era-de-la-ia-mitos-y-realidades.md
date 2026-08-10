@@ -161,7 +161,7 @@ La clave no es evitar la IA, es usarla con consciousness. Documentación, review
 
 ¿Has visto deuda técnica creada por IA en tu códigobase? ¿Cómo la manejas?
 
-Leer el análisis completo: https://ochoajorge.me/es/blog/deuda-tecnica-en-la-era-de-la-ia-mitos-y-realidades
+Leer el análisis completo: https://www.ochoajorge.me/es/blog/deuda-tecnica-en-la-era-de-la-ia-mitos-y-realidades
 
 ---
 

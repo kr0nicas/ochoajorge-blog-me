@@ -144,6 +144,6 @@ Monitorabilidad de sistemas multi-agente requiere observabilidad de primera clas
 
 Con OpenTelemetry, metrics por agent, structured logging, y alerts específicos, puedes diagnosticar y resolver problemas en minutos en lugar de horas.
 
-🔗 Análisis completo: https://ochoajorge.me/es/blog/innova-ia-produccion-monitorabilidad-observabilidad-sistemas-multi-agente
+🔗 Análisis completo: https://www.ochoajorge.me/es/blog/innova-ia-produccion-monitorabilidad-observabilidad-sistemas-multi-agente
 
 #Observabilidad #OpenTelemetry #GCP #MultiAgent #InnovaIA #DevOps
