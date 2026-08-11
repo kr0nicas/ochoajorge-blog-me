@@ -65,22 +65,21 @@ phase_verify      # limpieza de caché zsh + resumen final
 
 El refactor dejó `install.sh` en **123 líneas** (hoy son 150, porque los presets vinieron después), con ocho fases distribuidas en diez archivos de `lib/`. Ninguno de los dos dieces que puedes contar cuadra con ese ocho, y cada uno tiene su explicación. Los diez archivos son las ocho fases más `common.sh` y `menu.sh`, que no son fases sino los helpers y los menús que las demás usan. Las diez líneas de invocación de arriba son ocho fases de las que dos tienen dos ramas: `phase_packages` y `phase_packages_if_possible` son la misma fase con y sin permisos, y lo mismo pasa con `phase_symlinks` y `phase_symlinks_agent`.
 
-<FileTree title="lib/ — ocho fases en diez archivos">
-{`
-  install.sh  [highlight]
-  lib/
-    common.sh
-    detect.sh
-    packages.sh
-    runtimes.sh
-    binaries.sh
-    editors.sh
-    symlinks.sh
-    repo.sh
-    verify.sh
-    menu.sh
-`}
-</FileTree>
+```text
+~/dotfiles/
+├── install.sh          # orquestador: flags, presets, orden de las fases
+└── lib/
+    ├── common.sh       # logging, checksums, banner
+    ├── menu.sh         # ayuda, menús, detección de update
+    ├── detect.sh       # SO, arquitectura, dependencias
+    ├── packages.sh     # brew bundle / apt
+    ├── runtimes.sh     # fnm+Node, fzf, starship, zoxide, uv
+    ├── binaries.sh     # GitHub Releases + checksums (Linux)
+    ├── editors.sh      # tmux/TPM, Neovim/lazy.nvim, Claude Code
+    ├── symlinks.sh     # symlinks, un grupo por destino
+    ├── repo.sh         # hooks de git (core.hooksPath)
+    └── verify.sh       # caché zsh + resumen final
+```
 
 La prueba de que el corte estaba en el sitio correcto no es estética, es que habilitó algo que antes era imposible: `lib/symlinks.test.sh` corre 27 tests **sin tocar el `$HOME` de nadie**, en una décima de segundo, en cualquier máquina. Eso solo puede hacerse cuando la fase es una función aislada cuyas entradas son explícitas. Mientras la lógica vivía incrustada en el flujo del script, sus entradas eran «el estado del sistema entero», y eso no se puede fingir en un test.
 
