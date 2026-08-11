@@ -73,7 +73,7 @@ agrupa como series distintas.
 ```yaml
 # Parte 2
 title: "Dotfiles cross-platform: un instalador con cinco presets"
-date: "2026-08-10"
+date: "2026-08-11"
 pillar: "construir-con-ia"
 tags: ["devex-tools", "automatizacion", "sre"]
 series:
@@ -82,7 +82,7 @@ series:
 
 # Parte 3
 title: "Dotfiles con CI: hooks, CHANGELOG generado y datos que no mienten"
-date: "2026-08-13"
+date: "2026-08-14"
 pillar: "construir-con-ia"
 tags: ["devex-tools", "automatizacion", "ingenieria-software"]
 series:
@@ -90,10 +90,13 @@ series:
   part: 3
 ```
 
-Fechas escalonadas para que las dos partes no compitan en el feed. `lib/posts.ts`
-filtra por `draft`, no por fecha futura: si las dos partes se publican en el
-mismo PR, la Parte 3 aparece igual el día 10 con fecha del 13. Para que la fecha
-sea cierta, la Parte 3 va en su propio PR el día que se publique.
+Publicación escalonada, decidida por el autor: la Parte 2 sale hoy (2026-08-11) y
+la Parte 3 tres días después (2026-08-14).
+
+`lib/posts.ts` filtra por `draft`, no por fecha futura: si las dos partes fueran
+en el mismo PR, la Parte 3 aparecería el día 11 con fecha del 14. Por eso **cada
+parte va en su propio PR**, y el de la Parte 3 se abre el día que le toca. Hasta
+entonces su MDX puede existir en rama, pero no se mergea.
 
 `agentes-ia` **no** entra en los tags de la Parte 2 pese a la sección del preset
 `--agent`: el post trata de instalar entornos, y ese tag lo mezclaría con los 31
