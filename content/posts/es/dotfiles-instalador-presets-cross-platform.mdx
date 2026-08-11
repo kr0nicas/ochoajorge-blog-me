@@ -21,7 +21,7 @@ resources:
 
 Ese consejo aguanta exactamente hasta la primera máquina que no es tu laptop.
 
-Seis meses y 350 commits después, el repositorio se parece bastante poco a un puñado de configuraciones. Tiene un instalador partido en fases, presets que deciden qué se instala según dónde se está instalando, verificación de integridad de los binarios que descarga y un CI que monta el entorno entero en un contenedor limpio para comprobar que la instalación no miente. Nada de eso estaba planificado: cada pieza apareció el día que algo se rompió en una máquina distinta a la mía.
+Cinco meses y medio y 350 commits después, el repositorio se parece bastante poco a un puñado de configuraciones. Tiene un instalador partido en fases, presets que deciden qué se instala según dónde se está instalando, verificación de integridad de los binarios que descarga y un CI que monta el entorno entero en un contenedor limpio para comprobar que la instalación no miente. Nada de eso estaba planificado: cada pieza apareció el día que algo se rompió en una máquina distinta a la mía.
 
 De ahí sale la tesis de este post, y la digo entera antes de justificarla: **en cuanto tus dotfiles tocan más de una máquina, dejan de ser configuración y pasan a ser software — con las obligaciones que eso trae.**
 
@@ -31,7 +31,7 @@ El instalador llegó a **1.012 líneas en un solo archivo**. No es un defecto mo
 
 El síntoma real, además, no es la longitud: un archivo largo pero legible es un inconveniente, no un problema. El problema es que **no se puede probar nada por separado**. Para comprobar que la creación de symlinks funcionaba había que ejecutar el instalador entero: detectar el sistema, instalar paquetes, descargar binarios, configurar editores. Diez minutos y una máquina sacrificada para verificar una función de veinte líneas. Con ese coste, la respuesta racional es no verificarla, y esa es la decisión que un instalador de mil líneas te empuja a tomar todos los días.
 
-El corte que acabé haciendo es de una sola frase: `install.sh` decide **qué** se hace y **en qué orden**; `lib/` sabe **cómo** se hace. Una fase por archivo. El instalador dejó de ser un procedimiento y pasó a ser un índice de contenidos.
+El corte que acabé haciendo es de una sola frase: `install.sh` decide **qué** se hace y **en qué orden**; `lib/` sabe **cómo** se hace. Casi un archivo por fase. El instalador dejó de ser un procedimiento y pasó a ser un índice de contenidos.
 
 ```bash
 # --- Fases, en orden ------------------------------------------------------------
@@ -65,7 +65,7 @@ phase_verify      # limpieza de caché zsh + resumen final
 
 El refactor dejó `install.sh` en **123 líneas** (hoy son 150, porque los presets vinieron después), con ocho fases distribuidas en diez archivos de `lib/`. La aritmética no cuadra a la primera y merece una aclaración: hay diez líneas de invocación arriba porque dos fases tienen dos ramas cada una — `phase_packages` y `phase_packages_if_possible` son la misma fase con y sin permisos, y lo mismo pasa con `phase_symlinks` y `phase_symlinks_agent`.
 
-<FileTree title="lib/ — una fase por archivo">
+<FileTree title="lib/ — ocho fases en diez archivos">
 {`
   install.sh  [highlight]
   lib/
@@ -82,7 +82,7 @@ El refactor dejó `install.sh` en **123 líneas** (hoy son 150, porque los prese
 `}
 </FileTree>
 
-La prueba de que el corte estaba en el sitio correcto no es estética, es que habilitó algo que antes era imposible: `lib/symlinks.test.sh` corre 27 tests **sin tocar el `$HOME` de nadie**, en dos segundos, en cualquier máquina. Eso solo puede hacerse cuando la fase es una función aislada cuyas entradas son explícitas. Mientras la lógica vivía incrustada en el flujo del script, sus entradas eran «el estado del sistema entero», y eso no se puede fingir en un test.
+La prueba de que el corte estaba en el sitio correcto no es estética, es que habilitó algo que antes era imposible: `lib/symlinks.test.sh` corre 27 tests **sin tocar el `$HOME` de nadie**, en una décima de segundo, en cualquier máquina. Eso solo puede hacerse cuando la fase es una función aislada cuyas entradas son explícitas. Mientras la lógica vivía incrustada en el flujo del script, sus entradas eran «el estado del sistema entero», y eso no se puede fingir en un test.
 
 ## Cinco presets: decide la máquina, no tú
 
@@ -93,14 +93,15 @@ Ese supuesto se rompe el día que clonas el repo en otro sitio. Un VPS no tiene 
 La respuesta a esto no puede ser un `if` suelto por herramienta, porque los `if` sueltos no componen: acabas con quince condiciones que nadie puede razonar en conjunto. Lo que compone son **módulos**. Cuatro, en este caso: `base`, `cloud`, `k8s` y `gui`. Y entonces los presets dejan de ser listas de herramientas y pasan a ser algo mucho más pequeño: un preset no elige herramientas, enciende módulos.
 
 <ComparisonTable
-  headers={["Preset", "base", "cloud", "k8s", "gui"]}
-  rows={[
+  headers='["Preset", "base", "cloud", "k8s", "gui"]'
+  highlight="-1"
+  rows='[
     ["--minimal", "ON", "OFF", "OFF", "OFF"],
     ["--container", "ON", "OFF", "OFF", "OFF"],
     ["--vps", "ON", "ON", "OFF", "OFF"],
     ["--k8s-node", "ON", "ON", "ON", "OFF"],
-    ["--agent", "ON", "ON", "ON", "OFF"],
-  ]}
+    ["--agent", "ON", "ON", "ON", "OFF"]
+  ]'
 />
 
 Una fila de esa tabla es idéntica a otra y no es un error: `--minimal` y `--container` encienden exactamente los mismos módulos. Se diferencian en la intención de quien los escribe y en el mensaje que emiten, no en lo que instalan. Lo digo aquí porque un lector atento buscaría la diferencia hasta encontrarla, y no la hay.
@@ -119,13 +120,13 @@ En esa caja no se renderiza nunca el prompt de starship, porque no hay prompt. N
 
 De ahí se sigue una conclusión incómoda: instalar el entorno completo en una máquina donde va a trabajar un agente es gastar la instalación —minutos, ancho de banda, disco— en configuración que nadie va a leer. El agente no es un usuario degradado. Es un usuario **distinto**, con otra superficie de contacto con el sistema.
 
-Así que `--agent` instala lo que ese usuario sí usa: herramientas de línea de comandos, hooks de git y `~/.claude` (settings, statusline, CLAUDE.md). Y no instala nada interactivo. No es una versión recortada por ahorrar, es la lista correcta para ese destino.
+Así que `--agent` no toca lo que ese usuario no puede usar, y el recorte es más quirúrgico de lo que suena: sigue instalando las herramientas de línea de comandos —fnm y Node, fzf, starship, zoxide, uv, los binarios de SRE—, porque un agente las invoca por su nombre y no le hace falta un prompt para eso. Lo que se salta son exactamente tres cosas: `phase_editors` entera (tmux, Neovim y sus gestores de plugins), todos los symlinks salvo el bloque de `~/.claude`, y la instalación de paquetes degrada en lugar de fallar cuando no hay root. No es una versión recortada por ahorrar, es la lista correcta para ese destino.
 
 <Callout type="note">
 Tu entorno de desarrollo ya tiene dos usuarios. Solo uno de los dos ve los colores.
 </Callout>
 
-El giro está en qué queda cuando quitas la decoración. Lo que sobrevive son las reglas: los hooks que rechazan un mensaje de commit inservible, los que impiden un commit directo a `main`, los que comprueban que la documentación sigue el paso del código. Un agente que trabaja en tu repositorio necesita precisamente eso, y por las mismas razones por las que [la disciplina de desarrollo con Claude Code](/es/blog/agentic-saas-b2b-disciplina-de-desarrollo-con-claude-code) importa más que el prompt: las restricciones que se ejecutan valen más que las instrucciones que se leen. De eso trata la tercera parte de esta serie.
+El giro está en qué queda cuando quitas la decoración. Lo que sobrevive son las reglas, repartidas en dos capas: los hooks locales, que rechazan un mensaje de commit inservible al escribirlo y bloquean el push a `main` en `pre-push`; y el CI, que es donde vive el resto, incluido el job que falla cuando el CHANGELOG deja de seguir el paso del código. Un agente que trabaja en tu repositorio necesita precisamente eso, y por las mismas razones por las que [la disciplina de desarrollo con Claude Code](/es/blog/agentic-saas-b2b-disciplina-de-desarrollo-con-claude-code) importa más que el prompt: las restricciones que se ejecutan valen más que las instrucciones que se leen. De eso trata la tercera parte de esta serie.
 
 ## "No coincide" no es lo mismo que "no pude comprobar"
 
