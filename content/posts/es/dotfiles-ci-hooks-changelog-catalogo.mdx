@@ -29,7 +29,9 @@ En [la parte anterior](/es/blog/dotfiles-instalador-presets-cross-platform) el p
 
 ## Tres puertas, y qué pasa cuando falta la herramienta
 
-El arnés son tres hooks, y cada uno está donde está por su coste. `commit-msg` valida el mensaje: es instantáneo y se paga en cada commit. `pre-commit` linta lo que está en el índice y barre secretos: cuesta unos segundos. `pre-push` corre las suites completas y bloquea `main`: es el único que se puede permitir tardar, porque empujas mucho menos de lo que commiteas.
+El arnés son tres hooks, y cada uno está donde está por su coste. `commit-msg` valida el mensaje: es instantáneo y se paga en cada commit. `pre-commit` linta lo que está en el índice y barre secretos: cuesta unos segundos. `pre-push` bloquea `main` y corre **dos** suites —la de `gcx` y la de los propios hooks, 115 tests de los 231—: es el único que se puede permitir tardar, porque empujas mucho menos de lo que commiteas.
+
+Que corra dos y no las ocho es deliberado. Las suites completas son trabajo del CI, que tiene todo el tiempo del mundo; el hook solo ejecuta las dos que cubren lo que más se toca y lo que sostiene el propio arnés. Un `pre-push` que tarda demasiado no se hace más riguroso: se salta.
 
 El detalle que decide si el arnés sobrevive está en el segundo. `pre-commit` despacha **por extensión y sobre el índice**, no sobre el repo entero. Un commit que toca un `.zsh` corre `zsh -n` sobre ese archivo y nada más. Lintar todo el repo en cada commit es la vía rápida a que alguien —tú, dentro de dos semanas— añada `--no-verify` a su muscle memory, y a partir de ahí el arnés no existe.
 
@@ -46,11 +48,11 @@ fi
 
 La razón es el caso de uso del repo. Estos dotfiles se clonan en cajas que no tienen nada: un VPS recién creado, un contenedor mínimo. Un hook que exige herramientas rompe exactamente el escenario para el que existe el repo, y lo rompe en el peor momento, cuando estás intentando dejar utilizable una máquina ajena.
 
-La degradación tiene un límite, y está trazado a propósito: **el formato del commit y el barrido de secretos no degradan nunca**. Los dos solo necesitan bash. El barrido de secretos incluso falla cerrado si `grep` no está disponible, porque un `if` sobre un comando inexistente devuelve 127 y se lee como falso: la comprobación se convertiría en un no-op silencioso. Un mensaje mal escrito se arregla con un `rebase`. Un secreto que se cuela no se arregla después.
+La degradación tiene un límite, y está trazado a propósito: **el formato del commit y el barrido de secretos no degradan nunca**. Los dos se apoyan solo en bash y en las utilidades que siempre están —`grep`, `sed`—, nunca en nada que haya que instalar. El barrido de secretos incluso falla cerrado si `grep` no está disponible, porque un `if` sobre un comando inexistente devuelve 127 y se lee como falso: la comprobación se convertiría en un no-op silencioso. Un mensaje mal escrito se arregla con un `rebase`. Un secreto que se cuela no se arregla después.
 
 <ComparisonTable
   headers='["Hook", "Qué comprueba", "¿Degrada si falta la herramienta?"]'
-  rows='[["commit-msg", "Formato, tipo, ámbito, longitud", "No"], ["pre-commit", "Lint de lo staged", "Sí"], ["pre-commit", "Secretos (claves, tokens, .env)", "No"], ["pre-push", "Suites completas + guardia de main", "Parcial"]]'
+  rows='[["commit-msg", "Formato, tipo, ámbito, longitud", "No"], ["pre-commit", "Lint de lo staged", "Sí"], ["pre-commit", "Secretos (claves, tokens, .env)", "No"], ["pre-push", "Guardia de main + 2 suites (115 tests)", "Parcial"]]'
   highlight="-1"
 />
 
@@ -72,9 +74,13 @@ El problema de un repo con un solo mantenedor es que la receta habitual no aplic
 
 La configuración que resuelve eso cabe en una línea: `required_approving_review_count: 0`. **Exige PR, no exige revisor.** El PR es donde corre el CI, donde queda el contexto del cambio y donde el bloqueo tiene sentido; la aprobación era el trámite, no la garantía. Separar las dos cosas es lo que permite que un repo de una persona tenga protección real sin quedarse esperando a nadie.
 
-`enforce_admins: false` es igual de deliberado. A las tres de la mañana arreglando un VPS hay que poder saltárselo, y el bypass queda registrado en el audit log de GitHub, que era la trazabilidad que se pedía desde el principio.
+Lo otro que hay que decir es `enforce_admins: true`, y conviene entender qué significa de verdad: **no hay válvula remota.** Siendo yo el único admin del repo, la protección se me aplica igual que a cualquiera. No existe el push de madrugada que GitHub deja pasar porque quien empuja tiene permisos.
 
-La postura completa cabe en una frase: **un arnés sin salida de emergencia se desactiva entero el primer día que estorba.** Es preferible un bypass explícito y registrado que un `--no-verify` instalado en el muscle memory de todo el mundo, porque el primero deja rastro y el segundo se vuelve invisible.
+La única salida de emergencia real es `--no-verify`, y es puramente local: desactiva los hooks de mi máquina y no toca GitHub. Para saltarse GitHub hay que entrar a la configuración, desactivar la protección de `main` a mano y volver a activarla después. Eso no es un atajo: es un acto deliberado, con varios pasos y visible en la configuración del repo, que es justo lo que uno quiere que sea un rompecristales.
+
+**Un arnés sin salida de emergencia se desactiva entero el primer día que estorba** — pero la salida no tiene por qué estar en todas partes. Aquí la válvula existe en local y no existe en remoto, y esa asimetría es en sí misma la decisión: lo que se puede saltar es lo que solo afecta a mi copia; lo que queda escrito para siempre en `main`, no.
+
+Y aquí viene la parte incómoda. Este mismo post afirmaba `enforce_admins: false`, con su justificación de las tres de la mañana y su apunte sobre el audit log, porque lo copié del spec de diseño del repo. Al comprobarlo contra la API antes de publicar, la configuración real decía `true`: el spec llevaba meses documentando una decisión que la configuración había dejado de reflejar. Es exactamente la tesis de este post cazándome a mí mientras lo escribía.
 
 Queda `required_linear_history: false`, que parece cosmético y no lo es: se usa `--no-ff` porque los merge commits son lo que hace posible agrupar el historial por feature. Esa decisión es la que sostiene la sección siguiente.
 
