@@ -1,0 +1,175 @@
+---
+title: "Dotfiles con CI: hooks, CHANGELOG generado y datos que no mienten"
+description: "Hooks de git, un CI que reusa el hook, un CHANGELOG generado y un catálogo derivado del repo: cómo hacer que las reglas de tus dotfiles se cumplan solas."
+date: "2026-08-14"
+pillar: "construir-con-ia"
+tags: ["devex-tools", "automatizacion", "ingenieria-software"]
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Dotfiles como software de producción"
+  part: 3
+resources:
+  - label: "kr0nicas/dotfiles — GitHub"
+    url: "https://github.com/kr0nicas/dotfiles"
+  - label: "El escaparate del repo"
+    url: "https://kr0nicas.github.io/dotfiles/"
+---
+
+El repo ya tenía CI. Tenía specs escritos antes de cada cambio, suites de tests y una convención de commits que yo respetaba casi siempre. «Casi siempre» resultó ser el detalle importante.
+
+Porque al mirar el historial, los mensajes que rompían la convención no eran despistes ocasionales: eran 45 commits idénticos, con la misma forma, y **los generaba el propio repo**. La función que usaba para guardar rápido era un alias que hacía `git add .`, componía un mensaje del tipo «Update dots» con la fecha del día y empujaba directo a `main`. Tres reglas violadas en una línea, y la línea la había escrito yo para ahorrarme trabajo.
+
+La ironía se sostiene sola: la herramienta de guardar rápido era exactamente la que contaminaba el historial. No porque nadie supiera la convención, sino porque la convención vivía en mi cabeza y el atajo vivía en el shell.
+
+Una convención que vive en la costumbre no es una regla; es una intención. La diferencia entre las dos es si algo la hace cumplir cuando tienes prisa. Y con tus propios dotfiles siempre tienes prisa, porque nunca son la tarea: son lo que te interrumpe la tarea.
+
+En [la parte anterior](/es/blog/dotfiles-instalador-presets-cross-platform) el problema era el instalador. Este post va del arnés que hace que las reglas se cumplan solas, y de las tres piezas del repo que se niegan a mentir.
+
+## Tres puertas, y qué pasa cuando falta la herramienta
+
+El arnés son tres hooks, y cada uno está donde está por su coste. `commit-msg` valida el mensaje: es instantáneo y se paga en cada commit. `pre-commit` linta lo que está en el índice y barre secretos: cuesta unos segundos. `pre-push` corre las suites completas y bloquea `main`: es el único que se puede permitir tardar, porque empujas mucho menos de lo que commiteas.
+
+El detalle que decide si el arnés sobrevive está en el segundo. `pre-commit` despacha **por extensión y sobre el índice**, no sobre el repo entero. Un commit que toca un `.zsh` corre `zsh -n` sobre ese archivo y nada más. Lintar todo el repo en cada commit es la vía rápida a que alguien —tú, dentro de dos semanas— añada `--no-verify` a su muscle memory, y a partir de ahí el arnés no existe.
+
+Pero la decisión más interesante es otra: **la degradación deliberada**. Si `shellcheck` no está instalado, el hook avisa y deja pasar.
+
+```bash
+if has shellcheck; then
+    shellcheck -x -S info "$f" \
+        || { hook_err "shellcheck falló: $f"; rc=1; }
+else
+    hook_warn "shellcheck no está instalado; no se analizó $f"
+fi
+```
+
+La razón es el caso de uso del repo. Estos dotfiles se clonan en cajas que no tienen nada: un VPS recién creado, un contenedor mínimo. Un hook que exige herramientas rompe exactamente el escenario para el que existe el repo, y lo rompe en el peor momento, cuando estás intentando dejar utilizable una máquina ajena.
+
+La degradación tiene un límite, y está trazado a propósito: **el formato del commit y el barrido de secretos no degradan nunca**. Los dos solo necesitan bash. El barrido de secretos incluso falla cerrado si `grep` no está disponible, porque un `if` sobre un comando inexistente devuelve 127 y se lee como falso: la comprobación se convertiría en un no-op silencioso. Un mensaje mal escrito se arregla con un `rebase`. Un secreto que se cuela no se arregla después.
+
+<ComparisonTable
+  headers='["Hook", "Qué comprueba", "¿Degrada si falta la herramienta?"]'
+  rows='[["commit-msg", "Formato, tipo, ámbito, longitud", "No"], ["pre-commit", "Lint de lo staged", "Sí"], ["pre-commit", "Secretos (claves, tokens, .env)", "No"], ["pre-push", "Suites completas + guardia de main", "Parcial"]]'
+  highlight="-1"
+/>
+
+Y un último detalle que parece burocrático y no lo es: el ámbito del commit se valida contra una lista cerrada en `scopes.txt`. Sin ella, `gcp` y `gcloud` acaban conviviendo como dos ámbitos distintos para la misma cosa, y la agrupación del CHANGELOG deja de significar nada. Lo que hace que la lista funcione es que el mensaje de error **dice en qué archivo añadir uno nuevo**. Si ampliar la lista cuesta más que saltarse la regla, la gente se salta la regla. Siempre.
+
+## El CI reusa el hook, no una copia
+
+El job `commit-lint` recorre los commits del PR y pasa cada mensaje por `.githooks/commit-msg`. No es una reimplementación con la misma regex: es literalmente el mismo archivo, invocado con `bash`. Dos copias de una regla divergen; la única pregunta abierta es cuándo.
+
+Aun así, el mismo archivo no garantiza el mismo resultado, y eso cuesta una tarde entender. En bash, `${#subject}` cuenta **caracteres o bytes según el locale**. Medido en este repo: 68 frente a 73 para la misma cadena con acentos. Sin fijar `LC_ALL` en el job, el límite de 72 significa cosas distintas en tu máquina y en el runner, y acabas con un commit que pasa en local y falla en CI sin que nada parezca haber cambiado. La línea que lo arregla es `LC_ALL: C.UTF-8` y no se le nota el trabajo que dio.
+
+El otro ajuste del CI que merece la pena es el nivel de `shellcheck`: corre a `info`, no a `warning`. El motivo es concreto y documentado en el propio workflow. Una variable mal escrita es SC2153, que shellcheck clasifica como *info*. A nivel `warning` pasaba entera — y así `github-topics-manager.sh` leyó `VALID_TOPIPS` donde el array se llamaba `VALID_TOPICS`, mandando `{"names":[""]}` a la API de GitHub desde su primer commit, con este job en verde todo el tiempo.
+
+La generalización vale para cualquier linter: **el nivel por defecto es una decisión que alguien tomó por ti, no una ley de la naturaleza**. Está calibrado para no molestar en el proyecto medio, no para proteger el tuyo. Vale la pena mirar una vez qué deja pasar.
+
+## main protegida sin bloquearte
+
+El problema de un repo con un solo mantenedor es que la receta habitual no aplica: exigir revisión es imposible cuando no hay revisor. Y sin exigir nada, `main` está abierta y el arnés local es lo único que queda entre tú y un push a las tres de la mañana.
+
+La configuración que resuelve eso cabe en una línea: `required_approving_review_count: 0`. **Exige PR, no exige revisor.** El PR es donde corre el CI, donde queda el contexto del cambio y donde el bloqueo tiene sentido; la aprobación era el trámite, no la garantía. Separar las dos cosas es lo que permite que un repo de una persona tenga protección real sin quedarse esperando a nadie.
+
+`enforce_admins: false` es igual de deliberado. A las tres de la mañana arreglando un VPS hay que poder saltárselo, y el bypass queda registrado en el audit log de GitHub, que era la trazabilidad que se pedía desde el principio.
+
+La postura completa cabe en una frase: **un arnés sin salida de emergencia se desactiva entero el primer día que estorba.** Es preferible un bypass explícito y registrado que un `--no-verify` instalado en el muscle memory de todo el mundo, porque el primero deja rastro y el segundo se vuelve invisible.
+
+Queda `required_linear_history: false`, que parece cosmético y no lo es: se usa `--no-ff` porque los merge commits son lo que hace posible agrupar el historial por feature. Esa decisión es la que sostiene la sección siguiente.
+
+## Un CHANGELOG que no se escribe
+
+`CHANGELOG.md` es un archivo generado desde el historial de git. No se edita a mano, y un job de CI —`changelog-drift`— falla si el archivo commiteado difiere de lo que el script produce hoy.
+
+La unidad de agrupación es la feature, no el commit suelto. `git log --first-parent` sobre `main` da los merge commits, y dentro de cada uno el rango `<merge>^1..<merge>^2` lista los commits reales de esa rama. El resultado se lee como el trabajo que hiciste, no como un volcado de SHAs.
+
+La parte que de verdad merece un post es la trampa que aparece en cuanto lo intentas: **la regresión infinita**.
+
+<Callout type="danger" title="El archivo insatisfacible">
+El commit que regenera el CHANGELOG entraría en su propio listado, con su propio SHA — así que al regenerar el archivo volvería a diferir. Y amendar ese commit cambia el SHA, con lo que vuelve a diferir. El job no puede pasar jamás.
+</Callout>
+
+La solución es excluir del listado los commits que solo tocan `CHANGELOG.md`, y el comentario que la explica es tan parte del código como la función:
+
+```bash
+# solo_changelog <sha> -> 0 si el commit toca únicamente CHANGELOG.md
+#
+# Estos commits se excluyen del listado, y no es cosmético: sin la exclusión el
+# archivo es INSATISFACIBLE. El commit que regenera el CHANGELOG entraría en su
+# propio listado con su propio SHA, así que al regenerar volvería a diferir;
+# amendarlo cambia el SHA y vuelve a diferir. Regresión infinita, y el job
+# changelog-drift no podría pasar jamás. Verificado empíricamente.
+solo_changelog() {
+    local tocados
+    tocados="$(git show --name-only --format= "$1" 2>/dev/null | sed '/^$/d')"
+    [ "$tocados" = "CHANGELOG.md" ]
+}
+```
+
+Su corolario de flujo es que regenerar va **siempre en su propio commit**, que no toca nada más. Deja de ser una preferencia estilística y pasa a ser un requisito del sistema.
+
+La misma clase de trampa aparece una segunda vez, en un sitio que no esperas: la fecha de cada sección sale del último commit del rango, **nunca de `date`**. Con la fecha de hoy, el archivo cambiaría solo por pasar la medianoche y el CI empezaría a fallar sin que nadie hubiera tocado una línea. Por la misma razón el encabezado usa el nombre de rama y no el número de PR: antes del merge ese número no existe, y el texto cambiaría al integrar.
+
+Los tres son el mismo fallo. **Un artefacto generado tiene que ser función pura del repo.** Cualquier entrada externa —la hora, la rama en la que estás, el número de PR, el locale del runner— lo vuelve insatisfacible, y lo descubres tarde, cuando el CI se pone rojo sin diff que lo explique.
+
+## El catálogo que no puede mentir
+
+El repo publica un escaparate en GitHub Pages que deja navegar las herramientas que instala. El problema es evidente en cuanto lo escribes: un catálogo a mano se desincroniza al primer `brew` nuevo, y a partir de ahí documenta un repo que ya no existe.
+
+<Steps>
+<Step title="Extraer">
+Un extractor lee los Brewfiles, los binarios de `lib/binaries.sh` y la lista apt de `lib/packages.sh`. Nombre, módulo y plataforma salen del repo.
+</Step>
+<Step title="Generar">
+La salida es un `tools.generated.json` versionado y con serialización estable: mismo repo, mismo byte. Hoy son 187 entradas y 5 presets.
+</Step>
+<Step title="Curar">
+Encima va una capa a mano con lo único que una máquina no puede saber: descripción, categoría de presentación y URL. Son 134 fichas.
+</Step>
+</Steps>
+
+Lo que se teclea es solo la prosa. Y la guardia que une las dos capas es **bidireccional**: una herramienta en el repo sin ficha es un error, y una ficha de algo que el repo ya no instala también lo es. Corre en el `npm run build` y en el workflow del PR.
+
+Con eso parecería resuelto, pero queda **el riesgo que casi nadie ve**: el extractor es regex sobre bash. Si alguien reescribe la forma de esas arrays, el parser deja de casar — y «no la veo» no produce ningún error. La guardia bidireccional seguiría contenta, porque compararía el JSON generado contra una extracción igual de mutilada. Publicaría un catálogo a medias con el CI en verde.
+
+La red para eso es un **conteo mínimo por fuente**:
+
+```js
+export const MINIMOS = {
+  'Brewfile': 55,
+  'Brewfile.cloud': 7,
+  'Brewfile.k8s': 11,
+  'Brewfile.gui': 24,
+  'lib/binaries.sh': 23,
+  'lib/packages.sh': 20,
+}
+```
+
+Si aparecen 12 binarios donde el repo declara 31, el build falla en vez de publicar. Están calibrados al ~75% del recuento real y no pegados al valor, y esa distancia es la parte pensada: lo que tienen que cazar es que el parser deje de casar —eso tumba el conteo a la mitad o a cero—, no que retires una herramienta a propósito. Un suelo pegado convierte cada retirada legítima en un build rojo, y una guardia con falsos positivos es una guardia que alguien acaba bajando sin mirar.
+
+De ahí la regla explícita, escrita en el propio archivo: bajar estos mínimos para poner verde un build rojo **es desactivar la guardia**. Se suben al añadir herramientas y solo se bajan a mano, en el mismo commit que retira la herramienta y explicando por qué.
+
+Cierra el conjunto un detalle de fontanería. El workflow del sitio dispara también en `Brewfile*`, `lib/binaries.sh`, `lib/packages.sh` e `install.sh`, no solo en `web/**`. Tocar un Brewfile sin regenerar el catálogo rompe el CI **en el PR**, que es el único momento en que enterarse sirve de algo.
+
+## El mismo principio, tres veces
+
+La pieza propia del repo, `gcx`, nació de un fallo pequeño y muy ilustrativo. Tres aliases activaban una configuración de `gcloud` y después imprimían con `echo` la cuenta asociada, escrita a mano en el propio alias:
+
+```bash
+alias gcpers='gcloud config configurations activate personal && echo "→ personal (ochoa.j@gmail.com)"'
+```
+
+Las cuentas cambiaron. El `echo` no. El mensaje seguía informando con total confianza de un estado que ya no era el real, y era imposible notarlo: la confirmación se veía correcta precisamente cuando mentía.
+
+La reescritura no añadió funciones. Quitó el `echo`. Ahora `gcx use` activa la configuración y después le pregunta a `gcloud` qué cuenta y qué proyecto están activos, y eso es lo que imprime. Si algo cambia por fuera, el mensaje cambia con ello.
+
+El CHANGELOG, el catálogo y `gcx` son **la misma regla aplicada tres veces**: estado leído, nunca hardcodeado. Lo que se escribe a mano se desincroniza, y no es una posibilidad remota: es el comportamiento por defecto de cualquier dato duplicado. La única variable es **cuándo te enteras**. Las tres piezas de este post existen para que te enteres en el PR y no en producción.
+
+## ¿Hace falta todo esto para tener dotfiles?
+
+No. Y conviene decirlo sin adornos: para tener dotfiles basta con un repo que contenga tu `.zshrc` y un symlink. [La parte 1 de esta serie](/es/blog/dotfiles-el-secreto-para-ser-productivo-en-tu-entorno-de-desarrollo) sigue siendo el consejo correcto para empezar, y el 90% del valor está ahí.
+
+Todo esto hace falta para otra cosa: para que sigan siendo **verdad** dentro de seis meses. La documentación que nadie regenera miente. El catálogo escrito a mano miente. El mensaje con el `echo` hardcodeado miente. Y ninguno de los tres avisa; simplemente dejan de coincidir con la realidad mientras siguen pareciendo correctos.
+
+El estado actual, medido: 231 tests —183 de shell y 48 del sitio—, tres hooks, cuatro jobs de CI, 134 fichas de catálogo y un escaparate que se regenera solo. Si quieres verlo por dentro, el [repo](https://github.com/kr0nicas/dotfiles) y el [escaparate](https://kr0nicas.github.io/dotfiles/) están abiertos, y la [parte 2](/es/blog/dotfiles-instalador-presets-cross-platform) cuenta cómo el instalador llegó hasta aquí.
