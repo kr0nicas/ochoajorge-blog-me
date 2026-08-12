@@ -18,6 +18,11 @@ export function slugify(text: string): string {
         .toString()
         .toLowerCase()
         .trim()
+        // Decompose accented chars and drop the combining marks, so "producción"
+        // becomes "produccion" and not "produccin". Without this, the [^\w-]
+        // strip below deletes the accented letter itself.
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
         .replace(/\s+/g, "-")
         .replace(/[^\w-]+/g, "")
         .replace(/--+/g, "-");
