@@ -48,7 +48,7 @@ fi
 
 La razón es el caso de uso del repo. Estos dotfiles se clonan en cajas que no tienen nada: un VPS recién creado, un contenedor mínimo. Un hook que exige herramientas rompe exactamente el escenario para el que existe el repo, y lo rompe en el peor momento, cuando estás intentando dejar utilizable una máquina ajena.
 
-La degradación tiene un límite, y está trazado a propósito: **el formato del commit y el barrido de secretos no degradan nunca**. Los dos se apoyan solo en bash y en las utilidades que siempre están —`grep`, `sed`—, nunca en nada que haya que instalar. El barrido de secretos incluso falla cerrado si `grep` no está disponible, porque un `if` sobre un comando inexistente devuelve 127 y se lee como falso: la comprobación se convertiría en un no-op silencioso. Un mensaje mal escrito se arregla con un `rebase`. Un secreto que se cuela no se arregla después.
+La degradación tiene un límite, y está trazado a propósito: **el formato del commit y el barrido de secretos no degradan nunca**. Los dos se apoyan solo en bash y en las utilidades que trae cualquier caja —`grep`, `sed`, `head`—, nunca en nada que haya que instalar. Y el barrido de secretos, además, falla cerrado: comprueba explícitamente que `grep` exista antes de usarlo y aborta si no está, en vez de dejar que un `if` sobre un comando inexistente devuelva 127, se lea como falso y convierta la comprobación en un no-op silencioso. Un mensaje mal escrito se arregla con un `rebase`. Un secreto que se cuela no se arregla después.
 
 <ComparisonTable
   headers='["Hook", "Qué comprueba", "¿Degrada si falta la herramienta?"]'
@@ -80,7 +80,7 @@ La única salida de emergencia real es `--no-verify`, y es puramente local: desa
 
 **Un arnés sin salida de emergencia se desactiva entero el primer día que estorba** — pero la salida no tiene por qué estar en todas partes. Aquí la válvula existe en local y no existe en remoto, y esa asimetría es en sí misma la decisión: lo que se puede saltar es lo que solo afecta a mi copia; lo que queda escrito para siempre en `main`, no.
 
-Y aquí viene la parte incómoda. Este mismo post afirmaba `enforce_admins: false`, con su justificación de las tres de la mañana y su apunte sobre el audit log, porque lo copié del spec de diseño del repo. Al comprobarlo contra la API antes de publicar, la configuración real decía `true`: el spec llevaba meses documentando una decisión que la configuración había dejado de reflejar. Es exactamente la tesis de este post cazándome a mí mientras lo escribía.
+Y aquí viene la parte incómoda. Este mismo post afirmaba `enforce_admins: false`, con su justificación de las tres de la mañana y su apunte sobre el audit log, porque lo copié del spec de diseño del repo. Al comprobarlo contra la API antes de publicar, la configuración real decía `true`. Y el detalle que lo empeora: el plan de implementación del arnés, del 8 de agosto, contiene el `gh api -X PUT` que dejó `enforce_admins` en `false`, con su paso de verificación marcado como comprobado. El spec no nació desfasado — fue cierto, y después la configuración cambió sin que nadie tocara el documento. Cuatro días bastaron. Es exactamente la tesis de este post cazándome a mí mientras lo escribía.
 
 Queda `required_linear_history: false`, que parece cosmético y no lo es: se usa `--no-ff` porque los merge commits son lo que hace posible agrupar el historial por feature. Esa decisión es la que sostiene la sección siguiente.
 
