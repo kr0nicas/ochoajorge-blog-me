@@ -27,6 +27,9 @@ El cliente canónico es `npm run post:images -- <slug> [es|en]`
 }
 ```
 
+- `maxInlineImages` ausente → 3; presente y no-entero o negativo → `422`;
+  mayor que 3 → se recorta a 3.
+
 ## Response 200 (síncrona; el cliente espera hasta 5 min)
 
 ```json
@@ -50,8 +53,8 @@ El cliente canónico es `npm run post:images -- <slug> [es|en]`
 
 | Código | Cuándo |
 |---|---|
-| `401` | `x-webhook-secret` ausente o inválido |
-| `422` | payload inválido: falta `slug`/`title`/`content`, `lang` ∉ {es,en}, o `pillar` no-vacío ∉ {construir-con-ia, agentes-en-produccion, arquitectura, seguridad} (`pillar` ausente o `""` es VÁLIDO — el post no tiene pilar asignado y el estilo se infiere de tags/título) |
+| `401/403` | `x-webhook-secret` ausente o inválido (el 403 con cuerpo propio de n8n viene de su Header Auth nativa; el cliente trata cualquier no-200 igual) |
+| `422` | payload inválido: falta `slug`/`title`/`content`, `slug` que no case `^[a-z0-9]+(-[a-z0-9]+)*$` (la misma regla que el pathname de `api/upload`), `lang` ∉ {es,en}, o `pillar` no-vacío ∉ {construir-con-ia, agentes-en-produccion, arquitectura, seguridad} (`pillar` ausente o `""` es VÁLIDO — el post no tiene pilar asignado y el estilo se infiere de tags/título) |
 | `5xx` | fallo total upstream (Gemini caído, Blob caído) |
 
 Ante cualquier no-200 el cliente publica sin imágenes. No hay reintentos.
