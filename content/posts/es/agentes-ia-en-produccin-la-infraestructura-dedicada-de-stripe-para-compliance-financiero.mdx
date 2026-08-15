@@ -6,7 +6,7 @@ pillar: "agentes-en-produccion"
 canonical: "https://ochoajorge.me/es/blog/agentes-ia-en-produccin-la-infraestructura-dedicada-de-stripe-para-compliance-financiero"
 tags: ["agentes-ia", "produccion", "infraestructura", "compliance", "observabilidad"]
 lang: "es"
-draft: true
+draft: false
 featured: false
 series:
   name: "Construyendo con IA: Lo que nadie te dice"
@@ -16,6 +16,8 @@ resources:
     url: "https://aws.amazon.com/blogs/machine-learning/production-grade-ai-agents-for-financial-compliance-lessons-from-stripe/"
   - label: "Amazon Bedrock"
     url: "https://aws.amazon.com/bedrock/"
+coverImage: "https://6pxof7rpjdk6gkca.public.blob.vercel-storage.com/posts/agentes-ia-en-produccin-la-infraestructura-dedicada-de-stripe-para-compliance-financiero/cover.png"
+coverImageAlt: "Una imagen abstracta de una red digital compleja, con una entidad central robusta que emite numerosas conexiones luminosas hacia formas geométricas más pequeñas, representando orquestación y escala."
 ---
 
 # Agentes IA en Producción: La Infraestructura Dedicada de Stripe para Compliance Financiero
@@ -26,6 +28,8 @@ resources:
 > layer, distinto del de los modelos de ML tradicionales.
 
 ## El contexto: compliance a escala planetaria
+
+![Una composición panorámica de islas de piedra oscura fragmentadas, representando sistemas o fuentes de datos separadas por abismos luminosos. Una entidad metálica dominante, que representa un analista, se esfuerza por conectar estas islas con delicados zarcillos de luz, simbolizando la dificultad de consolidar información.](https://6pxof7rpjdk6gkca.public.blob.vercel-storage.com/posts/agentes-ia-en-produccin-la-infraestructura-dedicada-de-stripe-para-compliance-financiero/inline-1.png)
 
 Stripe procesa aproximadamente **USD 1.4 billones en volumen de pagos anual** across 50
 países, atendiendo a millones de empresas — incluyendo el 62% de la Fortune 500. Eso
@@ -39,6 +43,8 @@ reto no era "hacer un agente", era escalar compliance sin crecer headcount propo
 ni sacrificar auditabilidad.
 
 ## El insight que nadie te dice: los agentes no son modelos de ML
+
+![Una composición panorámica que compara dos entornos computacionales abstractos. A la izquierda, una rejilla densa y regular de cubos luminosos que representan procesamiento predecible y de alta capacidad. A la derecha, un paisaje orgánico con patrones de energía impredecibles y nodos intermitentemente activos, representando operaciones asíncronas y latencia variable.](https://6pxof7rpjdk6gkca.public.blob.vercel-storage.com/posts/agentes-ia-en-produccin-la-infraestructura-dedicada-de-stripe-para-compliance-financiero/inline-2.png)
 
 La lección central de la arquitectura de Stripe es que **un agente en producción tiene un
 perfil de recursos fundamentalmente distinto al de un sistema de inferencia
@@ -79,6 +85,8 @@ class AgentService:
    modelos con signals internos expuestos como agent tools.
 
 ## El control de costos que sí importa: prompt caching
+
+![Una composición panorámica de una ciudad digital abstracta con múltiples capas. La capa inferior muestra flujos rápidos de datos (tokens de entrada). La capa media contiene cachés geométricos que almacenan y reutilizan estos datos. La capa superior muestra flujos de datos optimizados que emergen de los cachés hacia un núcleo de procesamiento, simbolizando la reducción de costos mediante el caching.](https://6pxof7rpjdk6gkca.public.blob.vercel-storage.com/posts/agentes-ia-en-produccin-la-infraestructura-dedicada-de-stripe-para-compliance-financiero/inline-3.png)
 
 El workload de agentes está dominado por **input tokens** (contexto, historia,
 documentos). Stripe reutiliza los prefijos comunes de prompt entre turns del agente en

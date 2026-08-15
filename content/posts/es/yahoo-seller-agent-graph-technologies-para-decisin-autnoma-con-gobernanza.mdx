@@ -1,40 +1,194 @@
 ---
 title: "Yahoo Seller Agent: Graph Technologies para Decisión Autónoma con Gobernanza"
-description: "Descubre cómo Yahoo Seller Agent usa Knowledge Graph y Context Graph para mantener accountability en agentes que ejecutan budgets reales y decisiones autónomas."
+description: "Yahoo construyó su Seller Agent con dual-graph en Google Cloud: Spanner Graph para operativa y BigQuery como memoria auditable de cada decisión autónoma."
 date: "2026-07-12"
 pillar: "seguridad"
+canonical: "https://ochoajorge.me/es/blog/yahoo-seller-agent-graph-technologies-para-decisin-autnoma-con-gobernanza"
 tags: ["agentes-ia", "knowledge-graph", "gobernanza", "decision-autonoma", "arquitectura"]
 lang: "es"
-draft: true
+draft: false
 featured: false
-coverImage: "/og-images/yahoo-seller-agent-graph-technologies-para-decisin-autnoma-con-gobernanza.jpg"
+coverImage: "https://6pxof7rpjdk6gkca.public.blob.vercel-storage.com/posts/yahoo-seller-agent-graph-technologies-para-decisin-autnoma-con-gobernanza/cover.png"
+coverImageAlt: "Una intrincada red central de nodos y líneas, simbolizando un grafo de conocimiento, rodeada por capas geométricas que representan la gobernanza. La composición general es armoniosa, con luz que resalta las conexiones."
 series:
   name: "Arquitectura de Software Avanzada"
   part: 6
+resources:
+  - label: "Graph technologies underpin Yahoo system of action — Google Cloud Blog"
+    url: "https://cloud.google.com/blog/products/databases/graph-technologies-underpin-yahoo-system-of-action"
 ---
 
-## Problem
+# Yahoo Seller Agent: Graph Technologies para Decisión Autónoma con Gobernanza
 
-Describe the context and why this topic matters.
+> **Serie: Arquitectura de Software Avanzada — Parte 6.** Cuando un agente IA empieza
+> a mover dinero real — budgets de advertising, decisiones de pricing, selección de
+> audiencias — la inteligencia del modelo no es suficiente. Cada decisión necesita
+> estar grounded en hechos, governed por política y explicable después. Yahoo
+> construyó el blueprint con dos grafos.
 
-## Core Concept
+## El contexto: media buying a velocidad agéntica
 
-Break down the main idea.
+Yahoo opera una de las plataformas de digital media buying más grandes del mundo.
+Históricamente, una campaña premium requería **semanas de handoffs manuales**:
+spreadsheets分散, revisiones humanas, coordinación entre equipos. Yahoo quería
+colapsar eso en campañas live, fully governed, ejecutándose en **segundos**.
 
-## Implementation
+El desafío no era predecir. Era decidir — sobre audiencias, inventory, pricing,
+contracts, consent y policy — y poder explicar cada decisión después. Cuando un
+agente mueve dinero real, los reguladores exigen respuestas inmediatas sobre por qué
+se tomó una decisión y qué políticas se aplicaron. Escarbar logs después del hecho
+es la superficie de control equivocada para ejecución autónoma.
 
-Provide real-world, production-ready code examples.
+## El principio: Models reason. Graphs ground. Policy governs.
 
-```python
-# Example code
-def solve_problem():
-    pass
+La arquitectura detrás del Seller Agent descansa en tres capas con separación
+deliberada de responsabilidades:
+
+- **Modelos razonan** — Gemini Enterprise Agent Platform hostea modelos para
+  embeddings, forecasting y graph learnings.
+- **Grafos groundean** — dos grafos especializados dan operational truth y
+  auditable memory.
+- **Política gobierna** — las policies viven dentro del grafo como relaciones
+  versionadas, no enterradas en application logic.
+
+## La arquitectura dual-graph
+
+La decisión clave es **dos grafos con jobs separados**:
+
+### Knowledge Graph (Spanner Graph) — operational truth
+
+Modela el negocio de monetización como un modelo operacional conectado: productos
+advertising, placements, audience segments, inventory, contracts y governance
+controls son entidades y relaciones first-class. Las **políticas viven dentro del
+grafo** como relaciones versionadas, no en código de aplicación.
+
+Esto permite que un agente navegue desde los requisitos del buyer hasta audiencias
+elegibles y políticas gobernantess en **una sola traversada del grafo**. No hay
+saltos entre sistemas — la evaluación de productos, obligaciones contractuales,
+requisitos de consent y restricciones regulatorias ocurren juntas.
+
+```cypher
+// Patrón: de buyer brief a eligible audiences + governing policies en una query
+// (esquemático — Spanner Graph GQL)
+MATCH (b:BuyerRequest)-[:REQUIRES]->(a:Audience),
+      (a)-[:GOVERNED_BY]->(p:Policy),
+      (a)-[:AVAILABLE_IN]->(i:Inventory)
+WHERE p.consent_required = true AND i.status = 'active'
+RETURN a, p, i
 ```
 
-## Lessons Learned
+### Context Graph (BigQuery Graph) — auditable memory
 
-Summary of key takeaways.
+Cada vez que el Seller Agent toma una acción, ese span operacional se captura con
+el **BigQuery Agent Analytics plugin**. El sistema da forma a esa evidencia como un
+**context graph tipado y queryable** con la decision-trace ontology de Yahoo,
+almacenado en BigQuery Graph.
 
-## Conclusion
+Cada decision point, candidate package, policy evaluation, specialist-agent
+delegation y execution outcome se convierte en un **grafo conectado de evidencia**.
+Porque el trace es un grafo tipado, explicar el proceso de decisión del agente se
+  vuelve una simple query.
 
-Wrap up and point to related articles.
+> Un auditor puede trazar una decisión desde el campaign brief original hasta cada
+> score asignado y cada política aplicada — en una sola query.
+
+## El runtime: multi-agente en GKE
+
+El Seller Agent es un sistema **multi-agente** corriendo en Google Cloud:
+
+- Un **planning supervisor agent** en **Google Kubernetes Engine (GKE)**,
+  orquestado con el **Agent Development Kit (ADK)** de Google, descompone cada
+  request en tareas especializadas: inventory discovery, audience matching,
+  forecasting, pricing analysis, package recommendation, governance review y
+  execution.
+- Los agentes coordinan via el protocolo abierto **Agent2Agent (A2A)**.
+- **Gemini Enterprise Agent Platform** hostea los modelos para embeddings,
+  forecasting y graph learnings.
+- Un pipeline actúa sobre el knowledge graph mientras un loop paralelo captura
+  el razonamiento en el context graph y retroalimenta los outcomes como training
+  signal.
+
+```
+┌───────────────────────────────────────────────────────┐
+│  Buyer Request → Planning Supervisor (GKE + ADK)      │
+│    ├── Inventory Discovery Agent                      │
+│    ├── Audience Matching Agent                        │
+│    ├── Forecasting Agent                               │
+│    ├── Pricing Analysis Agent                          │
+│    ├── Package Recommendation Agent                    │
+│    ├── Governance Review Agent                         │
+│    └── Execution Agent                                 │
+│  Coordinación: Agent2Agent (A2A)                       │
+├───────────────────────────────────────────────────────┤
+│  Knowledge Graph (Spanner Graph) — operational truth  │
+│  Context Graph (BigQuery Graph) — auditable memory     │
+│  Gemini Enterprise Agent Platform — models             │
+└───────────────────────────────────────────────────────┘
+```
+
+## El flujo end-to-end
+
+1. **Knowledge retrieval** — el Seller Agent consulta el knowledge graph para
+   identificar inventory, audiencias, disponibilidad contractual, performance
+   histórico y políticas gobernantess.
+2. **Evaluation y scoring** — el agente evalúa factores juntos para ensamblar un
+   paquete de candidatos. Modelos de forecasting scorean las oportunidades mientras
+   un **governance agent** revisa independientemente consent, brand safety y
+   restricciones regulatorias.
+3. **Approval y execution** — el paquete se aprueba automáticamente bajo umbrales
+   de política o se escala a revisión humana. Una vez aprobado, el media buy se
+   ejecuta y activa.
+4. **Auditing y learning** — mientras la pipeline avanza, el loop paralelo captura
+   el razonamiento en el context graph, asegurando transparencia y mejorando ciclos
+   futuros.
+
+## Resultados
+
+- Procesos de multi-semanas colapsados a **ejecución en segundos**.
+- Campaigns fully governed con accountability regulatoria integrada en el workflow.
+- Explainability instantánea: explicar por qué se seleccionó un paquete o qué
+  políticas influyeron se resuelve con una query al context graph.
+- Closed-loop learning: los outcomes retroalimentan el sistema para ciclos
+  futuros.
+
+## Por qué importa más allá de advertising
+
+El patrón dual-graph es un **blueprint aplicable a cualquier industria con
+decisiones de alto riesgo**:
+
+- **Financial trading** — decisiones de inversión con audit trail regulatorio.
+- **Supply chain logistics** — asignación de inventory con policy enforcement.
+- **Telecom** — routing y pricing con gobernanza de contracts.
+- **Healthcare** — decisiones de tratamiento con trazabilidad de políticas.
+
+El principio arquitectónico es el mismo: groundea decisiones en business reality con
+un knowledge graph, construye memoria auditable con un context graph, y apóyate en
+protocolos abiertos.
+
+## Lecciones para arquitectos
+
+1. **El moat no es el modelo.** A medida que los foundation models se comoditizan,
+   la ventaja duradera es el grafo propietario de tus operaciones y tu historial
+   gobernado de decisiones — no el LLM que uses.
+2. **Dos grafos, dos jobs.** No mezcles operational truth con auditable memory. La
+   separación deliberada es lo que permite velocidad sin sacrificar accountability.
+3. **Las políticas viven en el grafo.** Enterrar policies en application logic hace
+   que la gobernanza sea opaca. Versionarlas como relaciones en el knowledge graph
+   las hace verificables en una traversada.
+4. **Speed sin explainability es liability.** Un agente rápido que no puede
+   explicar por qué actuó es un riesgo regulado, no una ventaja competitiva.
+5. **A2A es la capa de coordinación.** El protocolo Agent2Agent abierto evita el
+   lock-in a un solo vendor de agentes y permite especialización real.
+
+## Conclusión
+
+Yahoo construyó un sistema donde conocimiento, decisión, gobernanza, medición y
+aprendizaje operan juntos — permitiendo que el media buying autónomo sea
+explicable, auditable y continuamente mejorable. La frase que lo resume: **"Models
+reason. Graphs ground. Policy governs."** Ese es el baseline arquitectónico para
+cualquier sistema de acción autónomo en 2026.
+
+---
+
+*Fuente: Google Cloud Blog — "Graph technologies underpin Yahoo system of action".
+Quotes de Swapnil Patel (Yahoo) y Jeff Cheng (Google Cloud).*
