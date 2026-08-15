@@ -33,9 +33,12 @@ export async function POST(request: Request): Promise<NextResponse> {
         );
     }
 
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    // El store puede estar conectado por token clásico (BLOB_READ_WRITE_TOKEN)
+    // o por OIDC (BLOB_STORE_ID + token de runtime); con cualquiera de los dos
+    // el SDK sabe autenticarse solo.
+    if (!process.env.BLOB_READ_WRITE_TOKEN && !process.env.BLOB_STORE_ID) {
         return NextResponse.json(
-            { error: "Vercel Blob token not configured" },
+            { error: "Vercel Blob not configured" },
             { status: 500 }
         );
     }
