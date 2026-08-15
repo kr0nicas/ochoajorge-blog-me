@@ -6,7 +6,7 @@ pillar: "construir-con-ia"
 canonical: "https://ochoajorge.me/es/blog/agentes-de-ingeniera-autnomos-cmo-mondaycom-corre-morphex-en-produccin"
 tags: ["agentes-ia", "ingenieria-software", "automatizacion", "kubernetes", "observabilidad"]
 lang: "es"
-draft: true
+draft: false
 featured: false
 series:
   name: "Arquitectura de Software Avanzada"
@@ -16,6 +16,8 @@ resources:
     url: "https://aws.amazon.com/blogs/machine-learning/ai-teammates-how-monday-com-runs-production-ai-agents-on-amazon-bedrock/"
   - label: "Amazon EKS + KEDA"
     url: "https://keda.sh/"
+coverImage: "https://6pxof7rpjdk6gkca.public.blob.vercel-storage.com/posts/agentes-de-ingeniera-autnomos-cmo-mondaycom-corre-morphex-en-produccin/cover.png"
+coverImageAlt: "Una escena abstracta y conceptual que ilustra el despliegue de agentes de ingeniería autónomos en un complejo entorno de software empresarial. Formas geométricas que representan código, usuarios e infraestructura se entrelazan y fluyen. Enfocada en estructuras robustas e interconectadas que simbolizan fiabilidad y escalabilidad, sugiriendo un sistema dinámico donde los procesos automatizados se integran sin problemas."
 ---
 
 # Agentes de Ingeniería Autónomos: Cómo monday.com Corre Morphex en Producción
@@ -33,6 +35,8 @@ usuarios esperan que siga funcionando en el próximo deploy. Esa es la diferenci
 demo: aquí hay on-call, clientes y compliance.
 
 ## Los tres niveles de adopción (L1 → L3)
+
+![Una representación visual abstracta de los niveles de adopción, desde la asistencia individual hasta la autonomía multi-agente. Tres capas concéntricas distintas, o formas progresivamente más grandes y abarcadoras, cada una representando una etapa de integración y control, desde lo impulsado por humanos hasta lo completamente autónomo. Se muestra una clara progresión y crecimiento en complejidad y alcance.](https://6pxof7rpjdk6gkca.public.blob.vercel-storage.com/posts/agentes-de-ingeniera-autnomos-cmo-mondaycom-corre-morphex-en-produccin/inline-1.png)
 
 - **L1 — Asistente.** El ingeniero usa IA como pair programmer (Cursor para lo rápido,
   Claude Code para lo pesado). Adopción casi se duplicó año a año.
@@ -78,6 +82,8 @@ para secretos por sesión; **Amazon Bedrock** para llamadas de modelo (un audit 
 
 ## Guardrails: el reviewer automático que reemplaza al humano en lo repetitivo
 
+![Ilustración conceptual de 'guardrails' como un sistema de revisión automatizado. Formas geométricas abstractas actúan como barreras o filtros, examinando flujos de datos o 'bloques de código' que pasan a través de ellos. Algunos bloques pasan sin impedimentos, mientras que otros son desviados, simbolizando controles fallidos. La composición general transmite un sentido de control de calidad automatizado y adherencia a estándares.](https://6pxof7rpjdk6gkca.public.blob.vercel-storage.com/posts/agentes-de-ingeniera-autnomos-cmo-mondaycom-corre-morphex-en-produccin/inline-2.png)
+
 El cuello de botella dejó de ser generar código y pasó a ser la **revisión humana**. La
 solución fue convertir cada estándar de ingeniería de monday en un **reviewer
 automatizado**: tagging de métricas, higiene de feature flags, uso de Datadog, límites
@@ -114,6 +120,8 @@ CI, Guardrails y protocolos de revert que cualquier Builder.
   razones que el de cualquiera: tests flaky, specs ambiguas, edge cases.
 
 ### La decisión de auto-merge no es un "confía y ya"
+
+![Una representación abstracta de un proceso de toma de decisiones basado en múltiples señales para el 'auto-merge'. Cuatro flujos visuales o caminos distintos convergiendo hacia un punto de decisión central. Cada flujo es distinguible, quizás por color o textura, representando diferentes métricas o entradas. La confluencia sugiere una puntuación compuesta o evaluación que lleva a un resultado binario (merge/no-merge).](https://6pxof7rpjdk6gkca.public.blob.vercel-storage.com/posts/agentes-de-ingeniera-autnomos-cmo-mondaycom-corre-morphex-en-produccin/inline-3.png)
 
 Combina cuatro señales:
 
