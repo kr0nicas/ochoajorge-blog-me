@@ -14,19 +14,25 @@ cliente ya desplegado (`scripts/post-images.mjs`) depende de él.
 ## Credenciales que te dará Jorge
 
 - `GEMINI_API_KEY` — Google AI Studio (modelos de texto e imagen).
-- `WEBHOOK_SECRET` — el valor que validarás en el header `x-webhook-secret`.
+- `WEBHOOK_SECRET` — el valor que configurarás en la credencial Header
+  Auth nativa del nodo Webhook, sobre el header `x-webhook-secret`.
 - `UPLOAD_SECRET` — Bearer para subir imágenes al blog.
 
 ## Contrato (idéntico a n8n-post-images.md)
 
 **Request que recibirás** — `POST` al webhook, JSON:
-`{ slug, lang ("es"|"en"), title, description, pillar, tags[], content, maxInlineImages }`
+`{ slug, lang ("es"|"en"), title, description, pillar, tags[], content, maxInlineImages }`.
+`maxInlineImages` ausente → 3; presente y no-entero o negativo → `422`;
+mayor que 3 → se recorta a 3.
 
 **Response 200 que debes emitir** (síncrona, el cliente espera hasta 5 min):
 `{ "cover": { "url", "alt" } | null, "inline": [ { "url", "alt", "afterHeading" } ] }`
 
-**Errores:** `401` secreto inválido · `422` payload inválido (falta
-slug/title/content, lang fuera de {es,en}, o pillar no-vacío fuera de
+**Errores:** `401/403` secreto ausente o inválido (el 403 con cuerpo propio
+de n8n viene de su Header Auth nativa; el cliente trata cualquier no-200
+igual) · `422` payload inválido (falta slug/title/content, `slug` que no
+case `^[a-z0-9]+(-[a-z0-9]+)*$` — la misma regla que el pathname de
+`api/upload` —, lang fuera de {es,en}, o pillar no-vacío fuera de
 {construir-con-ia, agentes-en-produccion, arquitectura, seguridad} —
 `pillar` ausente o `""` es VÁLIDO: el post no tiene pilar asignado y el
 estilo se infiere de tags/título) · `5xx` solo ante fallo total.
@@ -35,12 +41,20 @@ de las pedidas).
 
 ## Secuencia de nodos sugerida
 
-1. **Webhook** (POST, response mode "Using Respond to Webhook node").
-2. **Validación**: si `x-webhook-secret` ≠ `WEBHOOK_SECRET` → Respond 401
-   `{"error":"unauthorized"}`. Si payload inválido → Respond 422
-   `{"error":"invalid_payload","detail":"…"}`. Payload inválido = falta
-   slug/title/content, o `lang` fuera de {es,en}, o `pillar` no-vacío fuera
-   de {construir-con-ia, agentes-en-produccion, arquitectura, seguridad}.
+1. **Webhook** (POST, response mode "Using Respond to Webhook node";
+   credencial **Header Auth** nativa de n8n apuntando a
+   `x-webhook-secret`/`WEBHOOK_SECRET` — la autenticación la resuelve n8n
+   antes de que corra ningún nodo tuyo: un secreto ausente o inválido
+   produce `401/403` con cuerpo propio de n8n, sin llegar al nodo de
+   Validación).
+2. **Validación** (payload, ya autenticado): si payload inválido →
+   Respond 422 `{"error":"invalid_payload","detail":"…"}`. Payload
+   inválido = falta slug/title/content, `slug` que no case
+   `^[a-z0-9]+(-[a-z0-9]+)*$` (la misma regla que el pathname de
+   `api/upload`), `lang` fuera de {es,en}, `maxInlineImages` presente y
+   no-entero o negativo (si está ausente usa 3; si es mayor que 3 no es
+   error, recórtalo a 3), o `pillar` no-vacío fuera de
+   {construir-con-ia, agentes-en-produccion, arquitectura, seguridad}.
    `pillar` ausente o `""` es VÁLIDO (el post no tiene pilar asignado; NO
    respondas 422 en ese caso) — el estilo de las imágenes se infiere de
    `tags`/`title` en su lugar.
@@ -73,7 +87,7 @@ rendered text, no words, no letters, no third-party logos."
 
 ```bash
 URL="<url-del-webhook>"; SECRET="<WEBHOOK_SECRET>"
-# 1. Sin secreto → 401
+# 1. Sin secreto → 403 (lo responde la credencial Header Auth nativa de n8n)
 curl -s -o /dev/null -w "%{http_code}\n" -X POST "$URL" -H 'content-type: application/json' -d '{}'
 # 2. Payload inválido → 422
 curl -s -o /dev/null -w "%{http_code}\n" -X POST "$URL" -H 'content-type: application/json' -H "x-webhook-secret: $SECRET" -d '{"slug":"x"}'
