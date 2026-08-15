@@ -1,40 +1,161 @@
 ---
 title: "Governance a Escala: KPMG Despliega 276,000 Agentes IA con Microsoft Agent 365"
-description: "Descubre cómo KPMG implementó gobernanza para 276,000 agentes IA con Microsoft Agent 365, garantizando seguridad y control a escala empresarial y eficiencia."
+description: "Cómo KPMG implementó gobernanza para 276,000 agentes IA con Microsoft Agent 365: el control plane que registra, asegura y audita agentes a escala enterprise."
 date: "2026-07-10"
 pillar: "seguridad"
+canonical: "https://ochoajorge.me/es/blog/governance-a-escala-kpmg-despliega-276000-agentes-ia-con-microsoft-agent-365"
 tags: ["gobernanza-ia", "agentes-ia", "microsoft-agent-365", "kpmg", "governance"]
 lang: "es"
-draft: true
+draft: false
 series:
   name: "Construyendo con IA: Lo que nadie te dice"
   part: 5
 featured: false
-coverImage: "/og-images/governance-a-escala-kpmg-despliega-276000-agentes-ia-con-microsoft-agent-365.jpg"
+coverImage: "https://6pxof7rpjdk6gkca.public.blob.vercel-storage.com/posts/governance-a-escala-kpmg-despliega-276000-agentes-ia-con-microsoft-agent-365/cover.png"
+coverImageAlt: "Un escudo metálico abstracto de tonos obsidiana, con circuitos brillantes grabados, protegiendo contra una niebla etérea que representa agentes IA."
+resources:
+  - label: "KPMG and Microsoft scale trusted, enterprise AI agents globally — KPMG"
+    url: "https://kpmg.com/xx/en/media/press-releases/2026/06/kpmg-and-microsoft-scale-trusted-enterprise-ai-agents-globally.html"
+  - label: "KPMG and Microsoft scale trusted, enterprise AI agents globally — Microsoft"
+    url: "https://news.microsoft.com/source/2026/06/09/kpmg-and-microsoft-scale-trusted-enterprise-ai-agents-globally-through-deployment-of-agent-365-and-copilot/"
+  - label: "Microsoft Agent 365"
+    url: "https://www.microsoft.com/en-us/microsoft-365/business/microsoft-agent-365"
 ---
 
-## Problem
+# Governance a Escala: KPMG Despliega 276,000 Agentes IA con Microsoft Agent 365
 
-Describe the context and why this topic matters.
+> **Serie: Construyendo con IA — Parte 5.** La mayoría habla de cómo construir agentes.
+> Pocos hablan de cómo gobernarlos cuando ya son miles. KPMG acaba de mostrar el
+> playbook: 276,000 profesionales, 138 países, y un control plane que registra, asegura
+> y audita cada agente en producción.
 
-## Core Concept
+## El problema que nadie quiere enfrentar
 
-Break down the main idea.
+Las encuestas de industria dicen que ~72% de las empresas ya corren agentes IA en
+producción, pero solo ~21% tienen un modelo de gobernanza maduro para agentes
+autónomos. La brecha es el problema. Los agentes se multiplican más rápido que los
+sistemas para controlarlos: cada equipo despliega los suyos para customer service,
+finanzas, HR, operaciones — sin visibilidad central de qué hacen, qué datos tocan
+ni si cumplen lo que se esperaba de ellos.
 
-## Implementation
+KPMG, con **276,000 profesionales en 138 países**, estaba exactamente en ese punto.
+No podían permitir agentes sin control — son una firma de audit y advisory donde la
+confianza y la auditabilidad sostienen cada relación con el cliente.
 
-Provide real-world, production-ready code examples.
+## La decisión: no un agente más, un control plane
 
-```python
-# Example code
-def solve_problem():
-    pass
-```
+![Una estructura geométrica compleja y transparente que se cierne sobre un mar de esferas luminosas interconectadas, simbolizando un plano de control que gestiona agentes IA.](https://6pxof7rpjdk6gkca.public.blob.vercel-storage.com/posts/governance-a-escala-kpmg-despliega-276000-agentes-ia-con-microsoft-agent-365/inline-1.png)
 
-## Lessons Learned
+El 9 de junio de 2026, KPMG y Microsoft anunciaron la expansión de su relación global.
+La noticia no fue "un agente nuevo", fue **dos capas**:
 
-Summary of key takeaways.
+1. **Microsoft 365 Copilot** desplegado a los 276,000 profesionales (la superficie de
+   productividad — el asistente que usa cada persona).
+2. **Microsoft Agent 365** como **control plane** para gobernar, monitorear, asegurar
+   y actualizar cada agente IA que opera en la organización.
 
-## Conclusion
+Agent 365 alcanzó disponibilidad general el **1 de mayo de 2026** — cinco semanas
+antes del anuncio. KPMG es uno de los primeros enterprises en desplegarlo a escala
+completa.
 
-Wrap up and point to related articles.
+> El ordering es la señal: el headline no es "qué puede hacer el agente", es "qué
+> capa vigila a los agentes". El valor duradero en enterprise AI 2026 no está en
+> construir un agente — está en gobernar una flota.
+
+## Qué hace Agent 365 (el control plane)
+
+![Una red interconectada de caminos y nodos luminosos sobre una superficie oscura, con formas metálicas sólidas que representan los pilares de control, conectadas por haces de luz.](https://6pxof7rpjdk6gkca.public.blob.vercel-storage.com/posts/governance-a-escala-kpmg-despliega-276000-agentes-ia-con-microsoft-agent-365/inline-2.png)
+
+Agent 365 no es un agente. Es la capa que observa, gobierna y asegura agentes
+construidos por Microsoft, por terceros o auto-registrados desde cualquier
+plataforma. Se apoya en cuatro pilares:
+
+| Pilar | Función |
+|---|---|
+| **Registro y mapeo** | Inventario de cada agente: qué hace, qué datos toca, quién es owner |
+| **Identidad y acceso** | Integración con Microsoft Entra — least-privilege por agente |
+| **Seguridad y compliance** | Microsoft Defender para threat protection, Purview para data security |
+| **Lifecycle management** | Deploy, monitor, update, decommission con audit trail |
+
+Incluye **shadow-AI detection**: detecta agentes corriendo localmente y descubre
+agentes cloud desde AWS Bedrock y Google Cloud (en preview público). No se limita al
+stack de Microsoft — un paso real más allá de la gobernanza single-vendor.
+
+## La integración: KPMG Workbench
+
+![Una estructura monolítica oscura con líneas azules brillantes gestionando y alineando estructuras cristalinas más pequeñas y diversas, representando la integración disciplinada de aplicaciones.](https://6pxof7rpjdk6gkca.public.blob.vercel-storage.com/posts/governance-a-escala-kpmg-despliega-276000-agentes-ia-con-microsoft-agent-365/inline-3.png)
+
+El control plane no vive al lado del workflow — vive **dentro** de él. KPMG
+Workbench, la plataforma interna construida sobre **Microsoft Azure AI Foundry**,
+coordina agentes across todas las plataformas de servicio al cliente:
+
+- **KPMG Clara** (audit)
+- **Digital Gateway** (análisis regulatorio fiscal en tiempo real)
+- **KPMG Velocity** (advisory)
+
+Agent 365 se sienta por encima de todo eso como governance layer. Los agentes se
+gestionan, actualizan y auditan sin interrumpir a los profesionales usándolos.
+
+## El patrón "Client Zero"
+
+Lo más replicable que hizo KPMG no es la tecnología — es la **secuencia**. Adoptan
+Agent 365 internamente y, al mismo tiempo, ofrecen la implementación de gobernanza
+a sus clientes como servicio de consulting. La firma se convierte en su propio
+primer cliente de referencia.
+
+> Ya hay engagements externos nombrados: ACCA (transformación digital global) e
+> Integra LifeSciences (supply chain, regulatory, medical affairs). El patrón es
+> portable: gobierna tu propia flota primero, retira tu propio agent debt, luego
+> vende el playbook.
+
+## El costo real de la gobernanza
+
+No disclosedieron el valor del contrato, pero los precios públicos dan el orden de
+magnitud:
+
+- **Agent 365 standalone:** $15/user/month
+- **Bundled en Microsoft 365 E7:** $99/user/month
+
+Aplicado a 276,000 profesionales, la apuesta por la capa de gobernanza es de millones
+mensuales. Lo que antes era un consulting engagement ahora es un line item per-seat
+— y eso es lo que una firma mid-market puede copiar sin presupuesto de Big Four.
+
+## La honestidad del caso
+
+Esto es un anuncio de partnership, no un resultado auditado. Hay que ser claros:
+
+- **La gobernanza contiene el riesgo, no lo elimina.** Un control plane no borra
+  vulnerabilidades como prompt injection — las reduce y contiene.
+- **Las métricas internas son vendor-stated.** KPMG reporta que un agente de
+  onboarding redujo follow-up calls ~20%, pero es dato de la propia empresa, no
+  auditado independientemente.
+- **El framing comercial beneficia a ambos.** Posicionar la gobernanza como
+  esencial sirve a Microsoft (licencias) y a KPMG (consulting). La prueba real
+  vendrá con resultados auditados, no con press releases.
+
+## Lecciones para arquitectos
+
+1. **El agente build platform se está comoditizando.** Cualquiera puede levantar
+   uno. La capa durable — registro, identidad, audit trail, reglas de
+   off-boarding — es lo que Microsoft empaquetó en producto per-seat.
+2. **Governance es secuencia, no herramienta.** Adopta internamente, retira tu
+   propio agent debt, luego ofrece el playbook. Ese orden es lo replicable.
+3. **Shadow-AI es real.** Si tu control plane no ve agentes fuera de tu vendor,
+   tienes un punto ciego. La detección multi-cloud de Agent 365 es un paso
+   necesario, no un feature de lujo.
+4. **La gobernanza como producto cambia el mercado.** A $15/user/month, lo que
+   era consulting de Big Four ahora es accesible para mid-market. El moat se
+   mueve de "tener agentes" a "gobernarlos bien".
+
+## Conclusión
+
+KPMG no compró 276,000 agentes. Compró la capa que vigila a los agentes. En 2026,
+ese ordering es la señal más clara de hacia dónde se mueve el valor en enterprise
+AI: no está en construir, está en gobernar. El patrón es portable, el precio es
+accesible, y la brecha entre producción y gobernanza es el problema real que hay que
+cerrar.
+
+---
+
+*Fuentes y métricas en los enlaces de recursos. Datos del anuncio conjunto de KPMG
+y Microsoft del 9 de junio de 2026.*
