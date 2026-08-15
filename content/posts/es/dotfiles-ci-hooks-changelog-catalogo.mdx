@@ -15,6 +15,8 @@ resources:
     url: "https://github.com/kr0nicas/dotfiles"
   - label: "El escaparate del repo"
     url: "https://kr0nicas.github.io/dotfiles/"
+coverImage: "https://6pxof7rpjdk6gkca.public.blob.vercel-storage.com/posts/dotfiles-ci-hooks-changelog-catalogo/cover.png"
+coverImageAlt: "Una prensa de banco sosteniendo un complejo mecanismo de metal y madera, simbolizando la firmeza de las reglas automatizadas que se hacen cumplir."
 ---
 
 El repo ya tenía CI. Tenía specs escritos antes de cada cambio, suites de tests y una convención de commits que yo respetaba casi siempre. «Casi siempre» resultó ser el detalle importante.
@@ -28,6 +30,8 @@ Una convención que vive en la costumbre no es una regla; es una intención. La 
 En [la parte anterior](/es/blog/dotfiles-instalador-presets-cross-platform) el problema era el instalador. Este post va del arnés que hace que las reglas se cumplan solas, y de las tres piezas del repo que se niegan a mentir.
 
 ## Tres puertas, y qué pasa cuando falta la herramienta
+
+![Un conjunto de candados en una mesa de trabajo, simbolizando los diferentes niveles de protección y sus puntos débiles cuando no hay la herramienta adecuada.](https://6pxof7rpjdk6gkca.public.blob.vercel-storage.com/posts/dotfiles-ci-hooks-changelog-catalogo/inline-1.png)
 
 El arnés son tres hooks, y cada uno está donde está por su coste. `commit-msg` valida el mensaje: es instantáneo y se paga en cada commit. `pre-commit` linta lo que está en el índice y barre secretos: cuesta unos segundos. `pre-push` bloquea `main` y corre **dos** suites —la de `gcx` y la de los propios hooks, 115 tests de los 231—: es el único que se puede permitir tardar, porque empujas mucho menos de lo que commiteas.
 
@@ -59,6 +63,8 @@ La degradación tiene un límite, y está trazado a propósito: **el formato del
 Y un último detalle que parece burocrático y no lo es: el ámbito del commit se valida contra una lista cerrada en `scopes.txt`. Sin ella, `gcp` y `gcloud` acaban conviviendo como dos ámbitos distintos para la misma cosa, y la agrupación del CHANGELOG deja de significar nada. Lo que hace que la lista funcione es que el mensaje de error **dice en qué archivo añadir uno nuevo**. Si ampliar la lista cuesta más que saltarse la regla, la gente se salta la regla. Siempre.
 
 ## El CI reusa el hook, no una copia
+
+![Un técnico usando un calibrador para comparar dos planos casi idénticos, con una sutil diferencia revelada, representando la importancia de reusar código en el CI y las trampas de la divergencia.](https://6pxof7rpjdk6gkca.public.blob.vercel-storage.com/posts/dotfiles-ci-hooks-changelog-catalogo/inline-2.png)
 
 El job `commit-lint` recorre los commits del PR y pasa cada mensaje por `.githooks/commit-msg`. No es una reimplementación con la misma regex: es literalmente el mismo archivo, invocado con `bash`. Dos copias de una regla divergen; la única pregunta abierta es cuándo.
 
@@ -120,6 +126,8 @@ La misma clase de trampa aparece una segunda vez, en un sitio que no esperas: la
 Los tres son el mismo fallo. **Un artefacto generado tiene que ser función pura del repo.** Cualquier entrada externa —la hora, la rama en la que estás, el número de PR, el locale del runner— lo vuelve insatisfacible, y lo descubres tarde, cuando el CI se pone rojo sin diff que lo explique.
 
 ## El catálogo que no puede mentir
+
+![Un contador mecánico industrial mostrando un número fijo, contrastando con una nota escrita a mano que muestra un número incorrecto, simbolizando datos leídos del estado real en lugar de hardcodeados.](https://6pxof7rpjdk6gkca.public.blob.vercel-storage.com/posts/dotfiles-ci-hooks-changelog-catalogo/inline-3.png)
 
 El repo publica un escaparate en GitHub Pages que deja navegar las herramientas que instala. El problema es evidente en cuanto lo escribes: un catálogo a mano se desincroniza al primer `brew` nuevo, y a partir de ahí documenta un repo que ya no existe.
 

@@ -15,6 +15,8 @@ resources:
     url: "https://github.com/kr0nicas/dotfiles"
   - label: "El escaparate del repo"
     url: "https://kr0nicas.github.io/dotfiles/"
+coverImage: "https://6pxof7rpjdk6gkca.public.blob.vercel-storage.com/posts/dotfiles-instalador-presets-cross-platform/cover.png"
+coverImageAlt: "Un intrincado mecanismo de relojería con engranajes, simbolizando la modularidad y precisión de un instalador de dotfiles cross-platform."
 ---
 
 [La primera parte de esta serie](/es/blog/dotfiles-el-secreto-para-ser-productivo-en-tu-entorno-de-desarrollo) defendía una idea modesta y con la que sigo de acuerdo: ten dotfiles. Y daba el consejo estándar, el mismo que da todo el mundo: empieza por tu `.zshrc`, tu `.gitconfig` y un `install.sh` que cree los symlinks.
@@ -26,6 +28,8 @@ Cinco meses y medio y 350 commits después, el repositorio se parece bastante po
 De ahí sale la tesis de este post, y la digo entera antes de justificarla: **en cuanto tus dotfiles tocan más de una máquina, dejan de ser configuración y pasan a ser software — con las obligaciones que eso trae.**
 
 ## El script que crece hasta que nadie lo lee
+
+![Manos de artesano desenredando y organizando un manojo de cables en un banco de trabajo, representando la modularización de un script complejo.](https://6pxof7rpjdk6gkca.public.blob.vercel-storage.com/posts/dotfiles-instalador-presets-cross-platform/inline-1.png)
 
 El instalador llegó a **1.012 líneas en un solo archivo**. No es un defecto moral ni un descuido, y el diagnóstico fácil («haberlo modularizado antes») no explica nada. Un instalador crece de la única forma en que puede crecer: una herramienta cada vez, ocho líneas cada vez. Ningún día concreto parece el día de partirlo, porque ningún cambio individual lo justifica. Cuando por fin lo parece, ya llevas mil líneas.
 
@@ -85,6 +89,8 @@ La prueba de que el corte estaba en el sitio correcto no es estética, es que ha
 
 ## Cinco presets: decide la máquina, no tú
 
+![Vista aérea de un banco de trabajo con cinco bandejas distintas, cada una con un conjunto diferente de herramientas, ilustrando los presets.](https://6pxof7rpjdk6gkca.public.blob.vercel-storage.com/posts/dotfiles-instalador-presets-cross-platform/inline-2.png)
+
 Unos dotfiles nacen con un supuesto tan implícito que ni siquiera se formula: hay un destino, y ese destino es mi laptop. Todo lo demás se deriva de ahí. Hay entorno gráfico, hay `sudo` sin restricciones, hay pantalla, hay tiempo para instalar cosas grandes.
 
 Ese supuesto se rompe el día que clonas el repo en otro sitio. Un VPS no tiene entorno gráfico, así que WezTerm y las fuentes Nerd son bytes descargados para nada. Un contenedor no tiene `sudo`, y un instalador que lo asume no falla con elegancia: falla a mitad, dejando la máquina en un estado que nadie sabe describir. Un nodo de Kubernetes al que entras a diagnosticar algo a las tres de la mañana no necesita Spotify ni Postman; necesita `kubectl`, `jq` y una shell que arranque rápido.
@@ -128,6 +134,8 @@ Tu entorno de desarrollo ya tiene dos usuarios. Solo uno de los dos ve los color
 El giro está en qué queda cuando quitas la decoración. Lo que sobrevive son las reglas, repartidas en dos capas: los hooks locales, que rechazan un mensaje de commit inservible al escribirlo, lintean lo que hay en el índice, barren secretos y bloquean el push a `main` en `pre-push`; y el CI, que vuelve a pasar esas comprobaciones sobre el PR y añade las que no caben en una máquina, incluido el job que falla cuando el CHANGELOG deja de seguir el paso del código. Un agente que trabaja en tu repositorio necesita precisamente eso, y por las mismas razones por las que [la disciplina de desarrollo con Claude Code](/es/blog/agentic-saas-b2b-disciplina-de-desarrollo-con-claude-code) importa más que el prompt: las restricciones que se ejecutan valen más que las instrucciones que se leen. De eso trata la tercera parte de esta serie.
 
 ## "No coincide" no es lo mismo que "no pude comprobar"
+
+![Una balanza antigua con un lado sobrecargado y otro con una sola esfera pulida, representando la diferencia entre verificar o no un checksum.](https://6pxof7rpjdk6gkca.public.blob.vercel-storage.com/posts/dotfiles-instalador-presets-cross-platform/inline-3.png)
 
 Los binarios de SRE del repo vienen de GitHub Releases. La versión anterior los instalaba con el idioma habitual del ecosistema, `curl … | tar -xz`, que tiene una propiedad que no suele nombrarse: no deja nada en disco que se pueda comprobar. Los bytes van del socket al sistema de archivos sin pasar por ningún punto donde alguien pueda preguntarse si son los correctos. Ahora se descargan **a disco** y se comparan contra el `checksums.txt` del propio release antes de instalar nada.
 
