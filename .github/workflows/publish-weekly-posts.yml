@@ -8,15 +8,15 @@ name: Publish Weekly Posts
 on:
   schedule:
     # 08:00 CST (America/El_Salvador, UTC-6) = 14:00 UTC
-    - cron: '0 14 11 8 *'   # Post 1: Stripe        — Martes 2026-08-11
-    - cron: '0 14 13 8 *'   # Post 2: monday.com    — Jueves 2026-08-13
-    - cron: '0 14 15 8 *'   # Post 3: UNACEM       — Sábado 2026-08-15
+    - cron: '0 14 25 8 *'   # Post 1: Klarna      — Martes 2026-08-25
+    - cron: '0 14 27 8 *'   # Post 2: DoorDash    — Jueves 2026-08-27
+    - cron: '0 14 29 8 *'   # Post 3: GitLab Duo  — Sábado 2026-08-29
   workflow_dispatch:
     inputs:
       post:
         description: 'Slug del archivo .mdx a publicar (sin extensión)'
         required: true
-        default: 'agentes-ia-en-produccin-la-infraestructura-dedicada-de-stripe-para-compliance-financiero'
+        default: 'agentes-ia-en-klarna-3-capas-de-juicio-y-el-humano-bajo-demanda'
 
 permissions:
   contents: write
@@ -42,9 +42,9 @@ jobs:
             DAY=$(date -u +%d)
             MONTH=$(date -u +%m)
             case "${MONTH}-${DAY}" in
-              08-11) SLUG="agentes-ia-en-produccin-la-infraestructura-dedicada-de-stripe-para-compliance-financiero" ;;
-              08-13) SLUG="agentes-de-ingeniera-autnomos-cmo-mondaycom-corre-morphex-en-produccin" ;;
-              08-15) SLUG="agentic-ai-operacional-con-pgvector-la-arquitectura-de-unacem-sobre-watsonx-orchestrate" ;;
+              08-25) SLUG="agentes-ia-en-klarna-3-capas-de-juicio-y-el-humano-bajo-demanda" ;;
+              08-27) SLUG="plataforma-de-agentes-en-doordash-llm-gateway-mcp-y-evals-a-2000-diarios" ;;
+              08-29) SLUG="gitlab-duo-y-el-roi-de-la-ia-como-medir-lo-que-los-agentes-aportan-al-sdlc" ;;
               *) echo "No post scheduled for ${MONTH}-${DAY}"; exit 0 ;;
             esac
           fi
@@ -90,5 +90,5 @@ jobs:
           git commit -m "content(posts): publish ${SLUG}"
           git push -u origin "$BR"
           gh pr create --base develop --title "content(posts): publish ${SLUG}" \
-            --body "Publicación programada del post de la semana del 2026-08-10. Cambia \`draft: true\` → \`draft: false\`. Generado por el workflow de contenido semanal." \
+            --body "Publicación programada del post de la semana del 2026-08-24. Cambia \`draft: true\` → \`draft: false\`. Generado por el workflow de contenido semanal." \
             --label "content"
