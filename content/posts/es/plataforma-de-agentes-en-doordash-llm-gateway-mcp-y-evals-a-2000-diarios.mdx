@@ -1,0 +1,328 @@
+---
+title: "Plataforma de Agentes en DoorDash: LLM Gateway, MCP y Evals a 2000 Diarios"
+description: "DoorDash construyó una plataforma de agentes con LLM Gateway, MCP de 60 herramientas, orquestador con domain agents y 2000 evaluaciones automáticas diarias."
+date: "2026-08-27"
+pillar: "construir-con-ia"
+tags: ["agentes-ia", "plataforma-ia", "mcp", "evals", "observabilidad"]
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Arquitectura de Software Avanzada"
+  part: 15
+resources:
+  - label: "A Platform for Building and Evolving Agents — DoorDash Engineering"
+    url: "https://careersatdoordash.com/blog/building-ask-doordash-part-four-a-platform-for-building_and_evolving_agents/"
+  - label: "How DoorDash Built an AI Shopping Assistant — InfoQ"
+    url: "https://www.infoq.com/news/2026/07/doordash-ai-ask-assistant/"
+  - label: "Building GenAI Platform at DoorDash — QCon AI Boston 2026"
+    url: "https://boston.qcon.ai/presentation/boston2026/building-genai-platform-doordash"
+---
+
+# Plataforma de Agentes en DoorDash: LLM Gateway, MCP y Evals a 2000 Diarios
+
+> **Serie: Arquitectura de Software Avanzada — Parte 15.** Cuando adoptas LLMs
+> across teams, cada equipo reimplementa la misma infraestructura: retry logic,
+> fallback, cost tracking, prompt versioning. DoorDash construyó una plataforma
+> de agentes que resuelve exactamente eso. Y publicó la arquitectura completa.
+
+## El problema: cada equipo construye su propio plumbing
+
+Cuando DoorDash empezó a adoptar LLMs, cada equipo implementaba la misma
+infraestructura repetidamente. Lógica de retry, mecanismos de fallback, tracking de
+costos, versioning de prompts, pipelines de batch. Tiempo de ingeniería desperdiciado
+en plumbing repetitivo en lugar de construir features.
+
+Peor aún, los equipos tomaban decisiones distintas: algunos usaban OpenAI directo,
+otros iban por Bedrock, algunos construyeron retry logic custom que no manejaba rate
+limits correctamente, y nadie tenía observabilidad consistente.
+
+<Callout type="note" title="El diagnóstico de DoorDash">
+  "El model call se volvió rápidamente la parte fácil. La parte difícil era todo
+  lo que lo rodeaba: model access, routing, tools, identity, evals, observability,
+  cost attribution, governance, y optimization."
+</Callout>
+
+Esta es la misma constatación que Stripe hizo con su infraestructura dedicada para
+compliance financiero: el harness importa más que el modelo. La diferencia es que
+DoorDash no construyó un serving layer para un dominio — construyó una **plataforma
+horizontal** que sirve a todos los dominios.
+
+## Los 4 componentes de la plataforma
+
+DoorDash dividió su plataforma de agentes en cuatro componentes, cada uno resolviendo
+un problema distinto:
+
+<ComparisonTable
+  headers={["Componente", "Responsabilidad", "¿Cuándo centralizar?"]}
+  highlight={2}
+  rows={[
+    ["LLM Gateway", "Routing, observabilidad, fallback, rate limiting, cost attribution", "Desde el día 1 — sin esto no hay governanza"],
+    ["Agentic Gateway", "Multi-step workflows, MCP streaming, auth, state management", "Cuando hay >1 agente en producción"],
+    ["ADK (Agent Dev Kit)", "Templates: instructions, tools, callbacks, sessions", "Cuando los patrones se repiten entre equipos"],
+    ["Batch Inference", "Job scheduler: cost optimization vs SLA", "Cuando hay workloads asíncronos a escala"],
+  ]}
+/>
+
+### LLM Gateway
+
+El LLM Gateway es el punto de entrada para todas las llamadas a modelos. Maneja:
+
+- **Rate limiting** across providers con modelos de quota distintos
+- **Cost attribution** por equipo, dominio y feature
+- **Prompt caching** para mejorar performance y reducir costo
+- **Fallback behavior** entre providers
+
+<Callout type="tip" title="¿Por qué un gateway y no llamadas directas?">
+  Sin un gateway, cada equipo implementa su propio retry, su propio tracking de
+  costo, su propia lógica de fallback. El resultado: spend sin dueño, seguridad
+  inconsistente, y ningún visibilidad agregada. Un gateway convierte el acceso a
+  modelos en una decisión de plataforma, no de cada equipo.
+</Callout>
+
+### Agentic Gateway
+
+Mientras el LLM Gateway maneja llamadas individuales a modelos, el Agentic Gateway
+maneja **workflows multi-step**: orquestación de agentes, streaming de protocolos
+como MCP, autenticación para usuarios internos y externos, y state management.
+
+### ADK (Agent Development Kit)
+
+Templates que estandarizan patrones comunes: instructions, tools, callbacks,
+sessions, model wiring. Un equipo nuevo no empieza desde cero — empieza con un
+template y lo adapta a su dominio.
+
+### Batch Inference
+
+Plataforma para procesar workloads a gran escala. El job scheduler balancea
+optimización de costo contra requisitos de SLA — no todos los jobs tienen la misma
+urgencia.
+
+## Arquitectura: Orchestrator + Domain Agents
+
+La decisión arquitectónica central fue: **¿qué comparte cada agente y qué es propio
+de cada dominio?**
+
+DoorDash construyó un **execution path compartido** alrededor de **agentes
+especializados por dominio**. Un agente general-purpose crecería más difícil de
+razonar a medida que acumulara responsabilidades. Stacks de agentes completamente
+independientes duplicarían infraestructura y producirían experiencias inconsistentes.
+
+```
+┌──────────────────────────────────────────────────┐
+│                    Gateway                        │
+│  Auth · Entry-point context · HTTP ↔ A2A          │
+└──────────────────────┬───────────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────────┐
+│                  Orchestrator                      │
+│  Elige domain agent por turn · pinning · reroute  │
+└───┬──────────┬──────────┬────────────────────────┘
+    │          │          │
+    ▼          ▼          ▼
+┌────────┐ ┌────────┐ ┌──────────────┐
+│Restaurant│ │Grocery│ │Reservations  │  ← Domain Agents
+│Agent    │ │Agent   │ │Agent         │    (own instructions,
+│         │ │        │ │              │     skills, tools, evals)
+└────┬───┘ └───┬───┘ └──────┬───────┘
+     │         │             │
+     └─────────┴─────────────┘
+               │
+               ▼
+┌──────────────────────────────────────────────────┐
+│              Shared MCP Layer                     │
+│  60+ tools: catalog search, recommendations,    │
+│  carts, checkout, order history, memory           │
+└──────────────────────────────────────────────────┘
+```
+
+### Por qué no un solo agente
+
+DoorDash probó una arquitectura de agente único. No funcionó. Restaurant, Grocery y
+Reservations dependen de tools distintas, políticas distintas y criterios de
+evaluación distintos. Combinarlos en un solo agente lo haría más difícil de testear y
+forzaría a cada dominio al mismo ciclo de release.
+
+### Pinning y rerouting
+
+El Orchestrator rutea cada turn al domain agent apropiado. Pero ese routing añade
+latencia y tokens de input, incluso cuando la conversación se mantiene en el mismo
+dominio. Para reducir este costo, el Orchestrator **pinea** los turns de seguimiento
+al domain agent ya seleccionado.
+
+Si la conversación cambia de dirección, el domain agent reconoce el mensaje
+out-of-scope y devuelve el control al Orchestrator, que rerutea **en el mismo turn**,
+oculto al usuario.
+
+<Callout type="tip" title="Patrón pinning">
+  El pinning es un patrón de optimización que vale la pena robar. En lugar de
+  re-evaluar el routing en cada turn (costoso), asume continuidad y solo rerutea
+  cuando hay una señal explícita de cambio de dominio. Reduce costo y latencia sin
+  perder la capacidad de switch.
+</Callout>
+
+## La capa MCP: 60+ herramientas con validación determinística
+
+Ask DoorDash necesita acceso a servicios internos: buscar stores, leer menús,
+manejar carts, actuar en nombre del usuario. Las APIs detrás de estas operaciones
+asumen código determinístico. Un LLM eligiendo operaciones en runtime necesita una
+interfaz más estrecha.
+
+Exponer las APIs directamente forzaría al modelo a interpretar interfaces de bajo
+nivel. Codificar permisos y reglas de negocio solo en el prompt añadiría contexto
+sin garantizar enforcement.
+
+DoorDash construyó una **capa MCP compartida** entre los agentes y las APIs internas.
+Cada MCP tool expone una operación enfocada con los inputs y outputs que el modelo
+necesita. El modelo elige qué tool llamar. **Código determinístico valida cada
+request y enforcea permisos y reglas de negocio antes de que la llamada llegue al
+servicio subyacente.**
+
+<CodeComparison
+  before={{ label: "❌ Sin capa MCP", code: `# El LLM llama la API directa
+# Permisos y reglas en el prompt (no enforced)
+agent.call_api("POST /cart/add", {
+  "item_id": "abc123",
+  "quantity": 999  # sin validación
+})
+# Resultado: el modelo puede hacer cualquier cosa
+# que la API permita, sin gate intermedio` }}
+  after={{ label: "✅ Con capa MCP", code: `# El LLM elige una MCP tool enfocada
+agent.call_tool("add_to_cart", {
+  "item_id": "abc123",
+  "quantity": 2
+})
+# Código determinístico valida:
+# - ¿El usuario tiene permiso?
+# - ¿El item existe y está disponible?
+# - ¿La cantidad es razonable?
+# Solo entonces llama al servicio subyacente` }}
+/>
+
+El servidor MCP compartido ahora provee **más de 60 tools** across workflows públicos
+e internos. Un agente nuevo selecciona las tools que necesita de esa librería, y
+mejoras a la validación, telemetría o integración de servicios benefician a cada
+agente que las usa.
+
+## Managed Agent Services: sessions, memory y artifacts
+
+Proyectos anteriores de agentes en DoorDash (2025) mostraron qué tan rápido se rompe
+la experiencia cuando el state es poco confiable. Un agente podía responder bien a un
+request, y luego olvidar o malusar información de un turn anterior.
+
+Ask DoorDash usa **tres formas de state**:
+
+<ComparisonTable
+  headers={["Tipo de state", "Propósito", "Lifetime"]}
+  highlight={1}
+  rows={[
+    ["Session state", "Conversación activa y trabajo completado", "Por sesión"],
+    ["Memory", "Preferencias del usuario útiles en conversaciones futuras", "Persistente"],
+    ["Artifacts", "Outputs estructurados: shopping lists, cards interactivas", "Por artifact"],
+  ]}
+/>
+
+DoorDash centralizó estos en **Managed Agent Services**, que provee APIs
+compatibles con ADK para sessions, memory y artifacts. Los domain agents usan las
+mismas interfaces sin operar sus propios sistemas stateful.
+
+### Memory con vector search
+
+La memoria a largo plazo se genera offline desde el comportamiento histórico del
+consumidor: cocinas favoritas, restricciones dietéticas. La memory relevante se
+recupera con **semantic vector search**, se rankea, y se incorpora al prompt. Esto
+separa la gestión de memory de la inferencia del modelo.
+
+Resultados de producción: memory computada mejoró grocery checkout conversion en
+**~24%**, aumentó basket sizes en **17%**, y redujo conversational turns en **7%**
+durante una evaluación de siete días.
+
+## Evals: 2000 automatizadas diarias
+
+Para validar el comportamiento de los agentes en producción, DoorDash construyó un
+framework de evaluación automatizada que:
+
+- Simula conversaciones stateful de clientes usando **LLM-generated users**
+- Usa **recorded tool fixtures** (no llama servicios reales durante evals)
+- Espeje el runtime de producción para evaluar independientemente orquestación,
+  guardrails y domain agents
+
+Resultados de la infraestructura de evals:
+
+<ComparisonTable
+  headers={["Métrica", "Antes", "Después"]}
+  highlight={2}
+  rows={[
+    ["Evals diarias", "Manual / ad-hoc", "2000+ automatizadas"],
+    ["Quality scores", "Baseline", "+8 puntos"],
+    ["Regression testing", "6 horas", "20 minutos"],
+    ["Model migration", "Semanas de validación", "Deployado en <1 semana, -35% p50 latency"],
+  ]}
+/>
+
+<Callout type="success" title="La lección de las evals">
+  Dentro de una semana del release de un nuevo LLM, DoorDash lo evaluó y deployó,
+  cortando p50 turn latency en 35% sin drop en quality scores. Una migración
+  posterior cortó p50 turn latency en otro 40%. Sin evals automatizadas a escala,
+  estas migraciones tomarían semanas de validación manual. Con ellas, son
+  decisiones de un día.
+</Callout>
+
+## El framework de decisión: cuándo centralizar
+
+La lección más transferible de DoorDash no es un componente específico — es el
+**framework de decisión** sobre qué centralizar y qué dejar a los equipos de dominio.
+
+DoorDash **centralizó una capacidad solo cuando** múltiples dominios la necesitaban
+y implementaciones separadas crearían problemas de confiabilidad u operacionales.
+
+<Steps>
+  <Step title="Centraliza cuando: hay duplicación + riesgo operacional">
+    Orquestación, memory, model access, tracing, evaluation infrastructure y rollout
+    controls. Múltiples dominios los necesitan. Implementaciones separadas crearían
+    inconsistencia y duplicación de trabajo.
+  </Step>
+  <Step title="Deja al dominio cuando: define el comportamiento del agente">
+    Instructions, skills, tools, evaluation criteria y model choices. Cada dominio
+    sabe qué hace su agente. Forzar un agente único compromete la calidad por
+    uniformidad.
+  </Step>
+  <Step title="No centralices prematuramente">
+    Una abstracción prematura puede forzar productos distintos en la misma forma.
+    DoorDash estandariza solo después de que múltiples dominios necesitan la
+    capacidad y separar implementaciones crearía problemas.
+  </Step>
+</Steps>
+
+## Resultados: el caso de Reservations
+
+Reservations fue la prueba concreta de la plataforma. El equipo reusó el path de
+producción ya sirviendo Restaurant y Grocery, y lanzó soporte de Reservations en
+**una semana** — aproximadamente **10x más rápido** que construir los domain agents
+iniciales.
+
+La plataforma de tracing ahorra **un mes de trabajo de observabilidad** por cada
+nuevo lanzamiento de agente. El SDK compartido propaga un trace ID a través de
+llamadas A2A, MCP tools y servicios downstream. Los ingenieros pueden seguir un
+request a través del Orchestrator, domain agents y tool calls en lugar de reconstruir
+logs de sistemas separados.
+
+## Conclusión
+
+DoorDash publicó el blueprint más completo de plataforma de agentes en producción:
+LLM Gateway + Agentic Gateway + ADK + Batch Inference, con Orchestrator + domain
+agents, MCP de 60+ tools, Managed Agent Services y evals a 2000 diarias.
+
+La lección no es "construye un gateway" o "usa ADK". Es cómo los equipos senior y
+líderes hacen **apuestas de plataforma bajo incertidumbre**: qué centralizar, qué
+dejar a los equipos, cuándo comprar, cuándo construir, y cómo moverse rápido sin
+convertir la plataforma en un bottleneck de confiabilidad o gobernanza.
+
+Si tu equipo está construyendo agentes, los patrones de [MCP en
+producción](/es/blog/mcp-en-produccin-patrones-de-integracin-real) y la
+[arquitectura hexagonal con
+MCP](/es/blog/arquitectura-hexagonal-agentes-ia-patrones-mcp) son el siguiente
+paso técnico. Pero antes: decide tu nivel de abstrucción. Demasiado bajo y cada
+equipo reconstruye plumbing. Demasiado alto y la plataforma se convierte en la
+fricción que intentabas eliminar.

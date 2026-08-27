@@ -1,0 +1,314 @@
+---
+title: "GitLab Duo y el ROI de la IA: Cómo Medir lo que los Agentes Aportan al SDLC"
+description: "GitLab Duo mide el ROI de la IA en el SDLC correlacionando adopción de code suggestions con cycle time, lead time, deployment frequency y change failure rate."
+date: "2026-08-29"
+pillar: "arquitectura"
+tags: ["observabilidad", "metricas", "ingenieria-software", "productividad", "ia"]
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Arquitectura de Software Avanzada"
+  part: 16
+resources:
+  - label: "AI Impact analytics dashboard measures the ROI of AI — GitLab"
+    url: "https://about.gitlab.com/blog/developing-gitlab-duo-ai-impact-analytics-dashboard-measures-the-roi-of-ai/"
+  - label: "Measuring AI ROI at scale: GitLab Duo Analytics"
+    url: "https://about.gitlab.com/blog/measuring-ai-roi-at-scale-a-practical-guide-to-gitlab-duo-analytics/"
+  - label: "GitLab Duo and SDLC trends — GitLab Docs"
+    url: "https://docs.gitlab.com/user/analytics/duo_and_sdlc_trends/"
+---
+
+# GitLab Duo y el ROI de la IA: Cómo Medir lo que los Agentes Aportan al SDLC
+
+> **Serie: Arquitectura de Software Avanzada — Parte 16.** Todos hablan de
+> desplegar IA en ingeniería de software. Casi nadie habla de cómo medir si esa
+> IA está generando valor real. GitLab construyó el AI Impact analytics dashboard
+> para responder exactamente eso — y publicó el framework completo.
+
+## El problema: despliegas IA, pero ¿cómo sabes que funciona?
+
+Las organizaciones adoptan herramientas de IA para sus equipos de desarrollo. Code
+suggestions, chat asistente, code review automatizado, root cause analysis. La
+adopción crece. Los licencias se pagan. Y entonces llega la pregunta inevitable del
+CFO: **¿esto está generando ROI?**
+
+La mayoría de las respuestas son anécdotas: "los desarrolladores dicen que es más
+rápido", "la tasa de aceptación de suggestions es del 30%". Pero la tasa de
+aceptación no es ROI. Un developer que acepta una suggestion que introduce un bug
+no es productividad — es deuda técnica acelerada.
+
+<Callout type="warning" title="La trampa de la acceptance rate">
+  La métrica que todos trackean — acceptance rate de code suggestions — es
+  necesaria pero insuficiente. Te dice qué porcentaje de suggestions se aceptaron.
+  No te dice si esas suggestions mejoraron o empeoraron el cycle time, el lead time,
+  o el change failure rate. Sin correlación con métricas del SDLC, la acceptance rate
+  es un vanity metric.
+</Callout>
+
+## La apuesta de GitLab: correlación, no solo conteo
+
+GitLab construyó el **AI Impact analytics dashboard** (disponible desde GitLab 17.0)
+con una premisa distinta: en lugar de solo contar usage, **correlacionar el uso de IA
+con métricas de performance del SDLC**.
+
+El framework define:
+
+- **Variable independiente (causa):** Code Suggestions Usage Rate — el número de
+  usuarios únicos mensuales de Code Suggestions dividido por el total de
+  contributors únicos mensuales.
+- **Variables dependientes (efecto):** Cycle Time, Lead Time, Deployment Frequency,
+  Change Failure Rate y Critical Vulnerabilities.
+
+<ComparisonTable
+  headers={["Variable", "Tipo", "Qué mide"]}
+  highlight={0}
+  rows={[
+    ["Code Suggestions Usage Rate", "Independiente", "% de contributors que usan IA activamente"],
+    ["Cycle Time", "Dependiente", "Tiempo desde primer commit hasta merge"],
+    ["Lead Time", "Dependiente", "Tiempo desde commit hasta deploy a producción"],
+    ["Deployment Frequency", "Dependiente", "Frecuencia de deploys"],
+    ["Change Failure Rate", "Dependiente", "% de deploys que causan incidentes"],
+    ["Critical Vulnerabilities", "Dependiente", "Vulnerabilidades críticas introducidas"],
+  ]}
+/>
+
+La pregunta que responde: **¿los equipos que adoptan Code Suggestions mejoran en
+cycle time, lead time y deployment frequency respecto a los que no?**
+
+## La comparación que importa: con IA vs sin IA
+
+El dashboard incluye una **comparison view** que compara el performance de equipos
+que usan IA contra equipos que no la usan. Esto es clave: el ROI de la IA no se mide
+en aislamiento. Se mide relativo al baseline.
+
+<Callout type="tip" title="Diseña tu experimento">
+  Si quieres medir el ROI real de tus tools de IA en ingeniería, necesitas un grupo
+  de control. Identifica equipos que adoptaron IA y equipos que no (o el mismo equipo
+  antes/después). Compara cycle time, lead time y change failure rate. Sin comparación,
+  cualquier mejora podría ser atribuida a otros factores: cambio de proceso, nuevo
+  senior engineer, refactor técnico.
+</Callout>
+
+GitLab considera solo contributors que han pusheado código al proyecto en el mes
+corriente — no cuenta usuarios inactivos como adoptadores. Esto evita inflar la
+tasa de adopción con licencias asignadas pero no usadas.
+
+## Las APIs: cómo extraer los datos
+
+GitLab expone tres endpoints de GraphQL para recuperar métricas de IA. Estas son las
+piezas que necesitas si vas a construir tu propio dashboard de ROI.
+
+### AiMetrics — métricas pre-agregadas
+
+```graphql
+query {
+  group(fullPath: "tu-org") {
+    aiMetrics(startDate: "2026-06-01", endDate: "2026-06-30") {
+      codeSuggestions {
+        shownCount
+        acceptedCount
+        acceptedLinesOfCode
+        shownLinesOfCode
+      }
+      codeContributorsCount
+      duoChatContributorsCount
+      duoUsedCount
+    }
+  }
+}
+```
+
+Esto te da los números agregados: cuántas suggestions se mostraron, cuántas se
+aceptaron, cuántas líneas de código se aceptaron vs mostraron, y cuántos contributors
+usaron Duo Chat o Duo en general.
+
+### AiUserMetrics — desglose por usuario y feature
+
+```graphql
+query {
+  group(fullPath: "tu-org") {
+    aiUserMetrics {
+      nodes {
+        user { username }
+        totalEventCount
+        codeSuggestions {
+          totalEventCount
+          codeSuggestionAcceptedInIdeEventCount
+          codeSuggestionShownInIdeEventCount
+        }
+        chat {
+          totalEventCount
+          requestDuoChatResponseEventCount
+        }
+        codeReview {
+          totalEventCount
+          requestReviewDuoCodeReviewOnMrByAuthorEventCount
+        }
+        agentPlatform {
+          totalEventCount
+          agentPlatformSessionStartedEventCount
+          agentPlatformSessionFinishedEventCount
+        }
+        mcp {
+          totalEventCount
+        }
+      }
+    }
+  }
+}
+```
+
+Esto te permite segmentar: ¿quién es power user? ¿Quién experimenta pero no retiene?
+¿Qué features generan más engagement?
+
+### AiUsageData — eventos crudos
+
+```graphql
+query {
+  group(fullPath: "tu-org") {
+    aiUsageData {
+      codeSuggestionEvents {
+        event        # ACCEPTED o SHOWN
+        timestamp
+        language     # Python, Go, TypeScript...
+        suggestionSize # SINGLE_LINE o MULTI_LINE
+        user { username }
+      }
+    }
+  }
+}
+```
+
+Eventos individuales para importar a tu BI tool o construir agregaciones custom.
+Nota: el date range máximo es de un mes por query — para rangos mayores, ejecuta
+queries separados.
+
+## Qué medir y qué no: el framework completo
+
+### Lo que importa
+
+<Steps>
+  <Step title="1. Usage Rate, no adoption count">
+    No cuentes cuántas licencias asignaste. Cuenta qué porcentaje de contributors
+    activos usan las features de IA. 100 licencias asignadas con 15 usuarios activos
+    es 15% de usage rate — y 85% de licencia desperdiciada.
+  </Step>
+  <Step title="2. Acceptance rate por lenguaje">
+    La acceptance rate varía dramáticamente por lenguaje. Lo que funciona para
+    TypeScript puede no funcionar para Go. Medir por lenguaje revela dónde la IA
+    aporta valor real y dónde ruido.
+  </Step>
+  <Step title="3. Correlación con SDLC metrics">
+    ¿El usage rate sube y cycle time baja? ¿Lead time mejora? ¿Change failure rate
+    se mantiene o empeora? Esta es la única correlación que responde "¿hay ROI?".
+  </Step>
+  <Step title="4. Retención por feature">
+    ¿Los usuarios que prueban Code Suggestions siguen usándolo mes 2, 3, 6? La
+    retención es el indicador más honesto de valor percibido. Un feature con alta
+    adopción inicial y baja retención es un feature que no aporta valor real.
+  </Step>
+  <Step title="5. Code Review sentiment">
+    GitLab trackea el sentimiento de los comentarios de code review (👍 vs 👎). Si
+    la IA genera código que los reviewers rechazan consistentemente, la acceptance
+    rate de suggestions es irrelevante — estás generando código que el equipo no
+    quiere mergear.
+  </Step>
+</Steps>
+
+### Lo que NO sirve como métrica de ROI
+
+<Callout type="danger" title="Métricas que engañan">
+  - **Total de suggestions generadas:** vanity metric. Generar suggestions no es
+    valor. Aceptarlas tampoco — si las aceptan y luego las reverten.
+  - **Licencias asignadas:** asignar no es adoptar. 1000 licencias con 200 usuarios
+    activos es 80% de desperdicio, no 100% de adopción.
+  - **Auto-reporte de productividad:** "los developers dicen que son 30% más
+    rápidos" no es medición, es percepción. La percepción tiende a sobreestimar.
+  - **Líneas de código aceptadas:** más código no es mejor código. Aceptar 1000
+    líneas de código que introducen bugs no es productividad.
+</Callout>
+
+## El dashboard en acción: tiles y visualizaciones
+
+El dashboard incluye tiles específicos que muestran:
+
+- **GitLab Duo Seats: Assigned and Used** — visibilidad inmediata de desperdicio de
+  licencias
+- **Code Suggestions: Acceptance Rate %** — no el número total, sino la tasa
+- **GitLab Duo Chat: Unique Users** — engagement con chat asistente
+
+Y la correlación principal: tendencias mensuales de Code Suggestions Usage Rate
+sobrepuestas con Cycle Time, Lead Time y Deployment Frequency, con sparklines de
+6 meses y cambios porcentuales.
+
+La tabla de metric trends muestra valores mensuales con cambios porcentuales en los
+últimos 6 meses y trend sparklines. Esto permite ver no solo el punto actual sino la
+dirección — ¿el adoption de IA está correlacionando con mejora sostenida o con un
+spike temporal?
+
+## Pipelines usando IA: la métrica oculta
+
+Una métrica subestimada del dashboard: **porcentaje de pipelines que usan GitLab
+Duo features durante ejecución**. Esto captura algo que la acceptance rate de
+suggestions no puede: cuánto del CI/CD está apalancando IA para root cause analysis,
+troubleshooting y otras tareas operacionales.
+
+Si tus pipelines no usan IA para troubleshooting, estás dejando valor en la mesa. El
+Root Cause Analysis de GitLab Duo puede diagnosticar fallos de pipeline en segundos
+que un humano tomaría minutos revisando logs.
+
+## Implementación práctica: tu propio dashboard de ROI
+
+Si no usas GitLab, el framework es transferible. Lo que necesitas construir:
+
+```
+┌─────────────────────────────────────────────────┐
+│           Data Collection Layer                   │
+│  IDE telemetry · Git events · CI/CD metrics      │
+│  → Usage events + SDLC performance metrics        │
+└──────────────────────┬──────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────┐
+│           Correlation Engine                      │
+│  Usage Rate (independent) ↔ SDLC metrics (dep.)  │
+│  Segment by: team, language, feature, seniority  │
+└──────────────────────┬──────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────┐
+│           Dashboard + Alerts                      │
+│  Tiles · Trends · Comparison view (with/without) │
+│  Alert: adoption ↓ without SDLC improvement      │
+└──────────────────────────────────────────────────┘
+```
+
+<Callout type="note" title="La regla del allocation">
+  Una organización financiera partner de GitLab implementó una solución híbrida de
+  analytics: recolección mensual de CSV + integración real-time vía API. El
+  resultado: visibilidad de 127% monthly ROI para usuarios activos, mientras 23% de
+  licencias permanecían subutilizadas. El insight accionable: expandir licencias a
+  equipos de alto performance, implementar training dirigido a usuarios
+  subutilizados, y construir business cases data-driven para adopción broader.
+</Callout>
+
+## Conclusión
+
+GitLab publicó el framework más práctico para medir ROI de IA en ingeniería de
+software: no contar usage, sino correlacionar adoption con métricas del SDLC.
+Code Suggestions Usage Rate como variable independiente, cycle time y change failure
+rate como dependientes, comparison view con/sin IA, y APIs GraphQL para extraer
+todo.
+
+La lección para tu equipo: antes de celebrar que "el 60% de los developers usan IA",
+verifica si esa adopción está correlacionando con mejora en cycle time, lead time y
+deployment frequency. Si no lo está, tienes adoption sin ROI — y eso es licencias
+desperdiciadas disfrazadas de éxito.
+
+Si quieres profundizar en la observabilidad de sistemas con IA, la [observabilidad
+de sistemas multi-agente con
+OpenTelemetry](/es/blog/observabilidad-sistemas-ia-trazas-opentelemetry) es el
+siguiente paso técnico. Pero primero: define tus variables independientes y
+dependientes. Sin framework de medición, cada número de "productividad" es una
+anecdota disfrazada de dato.
