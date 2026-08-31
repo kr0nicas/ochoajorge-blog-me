@@ -1,0 +1,295 @@
+---
+title: "Shopify Sidekick: El Bucle de Aprendizaje Continuo que Reduce Costos 96%"
+description: "Shopify comprime fallos de producción en pesos del modelo con self-healing, gisting y GRPO. El bucle de aprendizaje continuo que reduce costos 96 por ciento."
+date: "2026-09-01"
+tags: ["agentes-ia", "aprendizaje-continuo", "gisting", "grpo", "optimizacion"]
+pillar: "agentes-en-produccion"
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Construyendo con IA: Lo que nadie te dice"
+  part: 11
+resources:
+  - label: "Sidekick's continual learning loop — Shopify Engineering"
+    url: "https://shopify.engineering/sidekicks-continual-learning-loop"
+  - label: "Gisting: Compressing LLM Agent context — Shopify Engineering"
+    url: "https://shopify.engineering/gisting"
+  - label: "Teaching Sidekick to say no — Shopify Engineering"
+    url: "https://shopify.engineering/sidekick-curation"
+  - label: "Building production-ready agentic systems — Shopify Engineering"
+    url: "https://shopify.engineering/building-production-ready-agentic-systems"
+---
+
+# Shopify Sidekick: El Bucle de Aprendizaje Continuo que Reduce Costos 96%
+
+> **Serie: Construyendo con IA — Parte 11.** Desplegar un modelo frontier en
+> producción es el principio, no el final. Un modelo desplegado es un modelo
+> congelado: no tiene mecanismo para internalizar lo que la producción le
+> enseña. Shopify construyó un bucle de aprendizaje continuo que comprime la
+> experiencia de producción en los pesos del modelo — y publicó la arquitectura
+> completa.
+
+## El problema: tu modelo en producción es una foto congelada
+
+Despliegas un modelo frontier. Funciona. Los primeros días son mágicos: responde
+bien, los merchants están contentos, los dashboards se ven bien. Pero el modelo
+no aprende nada nuevo después del deploy. Cada fallo en producción se acumula
+en los artefactos que lo rodean — ediciones de prompt, ejemplos de retrieval,
+reglas de routing, código del harness — pero los pesos del modelo siguen intactos.
+
+El conocimiento de producción se acumula en palabras y código. El modelo sigue
+siendo el mismo. Y mientras tanto, el costo de servirlo crece.
+
+<Callout type="warning" title="El costo oculto del frontier">
+  El agente GraphQL de Shopify sirve hasta 2,000 requests por minuto en
+  producción. Servir ese tráfico en un modelo frontier costaría aproximadamente
+  $27M anuales. Ese es el costo de un feature que duele mantener a escala.
+</Callout>
+
+Shopify enfrentó esta pregunta directamente: **¿cómo haces que un modelo
+especializado sea más barato, más rápido y mejor que un frontier — y que siga
+mejorando con cada día de producción?**
+
+La respuesta es un bucle. No un prompt más elaborado, no un RAG más sofisticado:
+un **bucle de aprendizaje continuo** que convierte la experiencia de producción
+en actualizaciones de parámetros del modelo.
+
+## La arquitectura del bucle: dos capas, un solo ciclo
+
+Sidekick funciona en dos capas: un **planner externo** que interpreta la
+intención general del merchant, y un conjunto de **modelos de skill
+especializados** que manejan capacidades específicas — segmentación, analytics,
+email, etc. El planner rutea "envía un descuento a mis mejores clientes" a
+segmentación, analytics y email.
+
+El bucle de aprendizaje continuo opera sobre los skill models. Tiene cinco etapas:
+
+### 1. Mejorar el baseline con autoresearch
+
+Antes de tocar los pesos, Shopify empuja el sistema frontier-powered al máximo.
+Cada mejora cae en prompts, tool definitions y harness. Pero mejorar el baseline
+es un problema distinto a construir el judge: ya es una aplicación en producción
+con prompts dinámicamente ensamblados, control loops custom, y orquestación
+distribuida. Un solo prompt no determina el comportamiento, así que prompt tuning
+solo llega a una parte del sistema.
+
+El target de optimización es el **harness completo**: sus prompts, tool
+definitions y código de orquestación. Shopify lo trata como un problema de
+autoresearch: un agente propone un cambio, lo evalúa contra el judge, lo
+conserva si el score mejora, lo descarta si no. Todo configurable en un
+archivo markdown legible.
+
+### 2. El pipeline de self-healing
+
+La producción genera fallos constantemente: contexto parcial, requests
+ambiguos, workflows específicos de cada negocio, tool failures. En un workflow
+tradicional, cada fallo se convierte en un bug report o un thread de Slack. En
+el bucle, esos fallos entran automáticamente en un **pipeline de
+self-healing**.
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│                   PRODUCCIÓN (2,000 RPM)                       │
+│   Conversaciones reales → Judge calibrado scores cada una     │
+└──────────────────┬───────────────────────────────────────────┘
+                   │ Low-scoring conversations
+                   ▼
+┌──────────────────────────────────────────────────────────────┐
+│              PANEL DE RAZONAMIENTO (Frontier)                 │
+│   Modelo A · Modelo B · Modelo C → Critican cada fallo       │
+└──────────────────┬───────────────────────────────────────────┘
+                   │ Críticas fusionadas
+                   ▼
+┌──────────────────────────────────────────────────────────────┐
+│                    ÁRBITRO                                     │
+│   Merge de críticas → Repair instruction (hinting)           │
+└──────────────────┬───────────────────────────────────────────┘
+                   │ Replay + re-score
+                   ▼
+        ¿Pasa el judge? ──→ Sí → Trajectory para RL
+                         └─→ No → Anotación humana (Toloka)
+```
+
+Un panel de modelos frontier de razonamiento critica cada fallo. Un árbitro
+mergea las críticas en una **repair instruction** que se inyecta antes del turno
+del usuario — una técnica llamada "hinting." Se replayea la conversación desde
+ese punto y el judge la scorea de nuevo.
+
+- **Si pasa:** el replay se convierte en una **trayectoria para reinforcement
+  learning**, con el score del judge como reward.
+- **Si sigue fallando:** se envía a **anotación humana**. Toloka provee
+  anotadores expertos que corrigen lo que los críticos no pudieron arreglar.
+
+### 3. Entrenamiento en dos etapas
+
+**Stage 1 — Supervised Fine-Tuning (SFT):** las trayectorias curadas se
+destilan en un modelo más pequeño. Se entrena en las trayectorias completas —
+incluyendo el razonamiento que las produjo, no solo las respuestas finales.
+Esta **chain-of-thought distillation** permite que el modelo más pequeño herede
+comportamiento que no podría aprender de las respuestas solas.
+
+**Stage 2 — GRPO (Group Relative Policy Optimization):** con el judge calibrado
+como reward signal, GRPO refuerza las respuestas que mejor performan. Para cada
+prompt, el modelo samplea un grupo de respuestas, los judges las scorean, y
+GRPO refuerza las que mejor lo hacen.
+
+```python
+# Simplificación del loop de entrenamiento
+for cycle in range(num_cycles):
+    # 1. Recopilar fallos de producción del ciclo anterior
+    failures = collect_low_scoring_conversations(production_traffic)
+    
+    # 2. Self-healing: generar trayectorias corregidas
+    trajectories = self_heal(failures, panel_of_frontier_models)
+    
+    # 3. SFT: destilar trayectorias exitosas
+    model = supervised_finetune(model, trajectories)
+    
+    # 4. GRPO: optimizar contra el judge calibrado
+    model = grpo_train(model, judge, validation_set)
+    
+    # 5. Deployar y empezar de nuevo
+    deploy(model)
+    # El tráfico del modelo deployado alimenta el siguiente ciclo
+```
+
+### 4. Comprimir el prompt: gisting
+
+El sistema prompt del agente GraphQL tenía ~6,000 tokens. Cada request pagaba ese
+impuesto: más tokens significa inferencia más lenta y más cara. Y aunque prefix
+caching ayuda con el prefill, **no elimina el decode cost**: cada token generado
+atende sobre todo el KV cache, y ese read crece linealmente con el largo de la
+secuencia.
+
+<Callout type="tip" title="Gisting en una frase">
+  Gisting comprime el prompt del sistema en una secuencia corta de tokens
+  aprendidos que reproducen el comportamiento del prompt original a una fracción
+  del largo. El costo se paga una vez, en entrenamiento.
+</Callout>
+
+Shopify corre el mismo modelo dos veces: un **teacher** con el prompt completo
+de 6,000 tokens, y un **student** con ~1,500 gist tokens en su lugar. Se entrenan
+los embeddings de los gist tokens via knowledge distillation: KL divergence
+entre los logits del teacher y los del student, hasta que las predicciones del
+student igualen las del teacher.
+
+**Resultados del gisting a 350 RPM:**
+
+<ComparisonTable
+  headers={["Métrica", "Sin gisting", "Con gisting", "Mejora"]}
+  highlight={2}
+  rows={[
+    ["Time to first token", "438 ms", "354 ms", "-19%"],
+    ["Latencia end-to-end", "6.8 s", "4.2 s", "-38%"],
+    ["Throughput (QPS)", "20.2", "23.4", "+16%"],
+    ["GPUs necesarios", "Baseline", "14% menos", "-14%"],
+    ["Calidad (judge score)", "Baseline", "Sin pérdida medible", "≈"],
+  ]}
+/>
+
+El despliegue es simple: cuando el entrenamiento termina, los gist embeddings se
+escriben directamente en la embedding matrix del modelo, y los gist tokens se
+registran como special tokens en el tokenizer. El modelo carga y corre como
+cualquier otro. El único cambio en inference time es reemplazar el prompt con
+el string de gist tokens.
+
+### 5. El data flywheel: cada deploy financia el siguiente
+
+El bucle solo importa cuando cada gap de producción se convierte en
+combustible para el siguiente entrenamiento. El tráfico de producción no puede
+quedarse en dashboards — tiene que convertirse en el input del siguiente run.
+
+Una vez que el modelo mejorado va a producción, su tráfico se convierte en la
+siguiente muestra. Los merchants encuentran nuevas formas de pedir lo mismo, y
+los fallos exponen gaps que no existían en el set original. El judge etiqueta
+esos patrones nuevos, descarta los ejemplos donde los judges no se ponen de
+acuerdo, y agrega los aceptados al corpus. El siguiente fine-tuning empieza con
+más datos y labels más limpias.
+
+## Enseñar al modelo a decir no
+
+El bucle de aprendizaje continuo tiene un gap estructural: los datos de
+producción solo capturan queries exitosas. El modelo nunca aprende cuándo
+rechazar una request que no puede cumplir.
+
+Shopify construyó un **pipeline de curación automatizada** con consenso de
+LLM judges para cerrar ese gap. Un panel de cuatro modelos frontier evalúa cada
+query independientemente. Solo cuando los cuatro concuerdan en el veredicto
+**y** en el razonamiento, el label pasa el consensus gate. Las discrepancias se
+filtran, no se arbitran — mejor precisión que recall.
+
+```text
+Query: "Muéstrame los clientes que compraron el martes 13 de marzo de 2024"
+
+Judge A: Refusable — los segmentos no soportan filtrado por día específico
+Judge B: Refusable — fecha exacta no disponible en la API de segmentación  
+Judge C: Refusable — capability faltante
+Judge D: Refusable — capability faltante
+
+→ Consensus: 4/4 acuerdan → Label aceptado → entra al corpus de entrenamiento
+```
+
+Con refusal capabilities habilitadas, el score de evaluación de segmentación
+subió de 0.619 a 0.798 — un 28.9% de mejora relativa. La precisión de refusos
+alcanzó 86.3% con un false positive rate de 4.6%.
+
+<Callout type="note" title="La lección incómoda">
+  Si un sistema no puede hacer algo, una respuesta alucinada es el peor
+  resultado. Un rechazo truthful — idealmente con una sugerencia de qué intentar
+  en su lugar — mantiene la conversación productiva. Shopify invirtió mucho
+  tiempo enseñando al modelo cuándo decir sí. Deberían haber empezado por
+  cuándo decir no.
+</Callout>
+
+## Los números del bucle en producción
+
+El agente GraphQL de Shopify es donde el bucle entero funciona a 2,000 RPM.
+Los resultados después de múltiples ciclos:
+
+- **Calidad:** el modelo especializado supera al frontier-powered baseline
+- **Costo:** de un estimado de $27M/año en frontier a ~$1M/año — **96% menos**
+- **Latencia:** TTFT -19%, latencia end-to-end -38% a 350 RPM
+- **Throughput:** +16% QPS, +12% tokens/seg
+- **Hardware:** 14% menos GPUs para el mismo tráfico
+
+## Lecciones aprendidas
+
+- **El harness importa más que el modelo.** DoorDash llegó a la misma
+  conclusión con su LLM Gateway: el modelo es la parte fácil; todo lo que lo
+  rodea — judges, pipelines de self-healing, evaluación — es lo que determina
+  si funciona en producción.
+
+- **El self-healing diario es infraestructura, no un fix puntual.** Cada deploy
+  genera más signal, y cada gap se convierte en la semilla del siguiente ciclo
+  de anotación. Es un flywheel, no un proyecto.
+
+- **Consenso sobre confianza individual.** Cuando no sabes la forma del
+  problema, el acuerdo unánime de 4 modelos vale más que el score de confianza
+  de uno solo. Si cuatro modelos independientes no se ponen de acuerdo, un
+  humano debe decidir.
+
+- **Gisting y prefix caching no son mutuamente excluyables.** Se complementan:
+  prefix caching evita el prefill, gisting reduce el decode. Usar ambos
+  compone las ganancias.
+
+- **Empieza por enseñar a decir no.** El peor fallo de un agente no es no
+  saber algo — es alucinar que sí lo sabe. El rechazo truthful es una feature,
+  no una limitación.
+
+## Conclusión
+
+El bucle de aprendizaje continuo de Shopify es la respuesta más completa que he
+visto a la pregunta de cómo operar IA en producción a escala. No es un modelo
+mejor — es un **sistema** que hace que el modelo mejore automáticamente con
+cada día de tráfico real.
+
+La ventaja durable no es el modelo. Es el bucle que sigue girando: producción
+genera fallos, los fallos se convierten en trayectorias, las trayectorias se
+destilan en pesos, y los pesos se deployan de vuelta. Cada ciclo empieza con un
+modelo más capaz, no con un harness más elaborado.
+
+¿Quieres profundizar en gisting y optimización de serving? El siguiente post de
+la serie cubre la arquitectura de Notion para búsqueda vectorial a escala de
+millones de workspaces — otro caso real de infraestructura que tuvo que
+evolucionar bajo presión.

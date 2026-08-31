@@ -1,0 +1,284 @@
+---
+title: "Notion: Búsqueda Vectorial a Escala de Millones de Workspaces"
+description: "Notion escaló su búsqueda vectorial para AI Q&A: de pods acoplados a serverless y Turbopuffer, Page State con xxHash y Ray que redujo costos 90 por ciento."
+date: "2026-09-03"
+tags: ["rag", "busqueda-vectorial", "arquitectura", "escalabilidad", "embeddings"]
+pillar: "arquitectura"
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Arquitectura de Software Avanzada"
+  part: 17
+resources:
+  - label: "Two years of vector search at Notion — Notion Blog"
+    url: "https://www.notion.com/blog/two-years-of-vector-search-at-notion"
+  - label: "Enabling Multi-Region Data Systems at Notion — Notion Blog"
+    url: "https://www.notion.com/en-gb/blog/enabling-multi-region-data-systems-at-notion"
+  - label: "Rebuilding Notion's lexical search reindexer — Notion Blog"
+    url: "https://www.notion.com/nb/blog/rebuilding-notions-lexical-search-reindexer"
+---
+
+# Notion: Búsqueda Vectorial a Escala de Millones de Workspaces
+
+> **Serie: Arquitectura de Software Avanzada — Parte 17.** Cuando lanzas AI
+> Q&A en noviembre de 2023 y necesitas escalar a millones de workspaces en
+> meses, cada decisión de arquitectura que tomaste el día 1 se convierte en
+> deuda técnica. Notion publicó dos años de evolución de su infraestructura
+> de búsqueda vectorial — y cómo la llevaron de pods acoplados a una
+> arquitectura serverless que reduce costos 90%.
+
+## El problema: escalar AI Q&A no es escalar search
+
+En noviembre de 2023, Notion lanzó AI Q&A. La premisa era simple: un usuario
+hace una pregunta, el sistema busca en su workspace con búsqueda semántica, y
+el LLM responde con el contexto recuperado. La implementación inicial funcionó.
+
+Pero escalar esto a millones de workspaces es un problema completamente
+distinto. Cada workspace tiene su propio conjunto de páginas, permisos, y
+estructura. Los embeddings tienen que estar frescos — si editas una página, la
+búsqueda semántica tiene que reflejarlo casi en tiempo real. Y los costos de
+inferencia de embeddings a esa escala se convierten en el bottleneck dominante.
+
+<Callout type="note" title="La dualidad del problema">
+  Search tradicional resuelve "qué páginas contienen esta palabra." AI Q&A
+  resuelve "qué páginas responden esta pregunta" — y requiere que los
+  embeddings estén actualizados al instante. Eso convierte el pipeline de
+  ingesting en el corazón del sistema, no en un detalle de infraestructura.
+</Callout>
+
+## Evolución de la arquitectura: tres migraciones en dos años
+
+### Generación 1: Pods acoplados (noviembre 2023)
+
+La arquitectura inicial usaba clusters de pods dedicados que acoplaban
+**storage y compute**. El sharding usaba workspace ID como partitioning key,
+con range-based partitioning y una config que referenciaba todos los shards.
+
+Funcionó para el lanzamiento. Pero para abril de 2024, cuando Notion limpió la
+waitlist, manejar múltiples generaciones de bases de datos se volvió
+operacionalmente complejo y caro.
+
+### Generación 2: Serverless, storage desacoplado (mayo 2024)
+
+La primera migración movió toda la workload de embeddings de pods dedicados a
+una **arquitectura serverless** que desacoplaba storage de compute y cobraba por
+uso en lugar de uptime.
+
+```text
+ANTES (Pods)                    DESPUÉS (Serverless)
+┌────────────────┐              ┌────────────────┐
+│  Storage +     │              │   Storage       │
+│  Compute        │     →       │   (desacoplado)  │
+│  (acoplados)    │              ├────────────────┤
+│  Capacidad      │              │   Compute       │
+│  fija           │              │   (bajo demanda) │
+└────────────────┘              └────────────────┘
+  Costo: uptime                  Costo: uso real
+  Bottleneck: capacidad          Sin límite de storage
+```
+
+Los beneficios fueron inmediatos:
+
+- **-50% de costo** desde peak usage → varios millones de dólares ahorrados
+  anuales
+- **Eliminación del bottleneck de capacidad** de storage
+- **Operaciones simplificadas** — sin provisionar capacidad adelantada
+
+### Generación 3: Turbopuffer, object storage nativo (fines 2024 - enero 2025)
+
+En paralelo, Notion evaluó motores de búsqueda alternativos. Turbopuffer
+emergió como opción: construido desde cero sobre **object storage** para
+performance y cost-efficiency. Su arquitectura alineaba con las necesidades de
+Notion: soportaba deployment managed y bring-your-own-cloud, y hacía fácil
+modificar objetos vectoriales en bulk.
+
+La migración aprovechó para hacer tres cosas simultáneamente:
+
+1. **Full re-indexing:** aumentaron el throughput de writes en el pipeline
+   offline para reconstruir el corpus completo en Turbopuffer
+2. **Upgrade de embeddings model:** cambiaron a un modelo de embeddings más
+   performante durante la migración
+3. **Simplificación de arquitectura:** Turbopuffer trata cada namespace como
+   un índice independiente, sin sharding ni routing por generación
+
+La migración fue gradual: una generación a la vez, validando correctness antes
+de pasar a la siguiente.
+
+## Page State: el proyecto que redujo datos 70%
+
+El siguiente problema fundamental era la ineficiencia del pipeline de indexing.
+Las páginas de Notion pueden ser muy largas, así que se hace chunking por spans,
+se embeddea cada span, y se carga en la vector database con metadata como
+autores y permisos.
+
+El problema: detectar cambios era ineficiente. Si un usuario cambiaba un
+permiso en una página, todo el page se re-embeddeaba, aunque el texto no
+hubiera cambiado.
+
+### La solución: hashing con xxHash
+
+Notion mantuvo **dos hashes por span**: uno del texto del span, otro de todos
+los campos de metadata. Usaron la variante de 64 bits de **xxHash** — balance
+entre velocidad, ease of use, y bajas colisiones con el storage footprint.
+
+```python
+# Detección de cambios con Page State
+import xxhash
+
+def should_reembed(span, previous_state):
+    text_hash = xxhash.xxh64(span.text).intdigest()
+    metadata_hash = xxhash.xxh64(
+        f"{span.permissions}:{span.authors}:{span.created_at}"
+    ).encode().intdigest()
+    
+    prev = previous_state.get(span.id)
+    if prev is None:
+        return True  # span nuevo
+    
+    # Solo re-embed si cambió el texto
+    if prev.text_hash != text_hash:
+        return True
+    
+    # Si solo cambió metadata, parchar la vector DB directamente
+    if prev.metadata_hash != metadata_hash:
+        update_vector_db_metadata(span.id, span.metadata)
+        return False
+    
+    return False  # sin cambios, saltar
+```
+
+Eligen **DynamoDB** como solución de caching: inserts y lookups rápidos, un
+record por página con un struct de todos los spans y sus hashes. Cuando una
+página se actualiza, se compara contra el estado anterior, y solo se re-embeddea
+lo que cambió de texto. Los cambios de metadata se parchean directamente en la
+vector database.
+
+**Resultado: 70% menos volumen de datos.** Ahorro en ambos costos de API de
+embeddings y writes a la vector database.
+
+## Embeddings en Ray: unificando compute (julio 2025 - presente)
+
+La última gran migración abordó el **"double compute" problem**:
+
+1. **Spark en EMR** para preprocesamiento (chunking, transformaciones,
+   orquestación de API calls)
+2. **API de embeddings de un proveedor** cobrando por token
+
+Dos sistemas, un handoff vía S3 entre ellos, y dependencia del uptime del
+proveedor de API.
+
+<Callout type="warning" title="El costo del double compute">
+  Pagabas por procesamiento en Spark para preparar los datos, y luego pagabas
+  por token al proveedor de embeddings. Dos bills, dos sistemas, un handoff
+  frágil vía S3. Y si el proveedor de embeddings tenía un outage, tu pipeline
+  se detenía.
+</Callout>
+
+### La migración a Ray + Anyscale
+
+Notion migró su pipeline de embeddings de tiempo casi-real a **Ray corriendo
+en Anyscale** (managed Ray del equipo original de Ray). No tienen un equipo
+dedicado de ML infra — Anyscale les da la plataforma como servicio.
+
+Los beneficios de la migración:
+
+- **Model flexibility:** Ray permite correr modelos de embeddings open-source
+  directamente, sin depender de un proveedor externo. Cuando sale un modelo
+  nuevo, pueden adoptarlo inmediatamente.
+- **Unified compute:** preprocesamiento (CPU) e inferencia (GPU) en una sola
+  capa, eliminando el double-compute y el handoff vía S3.
+- **GPU/CPU pipelining:** Ray soporta nativamente pipelining de inferencia
+  GPU-bound con preprocesamiento CPU-bound en las mismas máquinas.
+- **Lower query latency:** self-hosting eliminó un hop de API de terceros del
+  critical path, reduciendo latencia end-to-end de búsqueda.
+- **90%+ menos costo** de infraestructura de embeddings.
+
+Ray Serve provee el serving layer: wrap de modelos open-source en un
+deployment persistente que se queda cargado en GPU, con batching dinámico,
+replicación, y autoscaling. El código de serving es Python normal, y las
+configs de compute/replicación/autoscaling son YAML plano.
+
+## Multi-región: data residency sin degradar la experiencia
+
+En 2025, Notión lanzó data residency para clientes EU. Esto requirió que toda la
+infraestructura de datos — incluyendo AI — respetara límites regionales.
+
+### El principio: la región como input de primera clase
+
+Notion rediseñó su infraestructura para ser más modular y ágil antes de la
+expansión multi-región. Sistemas se separaron en redes privadas aisladas, cada
+una procesando un slice de los datos con mínima comunicación cross.
+
+Para AI específicamente:
+
+1. **Onboarding regional:** cuando un workspace se hace elegible para AI, un
+   proceso de onboarding embeddea su contenido existente y lo almacena en una
+   **vector database regional**. Una tabla de mapping centralizada actúa como
+   source of truth para la región activa de cada workspace.
+2. **Updates en vivo:** los cambios de contenido se escriben a un **Kafka
+   cluster regional**, jobs de Spark procesan los cambios, generan embeddings
+   actualizados, y los escriben de vuelta a la vector database regional — sin que
+   los datos salgan de su región.
+
+<Callout type="tip" title="Airflow centralizado, compute regional">
+  Airflow se mantiene en US como plano de control — solo orquesta, no procesa
+  datos de clientes. Los jobs de Spark corren en clusters EMR regionales. Esto
+  mantiene el scheduling simple mientras respeta residency.
+</Callout>
+
+### El costo real de la multi-región
+
+La multi-región añade complejidad real:
+
+- **Tabla de mapping workspace → región** que debe mantenerse consistente
+- **Migraciones cross-región** de workspaces que se mueven entre regiones
+- **S3 buckets regionales** para datos, con configuración de Terraform
+- **Saneamiento de datos** antes de que cualquier cosa salga de su región para
+  analytics no sensitivos
+
+Notion ya está aplicando estos aprendizajes para expandir a Japón y Corea del
+Sur. El objetivo: poder desplegar el stack de datos en una región nueva en
+**días, no meses**.
+
+## Lecciones aprendidas
+
+- **Storage y compute desacoplados desde el día 1.** La primera migración de
+  Notion fue de pods acoplados a serverless. Si hubieran empezado con
+  serverless, se habrían ahorrado meses de complejidad operacional y millones
+  en costos.
+
+- **Hashing para evitar recomputación.** El 70% de los "cambios" en una página
+  son de metadata, no de texto. Hashar y comparar antes de re-embeddear
+  convierte un problema O(n) en un problema O(k), donde k son los spans que
+  realmente cambiaron.
+
+- **El double compute es el pattern anti.** Pagar por preprocesamiento y
+  luego pagar por inferencia en sistemas separados con un handoff frágil entre
+  ellos es el patrón más caro y frágil que existe. Unificar en una sola capa
+  de compute (Ray) resuelve ambos problemas simultáneamente.
+
+- **Self-hosting embeddings > API de terceros.** El hop de API de un tercero
+  en el critical path de búsqueda añade latencia y dependencia. Self-hosting
+  con Ray Serve da control, flexibilidad de modelo, y latencia más baja.
+
+- **La región debe ser un input de primera clase, no un afterthought.** Hacer
+  que la región sea un input explícito en el pipeline de AI desde el diseño
+  permite multi-región sin reescribir todo. Si no lo diseñas desde el inicio,
+  retrofitarlo es meses de trabajo.
+
+## Conclusión
+
+La historia de Notion es la historia de una infraestructura que evolucionó bajo
+presión real: de pods acoplados a serverless, de serverless a Turbopuffer sobre
+object storage, de Spark + API externa a Ray con modelos self-hosted. Cada
+migración resolvió un bottleneck que la anterior no podía resolver.
+
+El resultado: 10x más escala a 1/10 del costo. Millones de workspaces con AI
+Q&A que funciona, con embeddings frescos, en múltiples regiones, con data
+residency. Y la arquitectura es ahora lo suficientemente madura como para que
+el próximo feature de AI no requiera reescribir la infraestructura.
+
+El siguiente post de la serie cambia de infraestructura de RAG a la plataforma
+agentica completa: las seis capas del sistema de ingeniería agent-native de
+GitHub, desde sandboxes hasta Chronicle y multi-model review.
