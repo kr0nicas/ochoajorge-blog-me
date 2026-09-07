@@ -1,0 +1,292 @@
+---
+title: "Duolingo: Plataforma de Agentes Lista para Produccion en 10 Minutos"
+description: "Duolingo construyó una plataforma de agentes donde defines el agente una vez y Temporal maneja ejecución, observabilidad y evaluación automáticamente."
+date: "2026-09-10"
+tags: ["plataforma-ia", "agentes-ia", "temporal", "observabilidad", "evaluacion"]
+pillar: "arquitectura"
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Arquitectura de Software Avanzada"
+  part: 18
+resources:
+  - label: "Making production-ready agents the default: building Duolingo's agent platform — Duolingo Blog"
+    url: "https://blog.duolingo.com/production-ready-ai-agent-platform/"
+---
+
+# Duolingo: Plataforma de Agentes Lista para Produccion en 10 Minutos
+
+> **Serie: Arquitectura de Software Avanzada — Parte 18.** Construir un agente
+> IA local es fácil. Productionizarlo es otra historia. Duolingo resolvió esto
+> creando una plataforma donde defines el agente una vez y Temporal maneja
+> ejecución, observabilidad, orquestación y evaluación. De semanas a 10
+> minutos por agente nuevo.
+
+## El problema: cada equipo reconstruye la misma infraestructura
+
+Construir un agente IA local es trivial. Escribes un prompt, le das al modelo
+acceso a tools y archivos, lo corres, iteras hasta que estás contento con el
+output.
+
+La parte difícil empieza después.
+
+Cuando quieres correrlo en la nube, el trabajo pasa de *prompting* a
+*productionizing*. Cada agente útil necesita una cantidad sorprendente de
+infraestructura alrededor: configurar MCP servers, preparar credenciales,
+clonar repositorios, cargar contexto del proyecto.
+
+En Duolingo, esto se estaba volviendo un dolor real porque estaban recreando
+toda esta infraestructura en cada proyecto que necesitaba agentes. La
+infraestructura que un equipo construía para un sistema no podía reutilizarse
+fácilmente por otro equipo trabajando en un sistema o plataforma diferente.
+
+Había también un problema de distribución. Una vez que un agente existía,
+querían que estuviera disponible en múltiples lugares: Slack, sitios internos,
+un CLI, o otro workflow de Temporal. Sin una capa de ejecución compartida,
+tendrías que reconstruir el agente en cada uno de esos sistemas.
+
+Y por encima de todo, querían que cada agente tuviera la orquestación,
+evaluación y observabilidad que necesita para ser realmente
+production-ready.
+
+## La solución: definir una vez, ejecutar en cualquier lugar
+
+Duolingo construyó un sistema donde los desarrolladores definen un agente
+especificando qué debe hacer (system prompt), qué tools debe tener (qué MCPs
+habilitar), y a qué debe tener acceso (qué repos clonar a su workspace). Todo
+lo demás está abstraído.
+
+Los agentes se definen en un registry, haciéndolos reutilizables desde
+múltiples entry points. Una definición simplificada:
+
+```python
+AgentDefinition(
+    name="incident_summary",
+    description="Summarize incident context from prior investigation steps.",
+    owner="Incident Team",
+    system_prompt="Use the provided evidence to write a concise summary.",
+    model="gpt-5.5",
+    mcp_servers=("github", "sentry"),
+    output_type=IncidentSummaryOutput,
+)
+```
+
+Esto da una forma consistente de describir qué es el agente, quién lo
+posee, qué provider usa, qué tools necesita y cuál debe ser la estructura
+del output.
+
+Después, un workflow de Temporal llamado `AgentWorkflow` maneja el resto.
+
+## Por qué Temporal
+
+Temporal es un durable workflow engine. Persiste estado, reintenta de forma
+segura y coordina trabajo de larga duración entre sistemas.
+
+<Callout type="tip" title="El mapeo agente → workflow">
+  Los agentes pueden tardar minutos en correr, llamar tools externas, esperar
+  input humano y fallar de formas que necesitan retry o debugging. En lugar
+  de tratar una corrida de agente como un proceso one-off, la tratas como un
+  workflow. El workflow posee el estado durable y la orquestación.
+</Callout>
+
+El workflow hace cuatro cosas:
+
+1. **Carga la definición** del agente desde el registry.
+2. **Prepara el entorno de ejecución**: workspace, credenciales, MCP servers.
+3. **Ejecuta el agente** usando el SDK del provider del LLM.
+4. **Retorna el output** del agente.
+
+Una vez que el agente está definido, dispararlo es simple desde la
+perspectiva del caller:
+
+```python
+AgentWorkflow(
+    agent_name="incident_summary",
+    prompt="Summarize the investigation findings for this incident.",
+)
+```
+
+<ComparisonTable
+  headers={["Sin plataforma", "Con AgentWorkflow"]}
+  highlight={1}
+  rows={[
+    ["Días de setup por agente", "10 minutos para crear"],
+    ["SDK, tools y env acoplados", "Definición desacoplada de ejecución"],
+    ["Sin observabilidad estándar", "Temporal UI: cada tool call visible"],
+    ["Evals manuales o inexistentes", "Evals como workflows en Temporal"],
+    ["Un agente = un sistema", "Reutilizable desde cualquier entry point"],
+  ]}
+/>
+
+## Desacoplando definición de ejecución
+
+Antes de esta plataforma, el prompt, el modelo, el SDK, el tooling y el
+entorno de ejecución estaban todos acoplados. `AgentWorkflow` cambió eso.
+
+Puedes crear un agente definiendo qué hace, qué tools necesita y qué retorna.
+El workflow maneja todo lo relacionado con *cómo* ese agente corre.
+
+Esta separación es crucial para escalar. Una vez que la ejecución es
+independiente del comportamiento, puedes evolucionar runtimes, modelos,
+tooling y evaluación independientemente sin cambiar el interface que los
+consumers usan.
+
+### Un nuevo runtime: OpenAI Agents SDK
+
+`AgentWorkflow` ya soportaba varios runtimes, incluyendo el Claude Agents SDK
+y Codex CLI. Agregar soporte para el OpenAI Agents SDK no requirió cambiar cómo
+se definían o invocaban los agentes —simplemente fue otra implementación
+detrás de la misma abstracción de workflow.
+
+El impacto fue significativo en dos formas:
+
+1. **MCP tool calls como Temporal activities.** Con el plugin de Temporal,
+   cada llamada a una tool MCP se convierte en una activity de Temporal. Esto
+   hace al sistema más durable (los fallos de tools usan las mismas políticas
+   de retry) y más observable (cada tool call —inputs, outputs, fallos,
+   reintentos— es visible en la UI de Temporal).
+
+2. **Routing a través de un proxy.** El OpenAI Agents SDK soporta enrutar
+   requests a través de un proxy. Esto permitió usar su LLM Gateway interno,
+   que provee cost tracking, usage tracking y provider abstraction.
+
+<Callout type="note" title="El patrón LLM Gateway">
+  En lugar de soportar integraciones separadas del SDK para cada provider de
+  modelos, Duolingo enruta todo a través del gateway y cambia providers detrás
+  de un interface consistente. Un solo punto para cost tracking, rate
+  limiting y failover.
+</Callout>
+
+## Evaluando agentes: más allá de "suena razonable"
+
+Una vez que los agentes son reutilizables, el siguiente desafío es saber si
+están mejorando o empeorando. Esto es especialmente crítico para agentes que
+cambian código —no basta con que el output suene razonable, necesitas saber
+si hizo el cambio correcto.
+
+Duolingo construyó infraestructura de eval que corre el agente real contra
+escenarios diseñados. Captura el output del agente, los archivos cambiados y
+el `git diff` antes de calificar el resultado.
+
+Un caso de eval simplificado:
+
+```yaml
+agent_name: fix_ci
+cases:
+  - id: missing_requests_import
+    description: Fixes a deterministic NameError by importing requests.
+    input:
+      repo_fixture: fixtures/missing_requests_repo
+      prompt_file: prompts/fix_ci_eval_prompt.md
+    graders:
+      - type: structured_output
+        expect:
+          no_op: false
+      - type: diff_assertions
+        include:
+          - "import requests"
+        exclude:
+          - "pytest.mark.skip"
+        max_changed_files: 1
+      - type: no_op_consistency
+```
+
+### Cómo funciona el grading
+
+Duolingo usa varios tipos de graders:
+
+- **`structured_output`**: verifica campos en la respuesta estructurada del
+  agente.
+- **`diff_assertions`**: verifica el diff real del repo. Puede requerir
+  cambios específicos, capturar cambios riesgosos, limitar el número de
+  archivos modificados o restringir edits a ciertos paths.
+- **`no_op_consistency`**: verifica que el outcome reportado coincida con el
+  estado del repo. Si el output dice que no se necesitaba cambio pero los
+  archivos cambiaron, el eval falla.
+
+<Callout type="warning" title="Determinismo sobre vibranza">
+  Para casos donde las diff assertions exactas son demasiado frágiles,
+  también soportan un LLM-as-judge opcional. Pero los graders deterministas
+  son la base. No quieren que su única señal sea un modelo juzgando el
+  trabajo de otro modelo.
+</Callout>
+
+### Evals como workflows
+
+El sistema de eval también corre en Temporal. El suite workflow carga los
+casos, dispara un child workflow por cada caso y repetición, agrega
+resultados, genera un report y opcionalmente guarda el run para un dashboard.
+
+Esto da a los evals las mismas propiedades de durabilidad que las corridas de
+producción: un caso largo puede seguir corriendo, un caso fallido se captura
+explícitamente, las repeticiones corren en paralelo y los resultados se
+persisten para revisión posterior.
+
+## De semanas a 10 minutos
+
+Antes de esta plataforma, crear un agente production-ready era un proyecto
+multi-paso complejo. Los equipos tenían que elegir un SDK, aprender sus
+matices, configurar repository cloning, setear MCP servers y cablear
+credenciales. Dependiendo del caso de uso, este setup podía tomar varias
+semanas.
+
+Ahora, crear un agente toma unos 10 minutos. Un desarrollador usa un sitio
+interno para seleccionar MCPs, elegir un modelo y definir un system prompt
+para inmediatamente crear un agente. Desde ahí, puede invocarlo desde
+cualquier parte sin preocuparse por los detalles subyacentes.
+
+Pero el speedup es solo parte del impacto. Cada agente creado a través de la
+plataforma hereda automáticamente durabilidad, observabilidad, orquestación,
+evaluación y invocación desde múltiples entry points.
+
+Los agentes actualmente power workflows que arreglan fallos de CI,
+responden comentarios de code review y soportan tools internos como un Slack
+bot para release managers. Ese bot usa agentes especializados compuestos
+para investigar crashes, identificar cambios relevantes y resumir findings.
+
+## Lecciones para tu arquitectura
+
+1. **Separa definición de ejecución.** El insight más grande de Duolingo: si
+   desacoplas qué hace el agente de cómo corre, puedes evolucionar runtimes,
+   modelos y tooling independientemente. Cada agente nuevo hereda toda la
+   infraestructura sin código adicional.
+
+2. **Usa un durable workflow engine.** Temporal persiste estado, reintenta
+   safe y coordina trabajo de larga duración. Los agentes necesitan todo eso
+   por naturaleza. No lo reimventes.
+
+3. **MCP tool calls como activities.** Cuando cada tool call es una activity
+   de Temporal, obtienes retry policies, state management y observabilidad
+   gratis. Cada input, output, fallo y retry visible en la UI.
+
+4. **Evals deterministas como base.** Un LLM-as-judge es complemento, no
+   reemplazo. `diff_assertions` y `no_op_consistency` son deterministas,
+   reproducibles y no alucinan. Construye sobre eso.
+
+5. **El LLM Gateway es no-negociable.** Cost tracking, usage tracking y
+   provider abstraction en un solo punto. Sin esto, escalar agentes significa
+   escolar caos de integraciones.
+
+6. **La abstracción es el producto.** "Good abstractions have always been how
+   developers move fast" —Duolingo. La plataforma no acelera la creación de
+   agentes; cambia la naturaleza de los agentes creados. Cada uno hereda
+   calidad automáticamente.
+
+## Conclusión
+
+Duolingo nos enseña que la diferencia entre un agente que funciona en demo
+y uno que sobrevive en producción no es el modelo. Es la infraestructura que
+lo rodea: durabilidad, observabilidad, orquestación y evaluación.
+
+Cuando mueves esas preocupaciones a la plataforma, cada agente nuevo las
+hereda sin código adicional. Y "mover rápido" deja de ser un tradeoff contra
+"production-ready" —se vuelven la misma cosa.
+
+10 minutos por agente. Durabilidad, observabilidad y evaluación incluidas.
+Eso es lo que una buena abstracción hace.
+
+---
+
+*¿Estás construyendo plataformas de agentes? ¿Cómo separas definición de
+ejecución? Cuéntame en los comentarios.*

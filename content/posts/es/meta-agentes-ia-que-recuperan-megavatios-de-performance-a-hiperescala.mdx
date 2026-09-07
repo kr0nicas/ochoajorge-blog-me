@@ -1,0 +1,264 @@
+---
+title: "Meta: Agentes IA que Recuperan Megavatios de Performance a Hiperescala"
+description: "Meta construyó agentes IA que automatizan find-and-fix de regresiones de performance: MCP tools, skills y cientos de megavatios recuperados a hiperescala."
+date: "2026-09-08"
+tags: ["agentes-ia", "infraestructura", "eficiencia", "observabilidad", "hiperescala"]
+pillar: "agentes-en-produccion"
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Construyendo con IA: Lo que nadie te dice"
+  part: 13
+resources:
+  - label: "Capacity Efficiency at Meta: How Unified AI Agents Optimize Performance at Hyperscale — Engineering at Meta"
+    url: "https://engineering.fb.com/2026/04/16/developer-tools/capacity-efficiency-at-meta-how-unified-ai-agents-optimize-performance-at-hyperscale/"
+---
+
+# Meta: Agentes IA que Recuperan Megavatios de Performance a Hiperescala
+
+> **Serie: Construyendo con IA: Lo que nadie te dice — Parte 13.** Cuando sirves
+> a más de 3 mil millones de personas, una regresión de performance del 0.1%
+> se traduce en megavatios adicionales de consumo. Meta construyó agentes IA
+> que encuentran y reparan regresiones automáticamente. Y publicó la
+> arquitectura completa.
+
+## El problema: eficiencia a hiperescala es un deporte de dos bandas
+
+Cuando el código que despliegas sirve a más de 3 mil millones de personas, una
+regresión de performance del 0.1% no es un detalle: son megavatios adicionales
+de consumo eléctrico corriendo en los datacenters. En Meta, la organización de
+Capacity Efficiency trata esto como un esfuerzo de dos caras:
+
+1. **Ofensiva**: buscar oportunidades proactivas para hacer el código existente
+   más eficiente y desplegarlas.
+2. **Defensiva**: monitorear el uso de recursos en producción, detectar
+   regresiones, identificar el root cause y desplegar mitigaciones.
+
+Ambos sistemas funcionaron bien durante años. Pero el cuello de botella no era
+la detección —era la resolución. Cada oportunidad o regresión detectada
+requería tiempo de ingeniería humana para investigar, diagnosticar y producir
+un fix. Y ese tiempo competía con la innovación en producto.
+
+La pregunta que se hicieron: ¿Qué pasaría si la IA manejara la investigación
+y la resolución?
+
+## El insight: ofensiva y defensa comparten la misma estructura
+
+El breakthrough fue darse cuenta de que ambos problemas —encontrar
+optimizaciones y reparar regresiones— comparten la misma estructura:
+
+1. **Recoger contexto** sobre el problema (profiling data, code search,
+   configuration history, documentation).
+2. **Aplicar expertise de dominio** para entender qué hacer con ese contexto.
+3. **Producir un cambio** de código que resuelva el problema.
+
+Esto significaba que no necesitaban dos sistemas de IA separados. Necesitaban
+una plataforma que pudiera servir a ambos.
+
+<Callout type="tip" title="El insight clave">
+  No construyas agentes especializados por caso de uso. Construye una
+  plataforma con tools estandarizadas y skills intercambiables. El mismo set
+  de tools alimenta ofensiva y defensa —solo cambia el expertise codificado.
+</Callout>
+
+## La arquitectura: MCP Tools + Skills
+
+Meta construyó la plataforma sobre dos capas:
+
+### MCP Tools: interfaces estandarizadas
+
+Cada tool hace una sola cosa. No son generalistas: son específicas y
+deterministas. El inventario incluye:
+
+- **Query profiling data**: consultar datos de profiling para encontrar hot
+  functions.
+- **Fetch experiment results**: traer resultados de experimentos de
+  eficiencia.
+- **Retrieve configuration history**: historia de cambios de configuración
+  que podrían explicar un step change en uso de recursos.
+- **Search code**: buscar en el codebase por patrones o funciones.
+- **Extract documentation**: extraer docs relevantes al problema.
+
+Estas tools exponen el mismo interface estandarizado (MCP) que cualquier LLM
+puede invocar. No importan el modelo, el proveedor, ni el caso de uso: las
+tools son las mismas.
+
+### Skills: expertise de dominio codificado
+
+Las skills codifican el conocimiento que ingenieros senior de eficiencia
+desarrollaron durante años. Una skill le dice al LLM qué tools usar y cómo
+interpretar los resultados.
+
+Ejemplos concretos de skills:
+
+- *"Consulta los top GraphQL endpoints para regresiones de latencia en
+  endpoints."*
+- *"Busca cambios recientes de schema si la función afectada maneja
+  serialización."*
+- *"Si la regresión viene de logging, aumenta el sampling rate para reducir
+  CPU."*
+- *"Memoiza esta función para reducir uso de CPU."*
+
+<ComparisonTable
+  headers={["MCP Tools", "Skills"]}
+  highlight={-1}
+  rows={[
+    ["Query profiling data", "\"Para hot functions, consulta el profiler de producción\""],
+    ["Search code", "\"Busca cambios recientes que toquen esta función\""],
+    ["Retrieve config history", "\"Compara la config actual con la de hace una semana\""],
+    ["Extract documentation", "\"Lee el runbook de mitigación para este tipo de regresión\""],
+  ]}
+/>
+
+Juntas, tools y skills promueven un LLM generalista a algo que puede aplicar
+el expertise típicamente reservado para ingenieros senior. Las mismas tools
+alimentan ofensiva y defensa. Solo las skills difieren.
+
+## Defensa: FBDetect y el AI Regression Solver
+
+FBDetect es el tool interno de Meta para detección de regresiones. Puede
+capturar regresiones de performance tan pequeñas como **0.005%** en entornos
+de producción ruidosos. Analiza time series de métricas de recursos.
+
+Cuando FBDetect encuentra una regresión, el sistema intenta root-cause
+inmediatamente: correlaciona las funciones que regredieron con pull requests
+recientes usando técnicas tradicionales. Hasta ahí, todo es determinista.
+
+La novedad es lo que viene después.
+
+### AI Regression Solver: el agente que produce el fix
+
+El AI Regression Solver es el componente más reciente de FBDetect. En lugar de
+limitarse a notificar al ingeniero, activa un coding agent interno que:
+
+<Steps>
+  <Step title="1. Recoger contexto con tools">
+    El agente encuentra los síntomas de la regresión: qué funciones
+    regredieron, cuál fue el root cause (un pull request específico), qué
+    archivos y líneas exactas cambiaron.
+  </Step>
+  <Step title="2. Aplicar expertise de dominio con skills">
+    Usa conocimiento de mitigación de regresiones para el codebase, lenguaje
+    o tipo de regresión específico. Por ejemplo: regresiones por logging se
+    mitigan aumentando sampling. Regresiones por serialización se mitigan
+    revisando cambios de schema recientes.
+  </Step>
+  <Step title="3. Producir la resolución">
+    Genera un nuevo pull request con el fix y lo envía al autor original del
+    root cause para review. El ingeniero revisa, no escribe desde cero.
+  </Step>
+</Steps>
+
+El impacto es directo: lo que tradicionalmente era *rollback* (reduciendo
+velocidad de ingeniería) o *ignore* (aumentando consumo innecesario), ahora es
+un fix automático revisado por un humano en minutos.
+
+## Ofensiva: de oportunidad a pull request
+
+En el lado ofensivo, las "efficiency opportunities" son cambios conceptuales
+propuestos que se cree que mejorarán el performance del código existente. Meta
+construyó un sistema donde un ingeniero puede ver una oportunidad y solicitar
+un pull request generado por IA que la implemente.
+
+El pipeline espeja exactamente al AI Regression Solver:
+
+1. **Gather context**: el agente busca metadata de la oportunidad, documentación
+   del patrón de optimización, ejemplos de oportunidades similares resueltas,
+   archivos y funciones específicas involucradas, y criterios de validación.
+2. **Apply skills**: usa el conocimiento experto codificado para el tipo
+   específico de eficiencia. Por ejemplo, memoizar una función para reducir
+   CPU.
+3. **Create resolution**: produce un fix candidato con guardrails, verifica
+   sintaxis y estilo, confirma que aborda el problema correcto. El código
+   aparece en el editor del ingeniero, listo para aplicar con un click.
+
+<Callout type="note" title="La simetría es el punto">
+  Ofensiva y defensa usan las mismas tools: profiling data, documentation,
+  code search. Lo único que cambia son las skills. Una plataforma, dos caras,
+  retorno compuesto.
+</Callout>
+
+## Una plataforma, retornos compuestos
+
+La arquitectura unificada con tools y data sources compartidos resultó ser
+una abstracción limpia. Cada agente existente o nuevo tiene una forma simple
+de recoger contexto sobre performance a través de los interfaces
+estandarizados, sin reinventar la rueda.
+
+Dentro de un año, la misma base impulsó aplicaciones adicionales:
+
+- Asistentes conversacionales para preguntas de eficiencia
+- Agentes de capacity planning
+- Recomendaciones personalizadas de oportunidades
+- Workflows de investigación guiados
+- Validación asistida por IA
+
+Cada nueva capacidad requiere pocas o ninguna integración de datos nueva,
+porque puede componer tools existentes con skills nuevas.
+
+## El impacto: cientos de megavatios
+
+Los resultados del Capacity Efficiency Program son significativos:
+
+- **Cientos de megavatios** de poder recuperados —suficiente para alimentar
+  cientos de miles de hogares americanos por un año.
+- **~10 horas de investigación manual comprimidas a ~30 minutos** con
+  diagnóstico automatizado.
+- Agentes IA que **automatizan el camino completo** desde oportunidad de
+  eficiencia hasta pull request listo para revisión.
+
+Pero el cambio más profundo no está en los números. Está en cómo ofensiva y
+defensa se refuerzan mutuamente: ingenieros que pasaban mañanas en triage
+defensivo ahora revisan análisis generados por IA en minutos. Ingenieros que
+usan las tools de eficiencia ahora obtienen código asistido por IA en lugar
+de empezar desde cero. La pregunta abrumadora de *"¿por dónde empiezo?"* ha
+sido reemplazada por revisar y desplegar fixes de alto impacto.
+
+## Lecciones para tu organización
+
+<Callout type="warning" title="Lo que nobody te dice">
+  El valor no está en el modelo. Está en la separación entre tools
+  deterministas y expertise codificado. El modelo es intercambiable; las
+  skills son tu ventaja competitiva.
+</Callout>
+
+1. **No construyas agentes por caso de uso.** Construye una plataforma con
+   tools estandarizadas (MCP) y skills intercambiables. Un agente de
+   regresiones y un agente de oportunidades comparten el 90% de la
+   infraestructura.
+
+2. **Codifica el expertise senior, no el comportamiento del modelo.** Las
+   skills capturan patrones de razonamiento que ingenieros senior
+   desarrollaron durante años. Ese es el asset. El modelo es commodity.
+
+3. **Mide en unidades de negocio, no en tokens.** Cientos de megavatios. 10
+   horas a 30 minutos. Esos son los números que importan. El coste del LLM es
+   ruido comparado con el valor de ingeniería recuperada.
+
+4. **Diseña para composición desde día uno.** La razón por la que Meta pudo
+   lanzar 5 aplicaciones adicionales en un año fue que la plataforma estaba
+   diseñada para componer tools con skills nuevas, no para acumular
+   integraciones.
+
+5. **El humano revisa, no escribe desde cero.** El AI Regression Solver no
+   elimina al ingeniero del loop. Cambia su rol de *escribir el fix* a
+   *revisar el fix generado*. Eso es un upgrade, no un reemplazo.
+
+## Conclusión
+
+Meta nos enseña que la eficiencia a hiperescala no es un problema de
+modelos más inteligentes. Es un problema de arquitectura: separar las tools
+deterministas del expertise codificado, y dejar que el modelo componga ambos.
+
+Cuando lo haces bien, el resultado no es marginal. Son cientos de
+megavatios. Y cada nueva capacidad que construyes encima cuesta una fracción
+de lo que costó la primera, porque las tools ya están ahí.
+
+Eso es lo que nadie te dice sobre construir agentes IA para infraestructura:
+el truco no es el agente. Es la plataforma que lo sostiene.
+
+---
+
+*¿Estás construyendo agentes IA para infraestructura o DevOps? ¿Cómo
+estructuras tus tools vs skills? Cuéntame en los comentarios.*
