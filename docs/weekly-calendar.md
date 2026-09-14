@@ -1,29 +1,29 @@
-# Calendario Semanal de Contenido — Semana del 1 de Septiembre, 2026
+# Calendario Semanal de Contenido — Semana del 14 de Septiembre, 2026
 
 ## Serie: Agentes en Producción y Casos de Uso Reales
 
 | # | Fecha | Slug | Título | Serie | Parte | Pillar |
 |---|-------|------|--------|-------|-------|--------|
-| 1 | 2026-09-01 | `shopify-sidekick-el-bucle-de-aprendizaje-continuo-que-reduce-costos-96` | Shopify Sidekick: El Bucle de Aprendizaje Continuo que Reduce Costos 96% | Construyendo con IA: Lo que nadie te dice | 11 | agentes-en-produccion |
-| 2 | 2026-09-03 | `notion-busqueda-vectorial-a-escala-de-millones-de-workspaces` | Notion: Búsqueda Vectorial a Escala de Millones de Workspaces | Arquitectura de Software Avanzada | 17 | arquitectura |
-| 3 | 2026-09-05 | `github-seis-capas-del-sistema-de-ingenieria-agentica-nativa` | GitHub: Seis Capas del Sistema de Ingeniería Agéntica Nativa | Construyendo con IA: Lo que nadie te dice | 12 | construir-con-ia |
+| 1 | 2026-09-15 | `ibm-agentes-en-produccin-la-fbrica-de-datos-que-nadie-dibuja` | IBM: Agentes en Producción, la Fábrica de Datos que Nadie Dibuja | Construyendo con IA: Lo que nadie te dice | 15 | agentes-en-produccion |
+| 2 | 2026-09-17 | `state-farm-llm-como-juez-para-monitorear-agentes-ia-en-produccin` | State Farm: LLM como Juez para Monitorear Agentes IA en Producción | Construyendo con IA: Lo que nadie te dice | 16 | agentes-en-produccion |
+| 3 | 2026-09-19 | `toyota-deep-agents-y-langsmith-de-6-meses-a-4-das-por-agente` | Toyota: Deep Agents y LangSmith, de 6 Meses a 4 Días por Agente | Arquitectura de Software Avanzada | 19 | arquitectura |
 
 ## Foco de cada post
 
-1. **Shopify Sidekick** — Cómo Shopify comprime fallos de producción en pesos del modelo cada día con un bucle de aprendizaje continuo. Self-healing pipeline, gisting para comprimir prompts de 6000 a 1500 tokens, GRPO con judges calibrados, y el resultado: 96% menos costo de serving, 38% menos latencia, 14% menos GPUs.
+1. **IBM — Building Production Agentic AI at IBM** — Cómo IBM TLS puso una plataforma multiagente en producción con A2A en cada frontera de agente y MCP para cada herramienta. Lecciones: "fábrica de datos" antes que "fábrica de agentes", identity propagation con OAuth2 token exchange, instrumentar antes de construir (traces/evals/business metrics), LiteLLM para intercambiar modelo como configuración.
 
-2. **Notion** — Evolución de la infraestructura de búsqueda vectorial para AI Q&A: de pods acoplados a serverless, migración a Turbopuffer, Page State con xxHash para evitar re-embeddings, y migración a Ray/Anyscale que redujo costos de embeddings 90%+. Multi-región con data residency para EU.
+2. **State Farm — LLM as a Judge in Production** — Monitoreo continuo de agentes en producción con LLM-as-a-judge: métricas reference-free, faithfulness estricta vía GEval, meta-análisis con atribución por componente, y un experimento formal validando al juez contra 197 conversaciones revisadas por humanos (78% acuerdo <3pts, evaluación humana + automatizada complementarias).
 
-3. **GitHub** — Las seis capas del sistema agent-native de GitHub: Surfaces (Copilot app, Canvases), Runtime (sandboxes locales y cloud), Automation (Agent Merge), Quality (multi-model review, Rubber Duck), Memory (Chronicle), y Trust (aislamiento, credenciales scoped).
+3. **Toyota — Deep Agents + LangSmith** — 50+ agentes en producción, de 6 meses/6 ingenieros a 4 días/1 ingeniero por agente. Skills reutilizables inyectadas en runtime, GearPal (5-6h → 2-3 min de diagnóstico), LLM gateway con fallback, parallel tool-calling para precisión de retrieval, LangSmith como "tablero Andon".
 
 ## Cron Jobs de Publicación
 
-| Post | Fecha | Acción |
-|------|-------|--------|
-| Shopify Sidekick | 2026-09-01 09:00 CST | `draft: false` + commit + PR a develop |
-| Notion | 2026-09-03 09:00 CST | `draft: false` + commit + PR a develop |
-| GitHub | 2026-09-05 09:00 CST | `draft: false` + commit + PR a develop |
+| Post | Fecha | Job ID | Acción |
+|------|-------|--------|--------|
+| IBM | 2026-09-15 09:00 CST | `f237571a4ffd` | `draft: false` + commit + PR a develop + release a main |
+| State Farm | 2026-09-17 09:00 CST | `fe263276cbb2` | `draft: false` + commit + PR a develop + release a main |
+| Toyota | 2026-09-19 09:00 CST | `0d7d222921ec` | `draft: false` + commit + PR a develop + release a main |
 
 ---
 
-*Generado automáticamente por Hermes Agent — 2026-08-31*
+*Generado automáticamente por Hermes Agent — 2026-09-14*
