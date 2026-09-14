@@ -1,0 +1,160 @@
+---
+title: "IBM: Agentes en Producción, la Fábrica de Datos que Nadie Dibuja"
+description: "IBM construyó una plataforma multiagente con A2A en cada frontera de agente y MCP para cada herramienta. El cuello de botella real es la fábrica de datos."
+date: "2026-09-15"
+tags: ["agentes-ia", "multiagente", "mcp", "a2a", "arquitectura"]
+pillar: "agentes-en-produccion"
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Construyendo con IA: Lo que nadie te dice"
+  part: 15
+resources:
+  - label: "Building Production Agentic AI at IBM: Architecture, Decisions, and What We Learned — Tony Erwin"
+    url: "https://www.tonyerwin.com/2026/08/building-production-agentic-ai-at-ibm.html"
+---
+
+# IBM: Agentes en Producción, la Fábrica de Datos que Nadie Dibuja
+
+> **Serie: Construyendo con IA: Lo que nadie te dice — Parte 15.** Cuando
+> construyes una plataforma multiagente dentro de una empresa grande, el
+> código del agente es la parte fácil. Lo difícil —y lo que decide si el
+> proyecto entrega valor— es todo lo que pasa *antes* de que el agente pueda
+> llamar a una herramienta y obtener una respuesta real. IBM lo documentó en
+> producción.
+
+## El problema: la arquitectura no es el cuello de botella
+
+IBM Technology Lifecycle Services (TLS) construyó un sistema multiagente desde
+cero: agentes en Python con LangGraph, en producción desde otoño de 2025. El
+objetivo era darle a cada rol de TLS un único lugar donde preguntar lo que
+antes requería navegar una docena de sistemas distintos.
+
+Lo que el arquitecto principal del proyecto aprendió no fue sobre prompts,
+modelos ni grafos. Fue que **el cuello de botella real nunca fue el código del
+agente — fue el acceso a los datos**.
+
+Todo el mundo quiere una *fábrica de agentes*: un equipo que estampa agentes
+nuevos rápidamente. IBM descubrió que lo que en realidad necesitaba era una
+*fábrica de datos*: un esfuerzo dedicado a identificar los sistemas de
+registro, negociar acceso, resolver autenticación y autorización entre
+fronteras organizacionales, y construir la capa de herramientas que hace esos
+datos accesibles de forma confiable.
+
+Ninguno de esos pasos aparece en los diagramas de arquitectura. Y ninguno es
+rápido.
+
+## Dos contratos, una regla: A2A y MCP
+
+La decisión que más simplificó la vida del equipo fue uniformizar las
+fronteras de integración:
+
+1. **A2A (Agent-to-Agent) para cada frontera entre agentes.** Cinco de los
+   seis agentes especialistas fueron construidos por equipos separados, uno en
+   un entorno totalmente distinto. Funcionaron juntos porque todos hablaban el
+   mismo protocolo de delegación.
+
+2. **MCP (Model Context Protocol) para cada frontera con herramientas.** Cada
+   tool se expone como un MCP server, con un contrato estable y versionado.
+
+Esa uniformidad es lo que permite que los agentes se compongan sin que nadie
+escriba código de integración ad hoc entre ellos.
+
+```python
+# La regla de frontera en la práctica: el agente delega vía A2A,
+# el tool se invoca vía MCP. Nunca al revés.
+from langgraph.graph import StateGraph
+
+class DelegationBoundary:
+    """Toda delegación entre agentes cruza A2A, con la identidad del llamador."""
+
+    def __init__(self, target_agent: str, token_exchange):
+        self.target = target_agent
+        self.exchange = token_exchange  # OAuth 2.0 token exchange
+
+    def delegate(self, task: dict, caller_identity: str):
+        # Propagamos o intercambiamos el token; NUNCA lo sustituimos.
+        delegated_token = self.exchange.exchange(caller_identity)
+        return self.target.run(task, auth=delegated_token)
+```
+
+La lección de identidad es de las más caras de retroaprender: **cada delegación
+en un sistema multiagente es una oportunidad de perder la identidad del
+llamador**. Si el agente A pide algo al agente B, y B consulta el sistema de
+registro C, el acceso de C debe aplicarse con las credenciales del usuario
+original — no con las del agente. IBM usó OAuth 2.0 token exchange para que la
+misma persona "llegue" al otro lado. La plataforma nunca se convierte en el
+árbitro de quién puede ver qué.
+
+## Instrumentar antes de construir
+
+La lección más dolorosa fue la observabilidad. El equipo voló a ciegas
+demasiado tiempo por tres motivos que se retroalimentan:
+
+- **Tracing** se estancó en roadmaps internos cambiantes.
+- **Evals** llegaron *después* de los cambios que debían proteger.
+- **Una línea base de negocio** nunca llegó.
+
+> "Un framework de evaluación no es un nice-to-have que agregas cuando el
+> sistema madura. Es infraestructura load-bearing que debe existir antes de que
+> empieces a hacer cambios consecuentes."
+
+La solución práctica: no dependas de una plataforma que todavía es un
+roadmap, por creíble que sea el roadmap. Usa algo probado y disponible hoy
+(IBM usó Langfuse para traces distribuidas y Promptfoo para evals), y envuélvelo
+detrás de una interfaz que tú controlas. Cuando la opción estratégica exista,
+la revisas.
+
+## El modelo como configuración, no como decisión
+
+El equipo puso LiteLLM delante de cada llamada a modelo. El resultado: cambiar
+el backend de inferencia, o apuntar a los agentes a otro modelo, fue un cambio
+de configuración — nunca tocó código de agente.
+
+```python
+from litellm import completion
+
+class ModelFactory:
+    """El modelo se inyecta por configuración; migrar es un config change."""
+
+    def __init__(self, config):
+        self.default_model = config["default_model"]   # gpt-oss-120b → gemma-4-31B-it
+        self.fallback = config["fallback"]
+
+    def complete(self, messages: list, **kwargs):
+        return completion(model=self.default_model, messages=messages, **kwargs)
+```
+
+Esto tiene un precio: tu menú de modelos se convierte en el roadmap de tu
+proveedor de inferencia. La mitad más difícil es la *calificación*: saber si un
+modelo nuevo es realmente mejor para tus workloads, no solo más nuevo. Si
+mantienes el modelo intercambiable y un set de evals listo para responder esa
+pregunta, el retraso entre "disponible" y "en producción" es al menos tuyo.
+
+## La forma general
+
+La versión honesta de la historia es que funcionó: un equipo sin experiencia
+agentic previa puso una plataforma multiagente en producción en meses, y los
+agentes construidos por equipos que no construyeron la plataforma interoperan
+igual. La librería compartida se volvió un proyecto inner source adoptado por
+otros equipos de la unidad de negocio.
+
+Pero la lección estructural es más importante que el éxito puntual:
+
+1. **La fábrica de datos antes que la fábrica de agentes.** El trabajo de
+   agente es la parte visible; el acceso a datos decide si algo entrega valor.
+2. **A2A para agentes, MCP para herramientas.** Uniformidad de frontera es lo
+   que hace que agentes de equipos distintos se compongan sin pegamento.
+3. **Instrumenta desde el día uno:** traces, evals y una métrica de negocio
+   definida numéricamente antes de escribir el primer agente.
+4. **Identidad propaga o intercambia, nunca sustituyas.** Cada sistema de
+   registro aplica sus propios controles de acceso, no la plataforma.
+5. **No controlas cuándo se levanta una restricción; controlas cuánto trabajo
+   cuesta moverse cuando lo hace.** Mantén el modelo intercambiable y los evals
+   listos.
+
+Para arquitectos en Go, Python o Kubernetes, la traducción es directa: el
+diseño de fronteras (contratos estables, identidad propagada, modelo inyectado)
+es exactamente el tipo de trabajo que separa una plataforma que escala de un
+prototipo que se pudre al segundo agente.

@@ -1,0 +1,153 @@
+---
+title: "Toyota: Deep Agents y LangSmith, de 6 Meses a 4 Días por Agente"
+description: "Toyota North America pasó de 6 meses y 6 ingenieros por agente a 4 días y 1 ingeniero, con skills reutilizables y observabilidad continua como tablero Andon."
+date: "2026-09-19"
+tags: ["agentes-ia", "langgraph", "langsmith", "observabilidad", "ia-empresarial"]
+pillar: "arquitectura"
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Arquitectura de Software Avanzada"
+  part: 19
+resources:
+  - label: "How Toyota North America Put Enterprise AI on the Balance Sheet with Deep Agents and LangSmith — LangChain"
+    url: "https://www.langchain.com/blog/how-toyota-north-america-put-enterprise-ai-on-the-balance-sheet-with-deep-agents-and-langsmith"
+---
+
+# Toyota: Deep Agents y LangSmith, de 6 Meses a 4 Días por Agente
+
+> **Serie: Arquitectura de Software Avanzada — Parte 19.** Un equipo de ~35
+> personas define el norte de IA para toda una empresa de manufactura. El
+> cuello de botella no era el modelo: era el tiempo y la gente. Toyota lo
+> resolvió con skills reutilizables, un gateway de fallback y observabilidad a
+> nivel de fábrica.
+
+## El problema: 6 meses y 6 ingenieros por agente
+
+El equipo de IA empresarial de Toyota Motor North America funciona como una
+startup interna: ingenieros, arquitectos, product managers y evangelistas. Son
+la organización que define el norte de IA para toda la empresa, arquitectura los
+estándares que toda aplicación debe seguir, y construye los productos de IA de
+mayor prioridad.
+
+Con un mandato de superar un umbral de ROI de seis a siete cifras anuales por
+proyecto, el team no podía construir tooling desde cero para cada aplicación.
+Antes de su plataforma actual, **lanzar un agente nuevo tomaba 6 meses y 6
+ingenieros**. Hoy toma **4 días y 1 ingeniero**.
+
+La pieza central es **ToyotaGPT**: una plataforma interna con una librería
+creciente de agentes custom, específicos por dominio. Los empleados la usan para
+obtener respuestas fundamentadas en datos internos —de documentación de
+manufactura a reportes de R&D a registros de cadena de suministro. El acceso
+está *gated* por permiso: si un empleado no tiene acceso SharePoint a un
+dataset, el agente no lo expone.
+
+## Skills: el conocimiento no vive en el agente
+
+La decisión arquitectónica clave: en lugar de codificar el dominio dentro de
+agentes individuales, el equipo construyó una **librería de skills reutilizables**
+cubriendo manufactura, cadena de suministro, R&D, branding y más. Esos skills se
+inyectan en los Deep Agents en runtime, alimentando conocimiento institucional
+directo al modelo en una forma portátil entre casos de uso.
+
+```python
+# El skill se inyecta en runtime; el agente no lo incorpora en su código.
+# Mismo skill de "manufactura" sirve a GearPal, R&D GPT y ToyotaGPT por igual.
+from langchain.agents import create_deep_agent
+
+class SkillInjector:
+    """Carga skills específicos del dominio y los inyecta como contexto del agente."""
+
+    def __init__(self, skill_catalog):
+        self.catalog = skill_catalog  # {dominio: [skills]}
+
+    def inject(self, domain: str):
+        return self.catalog.load(domain)  # institutional knowledge portable
+
+agent = create_deep_agent(skills=SkillInjector(catalog).inject("manufacturing"))
+```
+
+El resultado es doble: el conocimiento de dominio se versiona y reutiliza, y cuando
+un técnico veterano se jubila, su expertise no desaparece con él — queda codificado
+en un skill.
+
+## El caso que lo demuestra: GearPal
+
+GearPal da a cualquier técnico una interfaz en lenguaje natural para diagnosticar
+problemas con cualquier robot o activo en la línea. Un técnico camina, pregunta
+por qué una máquina está rota y cómo arreglarla, y GearPal extrae diagnósticos,
+historial de servicio y guía de reparación.
+
+Lo que antes tomaba **5 a 6 horas de diagnóstico** se resuelve en **2 a 3
+minutos**.
+
+Para que GearPal fuera confiable en una línea de producción viva, el equipo
+agregó un **LLM gateway** para manejar fallbacks en caso de caída de un
+proveedor. Y resolvieron un reto técnico de precisión de recuperación: dominios
+superpuestos (pintura vs. corrosión, asientos vs. cueros) hacían que consultas
+de "paint" a veces extrajeran de la base de "corrosion". La solución fue un
+sistema de **parallel tool-calling** con LangGraph: cuando el agente no
+encuentra documentos en la herramienta primaria, consulta herramientas
+secundarias en paralelo y fusiona resultados antes de responder.
+
+```python
+# Parallel tool-calling: si la fuente primaria no tiene el documento,
+# consulta secundarias en paralelo y fusiona antes de responder.
+from langgraph.graph import StateGraph, END
+
+def parallel_fetch(state):
+    primary = query_primary(state["query"])
+    if primary["found"]:
+        return {"results": primary}
+    # Fallback paralelo sobre fuentes secundarias
+    secondaries = gather([query_paint, query_corrosion], state["query"])
+    return {"results": {"merged": merge(secondaries)}}
+```
+
+En R&D, el impacto es igual de contundente: R&D GPT permite a los
+investigadores consultar todo el material interno de R&D, comprimiendo líneas de
+tiempo de investigación de **~3 años a 1 año**.
+
+## Observabilidad como tablero Andon
+
+El tablero Andon es un principio fundacional de manufactura de Toyota: da a
+todos en el piso una vista en tiempo real de qué está corriendo, qué está
+fallando y dónde van los recursos. LangSmith es, en palabras del equipo, "el
+tablero Andon para las aplicaciones de IA de Toyota".
+
+```text
+  Observabilidad = monitorear agentes + entender fallos de tool call
+                   + detectar qué PR rompió el pipeline + adopción de features
+```
+
+Esa observabilidad es crítica no solo para construir mejores productos, sino
+para convencer a los stakeholders de que cada tool es segura. El equipo traza
+interacciones de agentes individuales, identifica fallos de recuperación y
+cuantifica patrones de comportamiento entre poblaciones de usuarios: el puente
+entre la confianza del ingeniero y el sign-off ejecutivo.
+
+## Qué cambió en la fábrica
+
+Cada caso de uso de manufactura va camino a entregar al menos **seis cifras en
+ahorros anuales por línea, por tienda y por planta**. Extrapolado a la huella de
+manufactura norteamericana, el equipo proyecta ahorros de varios millones por
+instalación a medida que el portafolio madura.
+
+Las tres decisiones que separan este caso de un demo:
+
+1. **Skills sobre encodificación en el agente.** El conocimiento vive en una
+   librería portable, inyectada en runtime, en lugar de enterrado en prompts de
+   agentes individuales.
+2. **Gateway de fallback de modelo.** La resiliencia ante caídas de proveedor
+   no es un nice-to-have cuando el sistema corre en una línea de producción viva.
+3. **Observabilidad como infraestructura, no como dashboard.** El tablero Andon
+   es lo que permite el ciclo de mejora: trazar → identificar fallo → medir
+   adopción → priorizar el siguiente agente.
+
+Para equipos que operan en Go, Python o Kubernetes, la traducción es la misma
+que vimos en IBM y State Farm: el modelo es la parte fácil; lo que determina si
+la plataforma entrega valor a escala son los skills reutilizables, la
+recuperación precisa con fallback paralelo, y una capa de observabilidad que
+convierta fallos invisibles en tickets accionables. El equipo ya apunta a
+"AI en el balance general", y por una razón simple: saben medir el delta.
