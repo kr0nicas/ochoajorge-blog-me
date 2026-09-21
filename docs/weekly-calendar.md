@@ -20,9 +20,9 @@
 
 | Post | Fecha | Job ID | Acción |
 |------|-------|--------|--------|
-| monday.com | 2026-09-22 09:00 CST | *(creado abajo)* | `draft: false` + commit + PR a develop + release a main |
-| Google | 2026-09-24 09:00 CST | *(creado abajo)* | `draft: false` + commit + PR a develop + release a main |
-| Wood Mackenzie | 2026-09-26 09:00 CST | *(creado abajo)* | `draft: false` + commit + PR a develop + release a main |
+| monday.com | 2026-09-22 09:00 CST | `c6b99b7ff523` | `draft: false` + commit + PR a develop + release a main |
+| Google | 2026-09-24 09:00 CST | `078859e8636c` | `draft: false` + commit + PR a develop + release a main |
+| Wood Mackenzie | 2026-09-26 09:00 CST | `feac57d63d55` | `draft: false` + commit + PR a develop + release a main |
 
 ---
 
