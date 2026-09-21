@@ -1,0 +1,128 @@
+---
+title: "Google AI Agent Clinic: 5 Lecciones al Refactorizar un Monolito a un Agente de Producción"
+description: "El AI Agent Clinic de Google desmontó el agente Titanium: de monolito a subagentes con ADK, salidas Pydantic, RAG dinámico y telemetría para producción."
+date: "2026-09-24"
+tags: ["agentes-ia", "arquitectura", "rag", "observabilidad", "adk"]
+pillar: "agentes-en-produccion"
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Construyendo con IA: Lo que nadie te dice"
+  part: 18
+resources:
+  - label: "Production-Ready AI Agents: 5 Lessons from Refactoring a Monolith — Google Developers Blog"
+    url: "https://developers.googleblog.com/production-ready-ai-agents-5-lessons-from-refactoring-a-monolith/"
+---
+
+# Google AI Agent Clinic: 5 Lecciones al Refactorizar un Monolito a un Agente de Producción
+
+> **Serie: Construyendo con IA: Lo que nadie te dice — Parte 18.** Construir un agente
+> que funciona en tu máquina es fácil. Construir uno que sobreviva el contacto con la
+> realidad —límites de rate, loops infinitos, escalar más allá de datos hardcodeados—
+> es otra bestia. Google lanzó el *AI Agent Clinic* y su primer episodio fue un
+> desarme completo de **Titanium**, un agente de investigación de ventas prometedor
+> pero frágil. Cinco desarmes, cinco fixes, cinco lecciones.
+
+## Titanium: de monolito a pipeline distribuido
+
+El trabajo original de Titanium era investigar una empresa objetivo y redactar un email
+de outreach personalizado. El prototipo corría, pero era lento, era un script Python
+monolítico, y estaba limitado a una lista hardcodeada de apenas 12 casos de estudio.
+
+**Desarme #1: subagentes orquestados, no un mega-loop.**
+
+El agente original corría sobre un `for` loop masivo y lineal — un script monolítico. Si
+una subtarea fallaba (un timeout de API o una alucinación), todo el proceso se detenía y
+fallaba **en silencio**.
+
+**El fix:** arrancaron el monolito e instalaron el Agent Development Kit (ADK) de Google.
+Crearon un pipeline `SequentialAgent` que divide la carga en nodos especializados:
+Company Researcher, Search Planner, Case Study Researcher, Selector y Email Drafter.
+
+**La lección:** separación de responsabilidades. Agentes especializados con tareas
+estrechas corren más confiablemente que un solo LLM tratando de ejecutar un prompt
+masivo de múltiples pasos.
+
+## El contrato, no la esperanza
+
+**Desarme #2: salidas forzadas con Pydantic, no con el prompt.**
+
+Titanium forzaba salidas JSON desde el modelo con hardcoding extensivo directo en el
+string del prompt. Resultado: código sucio, parsing frágil, y tokens desperdiciados
+describiendo la estructura una y otra vez.
+
+**El fix:** al migrar a ADK, erradicaron las instrucciones de schema del prompt. En su
+lugar inyectaron objetos Pydantic nativos como definiciones de schema explícitas. ADK
+usa *Structured Outputs* dinámicamente para abstraer el boilerplate y forzar adherencia.
+
+**La lección:** mover el "contrato" de una petición difusa en lenguaje natural a un
+objeto Python validado en runtime garantiza integridad estructural y elimina el parsing
+personalizado frágil. Un esquema es un contrato; un prompt pidiendo JSON es una
+esperanza.
+
+## Deja de hardcodear tu límite de contexto
+
+**Desarme #3: RAG dinámico en vez de estado hardcodeado.**
+
+El corpus de contexto de Titanium era artificialmente diminuto: solo conocía 12 casos de
+estudio hardcodeados escritos directamente en el archivo Python. No podía escalar ni
+aprender sin que un desarrollador editara código manualmente.
+
+**El fix:** construyeron un sistema de ingesta dinámica. Un crawler async (Playwright)
+corre en background para raspar autónomamente la página de casos de éxito de Google
+Cloud y batchearlos a Google Cloud Vector Search. Luego, en el pipeline, el Case Study
+Researcher corre una **búsqueda híbrida** sobre el corpus indexado — combinando el
+"significado" semántico de la query con la precisión del keyword matching exacto para no
+perder términos técnicos específicos.
+
+**La lección:** hardcodear está bien para un prototipo, pero un pipeline de producción
+se refresca solo. El valor agentic real viene de darle a los agentes las herramientas
+para buscar, escalar y consultar vía Vector Search de forma autónoma.
+
+## Observabilidad no es negociable
+
+**Desarme #4: trazas distribuidas, no cajas negras.**
+
+Cuando un LLM se confunde en un script estándar, es una caja negra: sabes que algo
+falló, pero no qué componente rompió.
+
+**El fix:** aprovecharon el soporte de primera clase de ADK para OpenTelemetry en Google
+Cloud. Out of the box, ADK emite trazas distribuidas del flujo completo de ejecución,
+capturando peticiones al modelo, tokens y ejecuciones de herramientas. Lo emparejaron
+con una app de streaming SSE, diseñando un dashboard de telemetría en vivo.
+
+**La lección:** no puedes poner un agente en producción sin diagnósticos vivos.
+Necesitas trazas OpenTelemetry para resolver disputas de ground truth y depurar
+latencias por componente.
+
+## Domar la quema de tokens
+
+**Desarme #5: circuit breakers para el costo.**
+
+Los loops agentic son caros. Si un agente topa un error y reintenta un prompt sin
+límites, quema tu presupuesto de tokens en minutos.
+
+**El fix:** al estandarizar sobre la orquestación nativa de ADK, heredaron las
+optimizaciones de costo intrínsecas del framework: backoffs exponenciales, límites de
+timeout y loops de retry configurables, sin escribir lógica custom.
+
+**La lección:** instala siempre circuit breakers. Deja que tu framework de orquestación
+maneje los fallos con gracia antes de escribir bucles try-catch a mano.
+
+## Lo que Titanium nos enseña
+
+El desarme de Titanium es un microcosmos del salto de demo a producción. Sus cinco
+brotes —monolito frágil, schema en el prompt, contexto hardcodeado, caja negra, quema de
+tokens— son exactamente los modos de fallo que todos vemos en la primera iteración de
+un agente. Y los cinco fixes comparten una forma:
+
+- **Separa** responsabilidades en subagentes.
+- **Contrata** la salida con un schema validado en runtime.
+- **Inyecta** contexto dinámico en vez de coserlo al código.
+- **Instrumenta** con trazas distribuidas desde el día uno.
+- **Acota** el costo con circuit breakers.
+
+Ninguno de los cinco requiere un modelo más inteligente. Todos requieren mejor
+**ingeniería alrededor del modelo**. Eso es lo que separa al agente que sobrevive el
+contacto con la realidad del que se queda como demo de fin de semana.

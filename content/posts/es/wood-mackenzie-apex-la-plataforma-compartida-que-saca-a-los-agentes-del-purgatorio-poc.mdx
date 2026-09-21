@@ -1,0 +1,131 @@
+---
+title: "Wood Mackenzie: APEX, la Plataforma Compartida que Saca a los Agentes del Purgatorio PoC"
+description: "El 88% de los PoC de IA de Wood Mackenzie nunca escalaron. Su respuesta fue APEX: una plataforma compartida con hub-and-spoke, identidad y evals para todos."
+date: "2026-09-26"
+tags: ["arquitectura", "agentes-ia", "plataforma", "gobernanza", "mcp"]
+pillar: "arquitectura"
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Arquitectura de Software Avanzada"
+  part: 20
+resources:
+  - label: "A shared agentic platform for Wood Mackenzie, on Amazon Bedrock AgentCore — AWS Machine Learning Blog"
+    url: "https://aws.amazon.com/blogs/machine-learning/a-shared-agentic-platform-for-wood-mackenzie-on-amazon-bedrock-agentcore/"
+---
+
+# Wood Mackenzie: APEX, la Plataforma Compartida que Saca a los Agentes del Purgatorio PoC
+
+> **Serie: Arquitectura de Software Avanzada — Parte 20.** Construir un prototipo
+> agentic toma una tarde. Llegar a producción es donde el trabajo explota. En Wood
+> Mackenzie, **el 88% de las pruebas de concepto de IA nunca llegaron a despliegue
+> masivo**. Su respuesta no fue otro agente: fue **APEX**, una plataforma compartida
+> para que cada equipo envíe agentes sin reinventar la infraestructura. Esto es lo que
+> la arquitectura de plataforma —no el modelo— tiene que decir al respecto.
+
+## El problema: cada equipo reimplementa el mismo boilerplate
+
+El momento en que un agente tiene que servir a más de un usuario aparece una capa
+entera de ingeniería: concurrencia, aislamiento de sesión, identidad, estado
+persistente, escalado y guardrails. Y casi todos los equipos la reconstruyen desde cero
+cada vez.
+
+Forrester atribuye los fallos de agentes principalmente a la ambigüedad, la
+descoordinación y el comportamiento impredecible del sistema — no a bugs ordinarios. El
+bloqueador más citado es **evaluación y observabilidad**: los equipos no pueden saber de
+antemano cuándo un agente no-determinista va a equivocarse, y los tests de regresión
+tradicionales no lo detectan. Gobernanza e identidad le siguen de cerca: una gran
+proporción de ejecutivos admitió que **no podían apagar inmediatamente a un agente que
+se comporta mal**.
+
+Y debajo de todo eso: infraestructura duplicada. Cada equipo reimplementa autenticación,
+guardrails, memoria y tracing, y hardcodea un modelo — de modo que cambiar de proveedor
+significa reescribir código.
+
+## El patrón que resuelve el problema N×M
+
+La única integración que más trabajo hace en APEX es el **modelo hub-and-spoke** sobre
+el gateway. Sin él, cada consumidor mantiene una conexión bespoke a cada servicio de
+datos. Con N consumidores y M servicios, eso es un problema de integración **N×M**: cada
+nuevo agente multiplica el número de conexiones punto a punto que hay que construir,
+asegurar y mantener, y cada conexión reimplementa las mismas preocupaciones
+transversales.
+
+El hub-and-spoke lo evita. Toda aplicación y agente se conecta a través de **un**
+gateway. Del lado del consumidor, un analista interno, un chatbot de cliente y un agente
+de trading hablan con el mismo hub. Del lado de los datos, el gateway se expande hacia
+lentes de datos, ejecución en tiempo real y catálogos de contenido. Agregar un
+consumidor o un servicio nuevo significa conectar **un** spoke al hub, no reconstruir el
+mesh completo.
+
+Y como el tráfico se embuda por un solo hub, las preocupaciones transversales se
+refuerzan **una vez** en el gateway en lugar de reimplementarse en cada consumidor o
+spoke: identidad, observabilidad, evaluación y guardrails, skills y tools, rate
+limiting, protección de datos y compliance. Un cambio de política aplica en todas partes
+en el momento en que aterriza en el hub, y cada tool call hereda el mismo contexto de
+identidad, la misma telemetría y los mismos guardrails.
+
+## El gateway habla MCP
+
+El gateway habla el *Model Context Protocol* (MCP): presenta una interfaz de herramienta
+consistente sin importar qué hay detrás de cada spoke. El AgentCore Gateway convierte
+APIs existentes, funciones Lambda y servidores MCP existentes en herramientas
+compatibles con agentes, con un solo endpoint seguro para descubrimiento e invocación.
+Soporta IAM, OAuth 2.1 y autenticación por API key.
+
+Exponer los servicios de datos a través de un endpoint MCP gobernado significa que los
+socios pueden alcanzarlos por una única interfaz controlada para acceso directo de datos
+impulsado por IA — en lugar de un sprawl de integraciones punto a punto.
+
+## Identidad y guardrails como capacidades de plataforma
+
+En vez de que cada equipo reimplemente la seguridad, APEX la convierte en capacidades
+gestionadas:
+
+- **Filtrado de contenido, detección de PII y enforcement de políticas** son
+  capacidades administradas, no código por equipo. La política se integra con el
+  Gateway para interceptar cada tool call en tiempo real, y convierte reglas en lenguaje
+  natural a **Cedar**, el lenguaje de políticas open source de AWS — de modo que
+  desarrollo, compliance y seguridad puedan redactar y auditar reglas sin código
+  custom.
+- **Identity** agrega integración IAM, aislamiento de VPC y cifrado, para que los
+  agentes puedan actuar en nombre de un usuario (o por sí mismos) bajo controles de
+  acceso definidos. El JWT OAuth 2.0 del usuario se propaga a los tool calls, de modo
+  que las bases de datos filtren resultados según los permisos de rol de cada usuario.
+
+## Observabilidad y evals: saber cuándo se rompe
+
+La salida de un agente es no-determinística, así que la pregunta difícil no es *¿funciona?*
+sino *¿podemos detectar cuándo deja de funcionar?*
+
+APEX emite telemetría en formato OpenTelemetry hacia CloudWatch: conteo de sesiones,
+latencia, duración, uso de tokens y tasas de error. Wood Mackenzie puede trazar una sola
+petición desde una sesión hasta un span individual, con logs de cada componente en el
+paso correcto en lugar de dispersos entre log groups.
+
+Sobre eso, las **evaluaciones** dan evaluadores integrados para dimensiones de calidad
+como helpfulness, selección de herramienta y precisión, más scoring personalizado basado
+en modelos — para puntuar a los agentes contra tráfico real. El *Live Chat Testing*
+permite que un operador ejercite al agente contra inputs reales antes de que llegue a
+los usuarios: la primera línea de defensa contra los fallos no-deterministas.
+
+## La lección arquitectónica
+
+La frase que resume APEX: **no construyas el agente como un *sidecar* de la empresa;
+constrúyelo *dentro* de la empresa.** El modo de fallo más común no es construir el
+agente — es construirlo desconectado de los sistemas que ya existen: identidad, datos,
+API gateway, SIEM, GRC.
+
+Cuando cada equipo construye su propio runtime, su propio auth, su propio estado y su
+propia observabilidad, se acumula trabajo duplicado, gasto sin dueño y riesgo de
+seguridad. La plataforma correcta no es la que centraliza *demasiado pronto* (matando la
+velocidad de los equipos), ni la que descentraliza *demasiado tiempo* (acumulando
+deuda). Es la que preserva la velocidad del equipo de producto mientras construye
+primitivas horizontales **lo suficientemente confiables para producción**.
+
+Para arquitectos, la pregunta no es "¿qué framework de agentes uso?" sino "¿qué capas
+centralizo, cuáles dejo a los equipos, y cómo evito el problema N×M antes de que se
+convierta en deuda?" Wood Mackenzie respondió con un hub-and-spoke gobernado, identidad
+heredada y evals como parte del runtime. No es la única respuesta, pero es una que
+escala — porque ataca la parte difícil, que no es el modelo sino **todo lo que lo rodea**.
