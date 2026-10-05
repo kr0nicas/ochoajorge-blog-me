@@ -18,11 +18,11 @@
 
 ## Cron Jobs de Publicación
 
-| Post | Fecha | Acción |
-|------|-------|--------|
-| Trane | 2026-10-06 09:00 CST | `draft: false` + commit + PR a develop |
-| Fortune 500 | 2026-10-08 09:00 CST | `draft: false` + commit + PR a develop |
-| OpenAI/Medicare | 2026-10-10 09:00 CST | `draft: false` + commit + PR a develop |
+| Post | Fecha | Job ID | Acción |
+|------|-------|--------|--------|
+| Trane | 2026-10-06 09:00 CST | `278b32fbe3dc` | `draft: false` + commit + PR a develop |
+| Fortune 500 | 2026-10-08 09:00 CST | `8cdace7ae239` | `draft: false` + commit + PR a develop |
+| OpenAI/Medicare | 2026-10-10 09:00 CST | `29dd3b368d72` | `draft: false` + commit + PR a develop |
 
 ---
 
