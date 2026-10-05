@@ -1,0 +1,114 @@
+---
+title: "Trane: 60x Más Rápido para Obtener Insights de Edificios con Amazon Bedrock AgentCore"
+description: "Trane pasó de 20 minutos a 20 segundos un diagnóstico de edificios usando Amazon Bedrock AgentCore: microVM de aislamiento, gateway MCP y memoria integrada."
+date: "2026-10-06"
+tags: ["agentes-ia", "bedrock-agentcore", "mcp", "arquitectura", "produccion"]
+pillar: "agentes-en-produccion"
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Construyendo con IA: Lo que nadie te dice"
+  part: 19
+resources:
+  - label: "How Trane gets building insights 60x faster with Amazon Bedrock AgentCore — AWS Machine Learning Blog"
+    url: "https://aws.amazon.com/blogs/machine-learning/how-trane-gets-building-insights-60x-faster-with-amazon-bedrock-agentcore/"
+---
+
+# Trane: 60x Más Rápido para Obtener Insights de Edificios con Amazon Bedrock AgentCore
+
+> **Serie: Construyendo con IA: Lo que nadie te dice — Parte 19.** La semana pasada
+> monday.com construyó su *harness* a mano, caminando el flujo fase por fase. Esta semana
+> la historia es la opuesta: Trane compró el harness. Un diagnóstico que tomaba 20 minutos
+> navegando dashboards desconectados hoy es una pregunta en lenguaje natural que se
+> responde en 20 segundos. La lección no es "compra vs construye" — es **qué** exactamente
+> obtienes cuando delegas la infraestructura del agente a un runtime administrado.
+
+## El caso: millones de activos conectados, preguntas que tardaban 20 minutos
+
+Trane fabrica equipos de climatización y gestión de edificios. Su nube ingiere telemetría
+en tiempo real de millones de activos conectados. Pero responder una pregunta operativa
+—"¿por qué este chiller está degradando eficiencia respecto al mes pasado?"— obligaba a un
+técnico a saltar entre dashboards desconectados y conectar la información a mano. Un
+diagnóstico multi-pantalla tomaba del orden de **20 minutos**.
+
+El equipo construyó un agente conversacional sobre **Amazon Bedrock AgentCore** y el
+framework **Strands**, desplegado con CDK como infraestructura como código. El resultado:
+de 20 minutos a **20 segundos**, una mejora de **60x** en time-to-insight. Pero el número
+es lo de menos. Lo interesante son las cuatro fricciones que tuvieron que resolver para
+llegar ahí, porque son las mismas que te encontrarás en cualquier agente de dominio.
+
+## Las cuatro fricciones que todo agente de dominio tiene
+
+### 1. Integración: telemetría en vivo + búsqueda semántica + sistemas externos
+
+El agente tenía que combinar telemetría en tiempo real con búsqueda inteligente sobre una
+base de conocimiento amplia, y conectarse a sistemas externos como un CRM. Tres fuentes de
+datos con tres naturalezas distintas.
+
+### 2. Separación: la lógica del agente no es la ejecución de las tools
+
+La lógica de razonamiento (qué pregunta, en qué orden) debía desacoplarse de la ejecución de
+las tools de backend, para que cada una se desplegara de forma independiente con límites de
+propiedad claros.
+
+### 3. Contexto: estado conversacional sin montar un vector database
+
+"Ahora compáralo con el mes pasado" no puede obligarte a re-especificar el contexto. Pero
+levantar un vector database propio para memoria de sesión era el tipo de infraestructura que
+el equipo quería evitar.
+
+### 4. Observabilidad: fallos que no se localizan
+
+Cuando un agente orquesta varias tools en una cadena de razonamiento multi-paso, una respuesta
+equivocada puede venir de una credencial faltante, una respuesta de tool mal formada, o una
+alucinación. Sin tracing end-to-end, son indistinguibles.
+
+## Lo que el runtime administrado resuelve de verdad
+
+La alternativa de auto-hospedarse era **Amazon ECS o Lambda**. Sobre eso habría que construir
+aislamiento de sesión, autoscaling y billing por sesión. Cuatro diferenciadores inclinaron la
+decisión hacia AgentCore:
+
+- **Runtime con aislamiento por microVM.** Cada sesión corre en una microVM dedicada con su
+  propio CPU, memoria y filesystem, que se termina y **sanea** al completarse. Separa la sesión
+  de un técnico de campo de la de un dueño de edificio, reforzando el acceso por rol sin
+  infraestructura custom. Y como se paga solo por cómputo activo, las pausas largas entre
+  tool-calls (típicas de flujos agentic) no acumulan costo.
+- **Gateway que convierte APIs internas en MCP.** Las APIs de la nube se exponen como tools
+  compatibles con MCP, organizadas por dominio de capacidad. El gateway maneja auth y
+  traducción de esquema: integrar el mismo backend en otra aplicación tomó **menos de un día**.
+- **Memoria de sesión incluida.** Memoria a corto plazo con caducidad de 90 días, sin montar
+  vector DB ni código de gestión de ventana de contexto.
+- **Observabilidad.** El tracing de tool-calls permitió aislar un fallo recurrente a un
+  **secret faltante en AWS Secrets Manager** — algo que sin visibilidad end-to-end habría
+  parecido un problema del modelo.
+
+## El harness que se compra sigue siendo un harness
+
+Lo que importa es que Trane no eliminó el *harness*: lo **delegó**. Las mismas conclusiones que
+monday.com documentó la semana pasada —aislar, validar la salida, acotar el run, observar—
+aparecen aquí como capacidades del runtime: aislamiento (microVM), contrato de tools (gateway
+MCP), memoria (gestión de contexto) y observabilidad (tracing). Cambia quién lo implementa, no
+qué hace falta.
+
+Y el rollout siguió el mismo patrón anti-vaporware que cualquier sistema serio: **beta interna
+primero**. Prototipo en 3–4 semanas, luego despliegue a los técnicos de campo —los usuarios que
+ejercitan los flujos de diagnóstico más exigentes— antes de abrir a clientes externos. Su
+feedback afloró brechas de exactitud y usabilidad bajo condiciones reales. Guardrails con
+filtros de contenido y políticas de denegación por tema mantuvieron al agente dentro de su
+dominio operativo.
+
+## Qué te llevas
+
+> *"El harness no desaparece cuando lo compras. Cambia de autor, no de responsabilidad."*
+
+La elección entre monday.com (harness DIY) y Trane (runtime administrado) no es una cuestión de
+mejor o peor. Es una cuestión de **dónde vive tu inversión en ingeniería**. Si tu negocio es la
+plataforma, construir el harness propio —como monday.com— tiene sentido porque es tu ventaja
+competitiva. Si tu negocio son los edificios, los chillers y los técnicos, comprar el harness y
+gastar tu ingeniería en el dominio es la decisión correcta.
+
+En ambos casos el modelo no fue el problema. Lo que importó —aislamiento, contrato de
+salida, memoria, observabilidad— siguió siendo trabajo de harness. La única pregunta real es
+quién lo escribe.

@@ -1,0 +1,115 @@
+---
+title: "10,000 Agentes en Producción: Cómo una Fortune 500 Bajó el Costo por Hora de $1.80 a $0.34"
+description: "Una Fortune 500 opera 10,000 agentes en producción: cómo bajó el costo por agent-hour de $1.80 a $0.34 con ruteo por tier, cacheo, idempotencia y evals."
+date: "2026-10-08"
+tags: ["agentes-ia", "escala", "costos", "orquestacion", "observabilidad"]
+pillar: "agentes-en-produccion"
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Construyendo con IA: Lo que nadie te dice"
+  part: 20
+resources:
+  - label: "How an Enterprise Deployed 10,000 AI Agents: A Practitioner Interview — Algorithmine"
+    url: "https://algorithmine.com/interviews/enterprise-10000-ai-agents-practitioner-interview"
+---
+
+# 10,000 Agentes en Producción: Cómo una Fortune 500 Bajó el Costo por Hora de $1.80 a $0.34
+
+> **Serie: Construyendo con IA: Lo que nadie te dice — Parte 20.** Vas a ver muchos números
+> que empiezan en "10,000 agentes". No te quedes con el titular: un agente no es un API call
+> con ambiciones, y diez mil no son diez mil veces uno. Son un problema de **sistemas
+> distribuidos** con un componente no determinístico en el medio. La entrevista a "Dana",
+> directora de ingeniería de plataforma en una Fortune 500, es lo más honesto que se ha
+> publicado sobre cómo operar una flota a esa escala — incluyendo el outage que la humilló.
+
+## Los números que importan, antes del hype
+
+La flota llegó a **10,000 agentes gobernados** en el mes 19. Tres unidades de negocio: triage
+de soporte al cliente, un service desk interno de IT/HR, y un pipeline de procesamiento de
+documentos. El ~60% son agentes longevos y stateful (unos 6,000); el resto son *task runners*
+efímeros que se levantan por trabajo y se desmontan en minutos.
+
+Pico de concurrencia: entre **2,800 y 3,400 ejecuciones simultáneas**. Y esta es la primera
+lección: la unidad de capacidad no es "cuántos agentes", es **carga concurrente pico**. Un
+agente configurado y versionado no consume nada hasta que corre; mil agentes idle cuestan lo
+mismo que cero.
+
+La línea de base era terrible de la forma correcta: **$9.40 por ticket**, mediana de **14
+horas** para primera respuesta, 38% de deflection en el bot basado en reglas. Objetivo: mitad
+de costo por resolución, >60% de self-service, y redestinar (no despedir) 200 personas. En 18
+meses cumplieron dos de tres; el redestino quedó corto porque la recapacitación es más lenta
+que la tecnología.
+
+## El primer outage no fue el modelo
+
+> "El primer outage que causamos no fue el modelo. Fueron 400 agentes martillando una API
+> interna que nunca fue diseñada para esa concurrencia."
+
+Esta es la frase más valiosa de toda la entrevista. El fix no fue throttlear el modelo: fue un
+**token-bucket limiter en el boundary de la tool** más *backpressure* que encola los pasos del
+agente en lugar de dropearlos. El rate-limiting se aplica en **tres niveles**: por agente, por
+tool y por sistema downstream.
+
+Sobre eso, la flota corre un **motor de workflow durable** con scheduling, retries y
+persistencia de estado. Cada invocación es un paso con **idempotency key**, de modo que un
+tool-call reintentado no pueda cobrar dos veces a un cliente ni abrir un ticket duplicado —
+siempre que la tool downstream honre la key. Donde una tool no es idempotente, se envuelve con
+una acción de reconciliación o compensación en lugar de confiar en el retry.
+
+## Economía de ruteo: $1.80 → $0.34 por agent-hour
+
+El costo se domina con una **mezcla por tier** de modelos: modelos pequeños para
+clasificación, extracción y ruteo; medios para drafting y resumen; frontier reservados para
+razonamiento complejo y decisiones de alto riesgo. Una **política de ruteo** puntúa cada
+request por complejidad, riesgo y presupuesto de latencia antes de elegir modelo, y loguea la
+decisión para poder trazar regresiones de costo a un cambio de política.
+
+El **cacheo agresivo** recortó ~30% de la inferencia de contexto repetido (cache-hit rate
+sobre prefijos y bloques de contexto, no un headline inventado). El *batch inference* absorbe
+el procesamiento nocturno. Resultado: costo blendado por agent-hour —incluyendo el overhead de
+plataforma (orquestación, memoria, sandboxing, observabilidad)— de **$1.80 en el piloto a
+$0.34 a escala**. Dana lo marca como direccional y altamente dependiente del workload; el
+ancla de sanidad es el **costo blendado por ticket resuelto**, que cayó en paralelo.
+
+La lección de métricas: **costo por resolución, no headcount de bots.** Contar agentes es un
+proxy de vanidad; el número que mueve el negocio es cuánto cuesta resolver un ticket.
+
+## Seguridad: asume que algo va a intentar corromper al agente
+
+Prompt injection y abuso de tools se tratan como amenazas primarias, no edge cases. Las
+mitigaciones son en capas: el contenido recuperado se trata como **no confiable**, los
+tool-calls se validan contra un **allow-list** declarado, las tools de alto impacto requieren
+confirmación explícita o aprobación humana, y las acciones salientes se chequean contra
+política antes de ejecutarse.
+
+> "Asume que algo va a intentar que tu agente haga lo incorrecto. Luego haz que lo incorrecto
+> sea aburrido."
+
+## AgentOps: evals que crecen con la flota
+
+Cada run emite un trace con spans de planificación, retrieval, tool-calls y generación, más
+contabilidad de tokens por span. Per-agent SLOs de success rate, p50/p95 y costo. El
+dashboard de on-call es **deliberadamente escueto**: error budget burn, anomalías de costo y
+workflows atascados — tres paneles, no treinta. El resto es drill-down.
+
+Los evals **offline** se curan por agente y se expanden desde los fallos de producción: cada
+fallo que llega a producción se convierte en un caso etiquetado, así la suite crece con la
+flota en lugar de escribirse una vez y olvidarse. Los **canary rollouts** mandan 5% del tráfico
+a una versión nueva, gated por umbrales estadísticos de success rate, latencia y costo; una
+regresión dispare rollback automático. "Shipeamos versiones de agente como software, porque lo
+son. El prompt es parte del artifact."
+
+## Qué te llevas
+
+El consejo de Dana para equipos que empiezan ahora es deliberadamente poco romántico:
+
+1. **Construye la capa de gobernanza antes que la flota**, no después.
+2. **Instrumenta costo y calidad desde el primer agente.**
+3. **Trata la evaluación como un producto**, no una tarea.
+4. **Resiste la tentación de contar agentes como proxy de valor.**
+
+La métrica que importa es costo por resolución. La lección que más cuesta es que el primer
+outage no va a ser el modelo — va a ser tu propia infraestructura pidiendo clemencia bajo una
+concurrencia que nunca planeaste.
