@@ -1,0 +1,112 @@
+---
+title: "Postman: Agent Mode para 40 Millones de Desarrolladores con Amazon Bedrock"
+description: "Postman lleva Agent Mode a 40 millones de desarrolladores sobre Bedrock: control del tool sprawl, lecturas por esquema y contexto como cuello de botella real."
+date: "2026-10-13"
+tags: ["arquitectura", "agentes-ia", "amazon-bedrock", "mcp", "escala"]
+pillar: "arquitectura"
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Arquitectura de Software Avanzada"
+  part: 22
+resources:
+  - label: "How Postman runs Agent Mode for 40 million developers on Amazon Bedrock — AWS Machine Learning Blog"
+    url: "https://aws.amazon.com/blogs/machine-learning/how-postman-runs-agent-mode-for-40-million-developers-on-amazon-bedrock/"
+---
+
+# Postman: Agent Mode para 40 Millones de Desarrolladores con Amazon Bedrock
+
+> **Serie: Arquitectura de Software Avanzada — Parte 22.** Construir un agente para
+> una demo y operar uno para cuarenta millones de desarrolladores son dos problemas de
+> ingeniería distintos. La semana pasada vimos a un agente romper el entorno de testing
+> y operar sin detección durante meses. Esta semana cambiamos de ángulo: qué pasa cuando
+> el agente **sí** funciona y el problema es meterlo dentro de un producto maduro que lleva
+> años asumiendo interfaces pensadas para humanos.
+
+## El problema no era el modelo
+
+El equipo de Postman lo dijo sin anestesia: esperaban que la calidad del modelo y el diseño
+de prompts fueran los problemas más duros al construir **Agent Mode**, su forma AI-native de
+trabajar sobre testing de APIs, documentación, descubrimiento e implementación. No lo fueron.
+
+Los retos reales llegaron de intentar hacer **legible** un producto maduro para un agente.
+Años de suposiciones ligadas a la interfaz, una superficie enorme y conceptos altamente
+especializados. La lección central: a esa escala, **el contexto —no la capacidad— es el
+cuello de botella primario**.
+
+## Tres patrones que emergieron al escalar
+
+### 1. Contener el *tool sprawl*
+
+Un producto como Postman tiene decenas de acciones posibles. Exponer todas como tools
+es una sentencia de muerte: cada tool serializa su esquema completo dentro de la ventana
+de contexto antes de que el modelo razone un solo token. La solución fue **selección dinámica
+de tools**: exponer solo el subconjunto relevante para la tarea en curso, no el catálogo entero.
+
+Esto conecta directo con lo que documenta el ecosistema MCP: un servidor con 90+ tools gasta
+más contexto en schema overhead que en razonamiento. El filtrado por *toolset* no es pulcritud,
+es presupuesto de tokens.
+
+### 2. Lecturas basadas en esquema
+
+En lugar de inyectar estados completos de la aplicación, Agent Mode expone **lecturas
+estructuradas por esquema**. El agente pide exactamente el slice de datos que necesita para
+decidir, y el producto se lo devuelve en una forma que no arrastra décadas de estructura
+interna. Es la diferencia entre darle al agente un reporte y darle una base de datos entera.
+
+### 3. El contexto como primer ciudadano
+
+La capacidad del modelo dejó de ser la restricción. Lo que limitaba la calidad era **qué
+contexto le dabas al modelo para cada decisión**. Postman invirtió en ensamblar contexto
+deliberado por tarea —no "todo lo que sabemos"— y en acotar las tools al propósito. Menos,
+pero mejor.
+
+## El runtime administrado que hace falta debajo
+
+Los tres patrones anteriores convergen en una sola acción de runtime: una llamada de
+inferencia a un *foundation model*. Y a la escala de Postman, el tráfico es **a ráfagas,
+dirigido por desarrolladores** y sensible a latencia. Amazon Bedrock aporta cuatro
+capacidades:
+
+- **Flexibilidad de modelo sin reconstruir la integración.** Agent Mode no está atado a un
+  modelo. Cambiar entre modelos Claude soportados es, en su mayoría, un cambio de
+  configuración, no una integración nueva. Un modelo rápido sirve interacciones de alto
+  volumen y latencia; uno grande maneja razonamiento donde la calidad importa más que el costo.
+  Y en pruebas, modelos más nuevos y grandes **redujeron las alucinaciones de tool**.
+- **Inferencia cross-Region.** El tráfico de desarrolladores es picoso, y provisionar para el
+  pico en una sola región AWS es caro. Un *inference profile* enruta automáticamente entre
+  regiones destino; por workload se elige un perfil global (máximo throughput) o geográfico
+  (procesamiento dentro de una geografía, por data residency).
+- **Retención de datos dependiente del modelo.** Para clientes enterprise, dónde se procesa
+  importa tanto como cuánto. Postman configuró `data_retention_mode: none` en los modelos que
+  lo soportan; la disponibilidad es dependiente del modelo, así que cada modelo en producción
+  se valida contra la documentación vigente.
+- **Prompt caching en dos niveles.** Un *checkpoint* de una hora para el núcleo casi inmutable
+  (system prompt, instrucciones, definiciones de tools) y otro de cinco minutos para el contexto
+  variable. El prefijo estable se amortiza entre muchas lecturas; el interactivo caduca cuando
+  la sesión se enfría.
+
+## El guardado de seguridad no es opcional, es diseño
+
+Aun con todo lo anterior, la supervisión humana forma parte del diseño de producción:
+
+- **Aprobación antes de acciones con estado.** Agent Mode exige aprobación del usuario antes
+  de cualquier acción que modifique el estado de la aplicación.
+- **Alcance de tools por tarea.** Que una tool exista no significa que esté disponible en
+  cualquier contexto.
+- **Redacción de PII.** Amazon Bedrock Guardrails redacta información de identificación
+  personal antes de que llegue al LLM; los admins enterprise lo activan en la config.
+
+## Qué te llevas
+
+> *"El contexto es el cuello de botella, no la capacidad del modelo."*
+
+La contribución de Postman no es un framework nuevo, es la confirmación a escala de una regla
+que se repite en todos los casos de esta serie: integrar un agente en un producto real es, sobre
+todo, un problema de **legibilidad** y de **control de contexto**. Tool sprawl, lecturas por
+esquema, caching por capas y retención por modelo son las palancas que separan un agente que
+funciona en una demo de uno que sobrevive a cuarenta millones de usuarios.
+
+El modelo fue el 10% fácil. Lo que vino después —enrutar, cachear, acotar contexto y auditar—
+fue el verdadero producto.

@@ -1,29 +1,29 @@
-# Calendario Semanal de Contenido — Semana del 1 de Septiembre, 2026
+# Calendario Semanal de Contenido — Semana del 12 de Octubre, 2026
 
 ## Serie: Agentes en Producción y Casos de Uso Reales
 
 | # | Fecha | Slug | Título | Serie | Parte | Pillar |
 |---|-------|------|--------|-------|-------|--------|
-| 1 | 2026-09-01 | `shopify-sidekick-el-bucle-de-aprendizaje-continuo-que-reduce-costos-96` | Shopify Sidekick: El Bucle de Aprendizaje Continuo que Reduce Costos 96% | Construyendo con IA: Lo que nadie te dice | 11 | agentes-en-produccion |
-| 2 | 2026-09-03 | `notion-busqueda-vectorial-a-escala-de-millones-de-workspaces` | Notion: Búsqueda Vectorial a Escala de Millones de Workspaces | Arquitectura de Software Avanzada | 17 | arquitectura |
-| 3 | 2026-09-05 | `github-seis-capas-del-sistema-de-ingenieria-agentica-nativa` | GitHub: Seis Capas del Sistema de Ingeniería Agéntica Nativa | Construyendo con IA: Lo que nadie te dice | 12 | construir-con-ia |
+| 1 | 2026-10-13 | `postman-agent-mode-para-40-millones-de-desarrolladores-con-amazon-bedrock` | Postman: Agent Mode para 40 Millones de Desarrolladores con Amazon Bedrock | Arquitectura de Software Avanzada | 22 | arquitectura |
+| 2 | 2026-10-15 | `sps-commerce-la-fabrica-de-software-que-proceso-500-tickets-con-cero-incidentes` | SPS Commerce: La Fábrica de Software que Procesó 500 Tickets con Cero Incidentes | Construyendo con IA: Lo que nadie te dice | 21 | agentes-en-produccion |
+| 3 | 2026-10-17 | `mufg-ontologia-y-grafos-de-conocimiento-para-cortar-90-del-trabajo-de-flujogramas` | MUFG: Ontología y Grafos de Conocimiento para Cortar 90% del Trabajo de Flujogramas | Construyendo con IA: Lo que nadie te dice | 22 | agentes-en-produccion |
 
 ## Foco de cada post
 
-1. **Shopify Sidekick** — Cómo Shopify comprime fallos de producción en pesos del modelo cada día con un bucle de aprendizaje continuo. Self-healing pipeline, gisting para comprimir prompts de 6000 a 1500 tokens, GRPO con judges calibrados, y el resultado: 96% menos costo de serving, 38% menos latencia, 14% menos GPUs.
+1. **Postman — Agent Mode (40M de desarrolladores sobre Amazon Bedrock)** — El problema no era el modelo: era hacer legible un producto maduro para un agente. Tres patrones emergen a escala: contener el tool sprawl (selección dinámica de tools, no catálogo entero), lecturas por esquema, y tratar el contexto —no la capacidad— como cuello de botella. Debajo, el runtime administrado: flexibilidad de modelo sin reconstruir integración, inferencia cross-Region, retención dependiente del modelo, y prompt caching en dos niveles (1h para el núcleo estable, 5min para el contexto variable). Supervisión humana como diseño: aprobación antes de acciones con estado y redacción de PII con Bedrock Guardrails.
 
-2. **Notion** — Evolución de la infraestructura de búsqueda vectorial para AI Q&A: de pods acoplados a serverless, migración a Turbopuffer, Page State con xxHash para evitar re-embeddings, y migración a Ray/Anyscale que redujo costos de embeddings 90%+. Multi-región con data residency para EU.
+2. **SPS Commerce — fábrica de software (500+ tickets, 0 incidentes)** — Conectar agentes que ya existían, dispersos por equipos, en una línea de ensamblaje con gobernanza. Flujo: planning agent redacta plan → humano aprueba → coding agent abre PR → humano mergea. El agente se trata como "ingeniero junior": aprobación humana donde los ingenieros ya revisan. Requisitos del andamiaje: contexto compartido (context lake), gobernanza, orquestación de handoffs, y visibilidad del ROI. Resultado en 4 meses: 500+ tickets, ~400 story points, 0 incidentes, >50% utilidad reportada.
 
-3. **GitHub** — Las seis capas del sistema agent-native de GitHub: Surfaces (Copilot app, Canvases), Runtime (sandboxes locales y cloud), Automation (Agent Merge), Quality (multi-model review, Rubber Duck), Memory (Chronicle), y Trust (aislamiento, credenciales scoped).
+3. **MUFG — ontología + grafo de conocimiento (11→1 días-persona, 90%)** — Por qué la IA generativa sola fallaba en banca regulada: el modelo no sabía qué es un procedimiento válido, así que inventaba. La solución añade dos capas debajo del LLM: una ontología (RDF/OWL, el plano del dominio) y un grafo de instancias en Amazon Neptune. El agente consulta el subgrafo antes de generar, restringe lo que el LLM puede emitir y cita nodos/aristas. La ontología no estandariza (eso es decisión humana); acelera el trabajo de sistema que precede cada decisión. Patrón replicable a cualquier empresa regulada que creció por adquisición.
 
 ## Cron Jobs de Publicación
 
-| Post | Fecha | Acción |
-|------|-------|--------|
-| Shopify Sidekick | 2026-09-01 09:00 CST | `draft: false` + commit + PR a develop |
-| Notion | 2026-09-03 09:00 CST | `draft: false` + commit + PR a develop |
-| GitHub | 2026-09-05 09:00 CST | `draft: false` + commit + PR a develop |
+| Post | Fecha | Job ID | Acción |
+|------|-------|--------|--------|
+| Postman | 2026-10-13 09:00 CST | *(pendiente)* | `draft: false` + commit + push + PR a develop |
+| SPS Commerce | 2026-10-15 09:00 CST | *(pendiente)* | `draft: false` + commit + push + PR a develop |
+| MUFG | 2026-10-17 09:00 CST | *(pendiente)* | `draft: false` + commit + push + PR a develop |
 
 ---
 
-*Generado automáticamente por Hermes Agent — 2026-08-31*
+*Generado automáticamente por Hermes Agent — 2026-10-12*
