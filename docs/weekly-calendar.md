@@ -20,9 +20,9 @@
 
 | Post | Fecha | Job ID | Acción |
 |------|-------|--------|--------|
-| Postman | 2026-10-13 09:00 CST | *(pendiente)* | `draft: false` + commit + push + PR a develop |
-| SPS Commerce | 2026-10-15 09:00 CST | *(pendiente)* | `draft: false` + commit + push + PR a develop |
-| MUFG | 2026-10-17 09:00 CST | *(pendiente)* | `draft: false` + commit + push + PR a develop |
+| Postman | 2026-10-13 09:00 CST | `8b4ee5f4f3da` | `draft: false` + commit + push + PR a develop |
+| SPS Commerce | 2026-10-15 09:00 CST | `b158de7219e3` | `draft: false` + commit + push + PR a develop |
+| MUFG | 2026-10-17 09:00 CST | `545275884054` | `draft: false` + commit + push + PR a develop |
 
 ---
 
