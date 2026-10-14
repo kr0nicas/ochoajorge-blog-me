@@ -1,0 +1,102 @@
+---
+title: "SPS Commerce: La Fábrica de Software que Procesó 500 Tickets con Cero Incidentes"
+description: "SPS Commerce orquestó agentes de planificación y código en una fábrica de software: más de 500 tickets y cero incidentes con aprobación humana en cada paso."
+date: "2026-10-15"
+tags: ["agentes-ia", "orquestacion", "sdlc", "gobernanza", "devtools"]
+pillar: "agentes-en-produccion"
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Construyendo con IA: Lo que nadie te dice"
+  part: 21
+resources:
+  - label: "How SPS Commerce Built an AI Software Factory on Port — Port case study"
+    url: "https://www.port.io/case-study/sps-commerce-ai-software-factory"
+---
+
+# SPS Commerce: La Fábrica de Software que Procesó 500 Tickets con Cero Incidentes
+
+> **Serie: Construyendo con IA: Lo que nadie te dice — Parte 21.** Hemos visto agentes a
+> diez mil de golpe y agentes que se escapan de su caja. SPS Commerce (400+ ingenieros) cuenta
+> la historia inversa: cómo conectar agentes que **ya existían**, dispersos por equipos, en una
+> sola línea de ensamblaje con gobernanza. El resultado no se mide en tokens, sino en tickets:
+> **500+ procesados y cero incidentes** en cuatro meses.
+
+## El estado inicial: agentes valiosos, pero en islas
+
+Cuando las herramientas de IA despegaron, cada equipo de SPS empezó a construir sus propios
+agentes —uno para codificación, otro para planificación, otro para migraciones— cada uno
+resolviendo una parte del ciclo de desarrollo de forma **independiente**. Mark DeBeer, lead
+software engineer, lo resumió: era genial, pero para evolucionar no bastaba con reutilizar
+agentes; había que **conectarlos para atravesar todo el SDLC**.
+
+El salto conceptual es la "**fábrica de software**": un modelo de ingeniería donde desarrolladores
+y agentes trabajan juntos sobre flujos conectados y automatizados. No es un agente más grande;
+es una **línea de ensamblaje** con estaciones y handoffs gobernados.
+
+## Qué exigían del andamiaje
+
+SPS evaluó varias plataformas y eligió **Port** porque cumplía cuatro requisitos que resumen
+el problema real de orquestar agentes en producción:
+
+1. **Un contexto compartido.** Un *context lake* que reúne los datos de las herramientas que
+   los desarrolladores ya usan —Jira, Azure DevOps, Kubernetes— para que agentes y humanos
+   vean lo mismo.
+2. **Gobernanza.** Quién aprueba qué, y en qué punto del flujo.
+3. **Orquestación.** Los handoffs entre un agente y el siguiente, con estado y visibilidad.
+4. **Visibilidad del ROI.** Dashboards que muestran qué está pasando en cada flujo complejo,
+   para depurar y justificar la inversión.
+
+El punto que más vale la pena subrayar: la **fuente única de verdad** para agentes *y*
+desarrolladores. Sin eso, depurar un flujo agentic multi-paso se vuelve imposible —no sabes
+qué decidió el agente ni con qué contexto.
+
+## El flujo: agente como ingeniero junior
+
+SPS diseñó su primer flujo igual que **onboardea a un ingeniero junior**: los agentes redactan
+planes y escriben código, y un desarrollador revisa las decisiones clave antes de que el trabajo
+avance. Concretamente, el recorrido de un ticket Jira a un pull request:
+
+1. Un desarrollador **etiqueta** un ticket Jira.
+2. Port lo envía a un **agente de planificación**, que redacta un plan de implementación usando
+   el *context lake*.
+3. El desarrollador **revisa y aprueba** el plan desde una acción self-service de Port.
+4. Port entrega el plan aprobado a un **agente de codificación**, que genera el código y abre
+   el pull request en GitHub.
+5. El desarrollador revisa y **mergea** el PR, manteniéndose responsable del resultado.
+
+Entre cada handoff, Port orquesta, publica el estado en Slack y en dashboards, y recoge
+feedback del desarrollador. El humano no desaparece: aparece **donde ya revisaba** (antes de
+implementar y antes de mergear), sin fricción adicional.
+
+## Los números, cuatro meses después
+
+- **500+ tickets Jira** procesados por el flujo agentic.
+- **~400 story points** de trabajo ejecutado.
+- **0 incidentes** relacionados con el flujo.
+- **Más del 50%** de los desarrolladores que lo usaron lo calificaron de útil.
+
+Para el liderazgo de SPS, el cero incidentes fue lo más importante. Los flujos de agentes se
+monitorean **junto a la telemetría y los sistemas de incidentes existentes**, de modo que hay
+visibilidad tanto del rendimiento del agente como de su impacto operativo.
+
+## Qué te llevas
+
+> *"Orquestación, no agentes sueltos: conectar agentes en flujos extremo a extremo es lo que
+> convierte casos de uso aislados en un sistema."*
+
+Tres lecciones que SPS deja servidas en bandeja:
+
+1. **Los flujos conectados escalan mejor que los agentes aislados.** Un agente automatiza una
+   tarea; una fábrica conecta agentes, desarrolladores y tools en un flujo que atraviesa el SDLC.
+2. **El contexto compartido hace a los agentes más efectivos.** Cuando el agente ve el mismo
+   contexto real de ingeniería que el desarrollador, planifica y actúa con el panorama completo.
+3. **El marco de "ingeniero junior" te dice dónde va el humano.** Pon la aprobación humana donde
+   los ingenieros ya revisan —antes de implementar y antes de mergear— para mantener la
+   responsabilidad sin añadir fricción.
+
+El siguiente paso de SPS es revelador del rumbo de la industria: expandir la fábrica a **revisión
+de PRs y fallos de build**, con flujos **agente-a-agente** en el horizonte —observability agents
+que invocarán coding agents directamente. La gobernanza que armaron hoy es la que hará creíble
+ese salto mañana.
