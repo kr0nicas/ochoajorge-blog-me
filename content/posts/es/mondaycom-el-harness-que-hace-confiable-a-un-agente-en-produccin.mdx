@@ -1,0 +1,143 @@
+---
+title: "monday.com: El Harness que Hace Confiable a un Agente en Producción"
+description: "Monday.com construyó un harness para su feedAgent: esquema de salida, filtrado de alucinaciones por alias y limpieza de PII. El modelo no es el problema."
+date: "2026-09-22"
+tags: ["agentes-ia", "harness", "evals", "observabilidad", "produccion"]
+pillar: "agentes-en-produccion"
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Construyendo con IA: Lo que nadie te dice"
+  part: 17
+resources:
+  - label: "Building a Robust Harness for agent in production: Feed agent case-study — monday.com AI Engineering"
+    url: "https://engineering.monday.com/building-a-robust-harness-for-agent-in-production-feed-agent-case-study/"
+---
+
+# monday.com: El Harness que Hace Confiable a un Agente en Producción
+
+> **Serie: Construyendo con IA: Lo que nadie te dice — Parte 17.** Pusiste el modelo,
+> le diste herramientas, probaste el happy path y el demo salió impecable. Después lo
+> mandas a producción y el agente inventa datos, agrupa el mismo evento dos veces y
+> devuelve JSON que no parsea. monday.com documentó el *harness* que puso alrededor de
+> su feedAgent para que nada de eso pase. El modelo no era el problema; lo que había
+> **alrededor** del modelo era el problema.
+
+## El caso: un agente que cura feeds en tiempo real
+
+El `feedAgent` de monday.com cura un feed de actividad personalizado para cada miembro
+de un workspace. Decide qué mostrar de todo lo que está pasando alrededor, y cada *feed
+item* debe ser preciso, accionable, fresco y confiable: cita las actividades concretas
+que lo respaldan y enmarca el siguiente paso.
+
+No es un chatbot de FAQ. Es un **deep agent**: razona en un bucle, llama herramientas,
+decide cuándo terminar, recupera datos de múltiples fuentes en tiempo real, y su salida
+es lo que el usuario **ve y usa directamente**. Cualquier alucinación, cualquier ID
+inventado, llega a la pantalla de un usuario real.
+
+La decisión de monday.com fue construir el harness *caminando el flujo*: recorrer cada
+fase del loop de ejecución del agente y, en cada paso, preguntar *"¿qué puede salir mal
+aquí, y qué hace el harness al respecto?"* El resultado es un patrón repetible, no una
+colección de parches.
+
+## Fase 1: lo que entra al prompt
+
+El primer paso del feedAgent es armar el prompt con una enorme cantidad de datos
+multi-asset: actividad del usuario, actividad de agentes, feed items existentes. Meter
+todo eso crudo al modelo es caro y peligroso. El harness lo procesa antes:
+
+1. **Preprocesador de actividad, PII-safe.** Colapsa ráfagas de eventos del usuario en
+   eventos únicos, mantiene solo cambios agregados importantes y elimina el ruido de
+   setup. Es **determinístico**: el modelo nunca ve el torrente crudo. Y —crítico—
+   **remueve todo el PII antes de que el LLM lo vea**. El dato sensible ni siquiera
+   entra al contexto.
+2. **Sistema de alias contra la alucinación.** En lugar de meter IDs crudos (que los
+   LLMs confunden y recitan mal), reemplaza los IDs por *aliases* cortos. Cuando el
+   modelo produce salida, cita esos aliases como evidencia. El harness luego filtra
+   toda actividad *inventada* que no resuelve a un alias real: una superficie de
+   detección de alucinaciones construida en el diseño, no agregada después.
+3. **Prompt caching.** El system prompt se carga antes de cada run. Sin cacheo, cada
+   invocación paga el costo completo de tokens por el mismo texto estático. Cacheado a
+   nivel del AI gateway, se transmite una vez y las siguientes llamadas dentro de la
+   ventana cuestan una fracción.
+
+La lección de esta fase: **el prompt es un sistema de interés, no un string**. Controlar
+qué entra (tokens, PII, IDs) es tan importante como controlar qué sale.
+
+## Fase 2: el agente y el contrato de salida
+
+Con el prompt armado, se instancia el agente: modelo, tools, system prompt, middleware.
+Aquí el harness gobierna los límites:
+
+1. **Esquema de salida explícito.** Sin esquema, el modelo devuelve texto libre. Pero
+   como la salida la consume código downstream, debe estar bien definida. El esquema de
+   salida fuerza al modelo a emitir su respuesta vía un tool call validado por schema,
+   en lugar de *"confiar"* en que el modelo produzca JSON válido. Es la diferencia entre
+   un **contrato** y una **esperanza**.
+2. **Retry ante fallo de schema.** Si el modelo no cumple el esquema, reintenta con el
+   error de validación devuelto como contexto. Con el error inyectado, el modelo tiene
+   lo necesario para corregirse.
+3. **Límite de llamadas al modelo.** Usan `modelCallLimitMiddleware` con
+   `exitBehavior: 'end'`. El agente no puede correr indefinidamente, y al tocar el
+   límite se detiene de forma segura en lugar de un fallo sin manejar. El modelo no
+   puede llamarse más de N veces; el loop no puede ciclar más de M veces.
+
+## Fase 3: las herramientas, cada una un punto de fallo
+
+Cada tool del agente es un punto de fallo potencial: una llamada de red que falla, una
+query que devuelve vacío. El harness trata cada una distinto:
+
+1. **Filtrado de alucinaciones.** Todo lo que no resuelve a un ID de actividad válido se
+   descarta y se loguea. Si el modelo citó un alias que nunca estuvo en los datos, esa
+   cita es una alucinación.
+2. **Deduplicación.** La misma actividad no puede aparecer en dos feed items. Si el
+   modelo agrupa el mismo evento dos veces, un sistema de prioridad decide en cuál de
+   los dos se queda. Se fuerza con un set que rastrea cada ID resuelto a lo largo de
+   todo el pass de salida.
+
+## Fase 4: memoria que sobrevive al run
+
+Un harness que se resetea en cada run no tiene memoria de lo que funcionó. El *Feed
+Memory* cierra el bucle: las señales de comportamiento de cómo el usuario interactúa con
+el feed vuelven a la entrada del agente en el siguiente run.
+
+- **Reglas explícitas.** El usuario le dice algo al feed-agent directamente. El chat
+  extractor lo convierte en una regla estructurada, de alta autoridad, aplicada de
+  forma determinística antes de curar.
+- **Observaciones inferidas.** El usuario no dijo nada, pero el agregador de
+  comportamiento lee patrones de dismissals, clics de CTA y tiempos de permanencia.
+  Autoridad más baja, entregada como contexto suave; informa decisiones de borde pero
+  **nunca** sobreescribe las reglas explícitas.
+
+## Fase 5: observabilidad y evals
+
+Cada invocación se envuelve en `traceable()` de LangSmith, capturando cada paso
+intermedio: tool calls, respuestas del modelo, conteo de tokens, cadenas de razonamiento.
+Además, un evento resumen se dispara en cada run —éxito o fracaso— con métricas a nivel
+de run: duración, conteo de actividades, nombre del modelo, trayectoria de tool-calls.
+
+Y porque el agente no es determinístico, **no basta con testear las partes
+determinísticas**:
+
+- **Evals offline.** Un dataset fuerte, enriquecido continuamente con casos que aparecen
+  en producción. Un LLM-juez con métricas específicas por parte corre en CI para
+  garantizar que no hay regresiones antes de desplegar.
+- **Evals online.** Análisis continuo de datos de producción que detecta problemas
+  potenciales y sugiere fixes, con métricas similares pero datos en tiempo real.
+
+## El patrón que se repite
+
+> *"Los bumpers no garantizan un strike. Garantizan que la bola se quede en la pista —
+> cada vez, en cada run, para cada usuario."*
+
+Caminando el flujo fase por fase, el patrón que seguía apareciendo era el mismo: **los
+modos de fallo no estaban en el modelo, estaban en las suposiciones que hacíamos a su
+alrededor**. Lo que entra al prompt, lo que acota el run, lo que se verifica antes de que
+la salida embarque, lo que se recuerda para la próxima vez — nada de eso es trabajo del
+modelo. Es trabajo del harness.
+
+Si tu agente funciona en el demo y se rompe en producción, deja de mirar el modelo.
+Mira el harness. Los flujos agentic en producción consisten en construir un
+**harness fuerte** alrededor del agente — y eso empieza por caminar el flujo y
+preguntarte, paso a paso, *qué puede salir mal y qué hará tu sistema al respecto*.
