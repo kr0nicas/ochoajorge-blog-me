@@ -1,29 +1,29 @@
-# Calendario Semanal de Contenido — Semana del 8 de Septiembre, 2026
+# Calendario Semanal de Contenido — Semana del 14 de Septiembre, 2026
 
 ## Serie: Agentes en Producción y Casos de Uso Reales
 
 | # | Fecha | Slug | Título | Serie | Parte | Pillar |
 |---|-------|------|--------|-------|-------|--------|
-| 1 | 2026-09-08 | `meta-agentes-ia-que-recuperan-megavatios-de-performance-a-hiperescala` | Meta: Agentes IA que Recuperan Megavatios de Performance a Hiperescala | Construyendo con IA: Lo que nadie te dice | 13 | agentes-en-produccion |
-| 2 | 2026-09-10 | `duolingo-plataforma-de-agentes-lista-para-produccion-en-10-minutos` | Duolingo: Plataforma de Agentes Lista para Produccion en 10 Minutos | Arquitectura de Software Avanzada | 18 | arquitectura |
-| 3 | 2026-09-12 | `spotify-xirp-y-portal-36000-sesiones-de-agentes-sin-vendor-lock-in` | Spotify: Xirp y Portal, 36000 Sesiones de Agentes sin Vendor Lock-in | Construyendo con IA: Lo que nadie te dice | 14 | construir-con-ia |
+| 1 | 2026-09-15 | `ibm-agentes-en-produccin-la-fbrica-de-datos-que-nadie-dibuja` | IBM: Agentes en Producción, la Fábrica de Datos que Nadie Dibuja | Construyendo con IA: Lo que nadie te dice | 15 | agentes-en-produccion |
+| 2 | 2026-09-17 | `state-farm-llm-como-juez-para-monitorear-agentes-ia-en-produccin` | State Farm: LLM como Juez para Monitorear Agentes IA en Producción | Construyendo con IA: Lo que nadie te dice | 16 | agentes-en-produccion |
+| 3 | 2026-09-19 | `toyota-deep-agents-y-langsmith-de-6-meses-a-4-das-por-agente` | Toyota: Deep Agents y LangSmith, de 6 Meses a 4 Días por Agente | Arquitectura de Software Avanzada | 19 | arquitectura |
 
 ## Foco de cada post
 
-1. **Meta — Capacity Efficiency AI Agents** — Cómo Meta construyó una plataforma unificada de agentes IA para eficiencia de capacidad a hiperescala. MCP tools estandarizadas + skills codificadas que automatizan find-and-fix de regresiones de performance. FBDetect detecta regresiones del 0.005%, el AI Regression Solver genera pull requests automáticamente. Resultado: cientos de megavatios recuperados, 10 horas de investigación manual → 30 minutos. Una plataforma, ofensiva y defensa, retornos compuestos.
+1. **IBM — Building Production Agentic AI at IBM** — Cómo IBM TLS puso una plataforma multiagente en producción con A2A en cada frontera de agente y MCP para cada herramienta. Lecciones: "fábrica de datos" antes que "fábrica de agentes", identity propagation con OAuth2 token exchange, instrumentar antes de construir (traces/evals/business metrics), LiteLLM para intercambiar modelo como configuración.
 
-2. **Duolingo — Production-Ready Agent Platform** — Cómo Duolingo construyó una plataforma donde defines un agente una vez (AgentDefinition) y Temporal maneja el resto: ejecución, observabilidad, orquestación y evaluación. MCP tool calls como Temporal activities para durabilidad. Evals deterministas (diff_assertions, no_op_consistency) sobre LLM-as-judge. De semanas a 10 minutos por agente nuevo, con infraestructura heredada automáticamente.
+2. **State Farm — LLM as a Judge in Production** — Monitoreo continuo de agentes en producción con LLM-as-a-judge: métricas reference-free, faithfulness estricta vía GEval, meta-análisis con atribución por componente, y un experimento formal validando al juez contra 197 conversaciones revisadas por humanos (78% acuerdo <3pts, evaluación humana + automatizada complementarias).
 
-3. **Spotify — Xirp + Portal** — Cómo Spotify construyó Xirp, un entorno agéntico vendor-neutral que coordina 50+ sesiones paralelas en worktrees aislados. Contexto desacoplado de cualquier tool o harness: switch de modelo mid-task sin perder estado. Portal como multiplicador: cada sesión se inicializa con contexto organizacional del software catalog (component architecture, dependency graphs, ownership). 36,000+ sesiones adoptadas orgánicamente.
+3. **Toyota — Deep Agents + LangSmith** — 50+ agentes en producción, de 6 meses/6 ingenieros a 4 días/1 ingeniero por agente. Skills reutilizables inyectadas en runtime, GearPal (5-6h → 2-3 min de diagnóstico), LLM gateway con fallback, parallel tool-calling para precisión de retrieval, LangSmith como "tablero Andon".
 
 ## Cron Jobs de Publicación
 
-| Post | Fecha | Acción |
-|------|-------|--------|
-| Meta | 2026-09-08 09:00 CST | `draft: false` + commit + PR a develop |
-| Duolingo | 2026-09-10 09:00 CST | `draft: false` + commit + PR a develop |
-| Spotify | 2026-09-12 09:00 CST | `draft: false` + commit + PR a develop |
+| Post | Fecha | Job ID | Acción |
+|------|-------|--------|--------|
+| IBM | 2026-09-15 09:00 CST | `f237571a4ffd` | `draft: false` + commit + PR a develop + release a main |
+| State Farm | 2026-09-17 09:00 CST | `fe263276cbb2` | `draft: false` + commit + PR a develop + release a main |
+| Toyota | 2026-09-19 09:00 CST | `0d7d222921ec` | `draft: false` + commit + PR a develop + release a main |
 
 ---
 
-*Generado automáticamente por Hermes Agent — 2026-09-07*
+*Generado automáticamente por Hermes Agent — 2026-09-14*

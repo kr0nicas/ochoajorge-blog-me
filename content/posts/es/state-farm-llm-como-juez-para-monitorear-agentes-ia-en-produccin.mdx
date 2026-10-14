@@ -1,0 +1,158 @@
+---
+title: "State Farm: LLM como Juez para Monitorear Agentes IA en Producción"
+description: "State Farm valida sus agentes con un LLM juez que califica conversaciones reales, métricas sin ground truth y atribución por componente en 197 casos reales."
+date: "2026-09-17"
+tags: ["observabilidad", "evals", "llm-as-judge", "agentes-ia", "calidad"]
+pillar: "agentes-en-produccion"
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Construyendo con IA: Lo que nadie te dice"
+  part: 16
+resources:
+  - label: "Grading the Machine: Using LLM as a Judge to Monitor AI Agents in Production — State Farm Engineering"
+    url: "https://engineering.statefarm.com/grading-the-machine-using-llm-as-a-judge-to-monitor-ai-agents-in-production-25a071db9c50"
+---
+
+# State Farm: LLM como Juez para Monitorear Agentes IA en Producción
+
+> **Serie: Construyendo con IA: Lo que nadie te dice — Parte 16.** Hiciste
+> pruebas de usuario antes de lanzar. Escribiste tests de regresión con LLM-as-a-Judge
+> en el pipeline. Nada te prepara para miles de clientes interactuando con tu
+> chatbot cada día de formas que no anticipaste. State Farm resolvió ese gap
+> con monitoreo continuo en producción.
+
+## El problema: el test de usuario definitivo
+
+Imagina que estás a cargo de un agente de chat generativo. Hiciste incontables
+sesiones de prueba antes de desplegar. Escribiste tests de regresión
+customizados con LLM-as-a-Judge y BERTScore en tu CI/CD. Aun así, el modo en que
+los clientes reales usan el sistema —miles de interacciones diarias, con
+formulaciones que jamás probaste— rompe cualquier set de casos curados.
+
+Ese es el problema que el monitoreo en producción con LLM-as-a-Judge resuelve.
+En State Farm, los agentes impulsados por IA ayudan a los representantes del
+centro de chat a manejar un alto volumen de interacciones reales. Necesitaban
+entender cómo se comportaban esos agentes *en el mundo real*, no solo en casos
+de prueba curados.
+
+## La técnica: el juez como evaluador
+
+LLM-as-a-Judge es darle a un LLM la interacción completa —pregunta del usuario,
+respuesta del sistema, contexto recuperado— junto con una métrica escrita en
+lenguaje natural, y pedirle que devuelva un score y una explicación de por qué
+lo dio.
+
+Un error común: creer que necesitas *ground truth* para evaluar. La realidad es
+que no puedes crear suficiente ground truth para miles de interacciones reales.
+Las métricas *reference-free* (sin ground truth) extraen insights accionables de
+una muestra estadísticamente significativa de conversaciones de producción.
+
+El flujo es directo: un job programado extrae conversaciones de los logs, elige
+una muestra significativa, y una función serverless (impulsada por DeepEval)
+alimenta cada conversación a Claude Sonnet 4.5 como juez. Los scores y el
+razonamiento se guardan para análisis de tendencias.
+
+## La métrica que importa: faithfulness estricta
+
+Los frameworks como DeepEval y Ragas traen métricas listas: *faithfulness*
+(¿la respuesta está fundamentada en el contexto recuperado?), *answer
+relevancy* (¿responde lo que preguntó el usuario?) y *topic adherence* (¿se
+mantuvo dentro del alcance?). Funcionan out-of-the-box para single-turn y
+multi-turn.
+
+State Farm fue más lejos con el patrón **GEval**, construyendo una métrica de
+faithfulness más estricta: no solo verifica que la respuesta no contradiga el
+contexto, sino que **cada afirmación** esté explícitamente soportada por él.
+
+```python
+from deepeval.metrics import GEval
+from deepeval.test_case import LLMTestCaseParams
+
+# GEval: faithfulness estricta — cada claim debe estar soportado por el contexto.
+strict_faithfulness = GEval(
+    name="Strict Faithfulness",
+    criteria=(
+        "Score the response 1 if and only if EVERY factual claim in the "
+        "response is explicitly supported by the retrieved context, "
+        "concept-by-concept. Penalize any inference or reasonable-sounding "
+        "conclusion unless the source data states it directly."
+    ),
+    evaluation_params=[
+        LLMTestCaseParams.INPUT,
+        LLMTestCaseParams.ACTUAL_OUTPUT,
+        LLMTestCaseParams.RETRIEVAL_CONTEXT,
+    ],
+)
+```
+
+Los criterios penalizan las inferencias, aun las que suenan razonables, salvo
+que la fuente las diga explícitamente. Esa es la diferencia entre "no contradice
+el contexto" y "cada claim está soportado por el contexto".
+
+## La capa que marca la diferencia: meta-análisis y atribución
+
+El score individual te dice qué pasó en una conversación. Pero State Farm
+quería rastrear *patrones*: qué parte del agente es responsable de cada modo de
+fallo. Construyeron una capa de meta-análisis: después de puntuar un batch, una
+segunda llamada al LLM lee los scores y el razonamiento de todo el dataset y
+los sintetiza en hallazgos estructurados.
+
+La técnica más valiosa fue la **atribución por componente**, categorizando cada
+patrón de fallo por la parte del agente responsable (el prompt, la recuperación,
+la herramienta). Esto convierte quejas vagas —"necesitamos mejorar la
+faithfulness"— en tickets de ingeniería concretos: "el prompt de billing
+desvió un 8% en faithfulness; aquí está el cambio que propone la meta-análisis."
+
+El bucle se cierra rápido para cambios de prompt: corres la evaluación, lees los
+hallazgos, aplicas el fix, y ves el cambio en la siguiente corrida. Ese bucle
+cerrado —no el dashboard— es el punto.
+
+## La validación que faltaba: ¿puedes confiar en el juez?
+
+Esta es la parte que la mayoría no hace. State Farm corrió un experimento formal:
+reviewers humanos (hasta tres independientes por conversación) puntuaron 197
+conversaciones reales de producción con los mismos criterios y rúbrica que el
+sistema automatizado, y compararon los resultados.
+
+Resultados:
+
+- Promediando múltiples reviewers, el **78%** de los scores difirieron en menos
+  de 3 puntos en una escala de 0–10, con una diferencia absoluta media de 2.14.
+- Las dos partes fallan *diferente* y cada una captura lo que la otra pierde.
+  El evaluador automático detectó violaciones inferenciales y campos mal
+  etiquetados que los humanos pasaron por alto (en un caso, un humano puntuó
+  7/10 una respuesta con múltiples distorsiones sutiles; el juez las capturó
+  todas y puntuó 2/10 con explicaciones trazables).
+
+Pero los humanos capturaron lo que el juez no podía: distinciones de dominio
+(la diferencia entre "autopay consent" y "autopay enrollment status"),
+conciencia de audiencia (cuando el agente le dijo a un State Farm Agent que
+"contactara a su State Farm Agent"), y si la información correcta se recuperó
+en primer lugar.
+
+La conclusión: **ninguno es perfecto en aislamiento; se complementan.** La
+evaluación automatizada maneja volumen y consistencia; la revisión humana maneja
+matiz y edge cases. La estrategia más fuerte usa ambos.
+
+## Qué significa para tu equipo
+
+No envías código sin tests. No corres servicios sin monitoreo. Los agentes IA no
+deberían ser la excepción. El patrón completo es:
+
+1. **Muestra estadísticamente significativa** de conversaciones de producción,
+   evaluada en cadencia regular con métricas reference-free.
+2. **Faithfulness estricta** vía GEval: cada afirmación soportada por el
+   contexto, no solo "no contradictoria".
+3. **Meta-análisis con atribución por componente**: convierte scores vagos en
+   tickets asignables y verificables.
+4. **Validación humana periódica** contra el juez: 197 conversaciones bastaron
+   para confirmar que el juez es confiable a nivel de tendencia y detectar su
+   propio drift.
+
+La evaluación automatizada no reemplaza a tus expertos de dominio. Identifica
+el trabajo de mayor valor para ellos: el juez maneja volumen y consistencia, y
+libera a los SMEs para los casos difíciles. Periódicamente, comparar el juez
+contra los humanos atrapa el drift del evaluador a medida que los agentes
+asumen nuevas tareas y los usuarios encuentran nuevas formas de preguntar.
