@@ -1,5 +1,12 @@
 # Calendario Semanal de Contenido — Semana del 12 de Octubre, 2026
 
+> **Consolidación 2026-10-14.** Del 8-sep al 13-oct ningún post llegó a producción: el PAT de
+> `gh` no tenía `pull_requests: write` (corregido el 14-oct) y los jobs del 8 al 12-sep se
+> saltaron por `drift_skip`. La rama `content/consolidacion-pendientes-oct14` publica de una vez
+> los 13 posts atrasados: Meta, Duolingo, Spotify, IBM, State Farm, Toyota, monday.com, Google,
+> Wood Mackenzie, Trane, Fortune 500, OpenAI Medicare y Postman. SPS Commerce y MUFG siguen
+> programados abajo. Shopify, Notion y GitHub (semana del 1-sep) quedan en `draft: true` sin fecha.
+
 ## Serie: Agentes en Producción y Casos de Uso Reales
 
 | # | Fecha | Slug | Título | Serie | Parte | Pillar |
