@@ -1,0 +1,106 @@
+---
+title: "MUFG: Ontología y Grafos de Conocimiento para Cortar 90% del Trabajo de Flujogramas"
+description: "MUFG ancla la IA generativa a una ontología y un grafo de conocimiento en Amazon Neptune, cortando hasta 90% el trabajo de flujogramas en banca regulada."
+date: "2026-10-17"
+tags: ["agentes-ia", "ontologia", "knowledge-graph", "rag", "banca"]
+pillar: "agentes-en-produccion"
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Construyendo con IA: Lo que nadie te dice"
+  part: 22
+resources:
+  - label: "How MUFG Bank aims to cut flowchart work by up to 90% with ontology-grounded AI — AWS Database Blog"
+    url: "https://aws.amazon.com/blogs/database/how-mufg-bank-aims-to-cut-flowchart-work-by-up-to-90-with-ontology-grounded-ai-on-amazon-neptune-and-amazon-bedrock/"
+---
+
+# MUFG: Ontología y Grafos de Conocimiento para Cortar 90% del Trabajo de Flujogramas
+
+> **Serie: Construyendo con IA: Lo que nadie te dice — Parte 22.** Esta semana cierro dos
+> historias de escala brutal (40M de desarrolladores y una fábrica de software) con un caso que
+> pone el dedo en la llaga del hype: **la IA generativa sola no basta**. MUFG, uno de los bancos
+> más grandes del mundo, necesitó una ontología y un grafo de conocimiento para que su agente
+> dejara de inventar procedimientos que no existían.
+
+## El problema: estándares de cabecera, procedimientos por sucursal
+
+MUFG mueve ~200,000 transacciones diarias en ~30 países, con más de 3,000 empleados ejecutando
+depósitos, remesas, préstamos y trade. Su división de planificación de operaciones globales
+estandariza procedimientos administrativos entre sucursales —y ahí estaba el costo estructural:
+un estándar de casa matriz arriba, y procedimientos propios de cada sucursal abajo.
+
+El artefacto de estandarización es el **flujograma**: documentar el procedimiento de una
+sucursal, compararlo contra otros a escala de portafolio y revisarlo cuando se acuerda un estado
+objetivo. Ese trabajo de "autor + comparación + revisión" tomaba **11 días-persona por
+procedimiento**, de los cuales 10 eran solo crear el flujograma.
+
+## Por qué la IA generativa sola fallaba
+
+Entre finales de 2024 y mayo de 2025, MUFG hizo un PoC usando foundation models directamente
+sobre los documentos de procedimiento. El resultado es la lección central del caso: **el modelo
+no tenía forma de saber qué es un procedimiento válido en su dominio**, así que cuando le faltaba
+información, la inventaba. En banca regulada, una alucinación en un flujograma de remesas no es
+un bug menor.
+
+La premisa que cambió todo: *un agente de IA es como un empleado nuevo y muy hábil, pero sin
+conocimiento del negocio*. Antes de confiarle un trabajo que un experto firmaría, hay que
+enseñarle el dominio, darle casos reales y corregirlo cuando asume cosas que no son ciertas.
+
+## La arquitectura neuro-simbólica: ontología + grafo + agente
+
+La solución añade **dos capas conectadas debajo del LLM**:
+
+1. **Una ontología (el plano del dominio).** Conceptos, relaciones y reglas extraídos de los
+   procedimientos de casa matriz, expresados en RDF y OWL. Por ejemplo, la tripleta
+   `"Información de pago → poblar → campos obligatorios"` o `"Oficial → ejecuta → remesa"`.
+   Define qué es un procedimiento de remesa *válido* a nivel conceptual, independiente de
+   cualquier sucursal.
+2. **Un grafo de conocimiento (instancias por sucursal).** El procedimiento real de cada
+   sucursal se mapea contra la ontología y se carga en **Amazon Neptune** como un grafo
+   instanciado. La ontología es el plano; el grafo de cada sucursal es un edificio construido
+   con ese plano.
+3. **Un agente que consulta el grafo antes de generar.** Con **Strands Agents**, el agente
+   primero recupera el subgrafo relevante de Neptune, lo usa para **restringir lo que el LLM
+   puede emitir**, y cita los nodos y aristas que soportan cada paso. Al preguntar por un pago
+   transfronterizo, recupera el camino `Payment Request → Cross-Border Payment → Mandatory
+   Field Validation → Sanctions Screening → Authorization` junto a las condiciones de umbral y
+   las referencias de política adjuntas. Las alucinaciones caen en picado porque el modelo ya no
+   puede inventar estructura que no existe en la ontología.
+
+Un matiz importante: la ontología **no estandariza** los procedimientos —eso sigue siendo una
+decisión de negocio de los expertos y actores regionales. Lo que hace es acelerar brutalmente
+el trabajo de sistema que precede a cada decisión: el humano sigue en el loop, y **el tooling
+deja de ser el cuello de botella**.
+
+## Los números
+
+| Paso | Antes | Después | Mejora |
+| --- | --- | --- | --- |
+| Creación de flujograma | 10 días-persona | 0.5 días-persona | 95% |
+| Comparación (por par de sucursales) | 0.5 días-persona | ~minutos | días a minutos |
+| Revisión | 0.5 días-persona | ~minutos | días a minutos |
+| **Esfuerzo total por procedimiento** | **11 días-persona** | **1 día-persona** | **90%** |
+
+Dos efectos secundarios que importan más que el número: la **comparación a escala de portafolio**
+pasa de infactible a ser la vista por defecto (una sucursal contra N, porque la ontología
+normaliza a una representación común antes del diff), y el rol del experto migra de *autor* a
+*revisor*: su juicio se vuelve el recurso escaso, no la redacción de flujogramas.
+
+## Qué te llevas
+
+> *"Sin una ontología, el modelo no sabe qué es válido en tu dominio. Con ella, deja de
+> inventar y empieza a citar."*
+
+La lección de MUFG no es bancaria —es estructural. Toda empresa regulada que creció por
+adquisiciones o expansión geográfica carga el mismo costo: estándares de casa matriz arriba,
+procedimientos por subsidiaria abajo, y ninguna forma escalable de **converger** esos artefactos.
+La IA generativa sola no cierra esa brecha porque no tiene una forma con principios de saber
+qué es un procedimiento válido en tu dominio.
+
+El patrón *ontology-grounded* es la respuesta: estructura de dominio + grafo de instancias +
+un agente que consulta antes de generar. MUFG ya lo está replicando a problemas adyacentes —
+generación de casos de prueba UAT, documentos de definición de requisitos, transferencia de
+conocimiento y due diligence de M&A— usando además el **Context Ontology Accelerator**, el
+proyecto open-source de AWS que cierra el círculo con una ontología reutilizable. Cuando el
+modelo puede citar sus fuentes, deja de necesitar que confíes en él.
