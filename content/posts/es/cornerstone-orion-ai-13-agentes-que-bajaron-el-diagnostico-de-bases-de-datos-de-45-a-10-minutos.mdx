@@ -1,0 +1,269 @@
+---
+title: "Cornerstone Orion AI: 13 Agentes que Bajaron el Diagnóstico de Bases de Datos de 45 a 10 Minutos"
+description: "Cornerstone coordina 13 agentes en hub-and-spoke con ruteo por keywords y memoria acotada para bajar el diagnóstico de bases de datos de 45 a 10 minutos."
+date: "2026-10-20"
+tags: ["agentes-ia", "multi-agente", "dataops", "mcp", "observabilidad"]
+pillar: "agentes-en-produccion"
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Arquitectura de Software Avanzada"
+  part: 23
+resources:
+  - label: "How Cornerstone OnDemand cut database diagnosis by 78% with Amazon Bedrock — AWS ML Blog"
+    url: "https://aws.amazon.com/blogs/machine-learning/how-cornerstone-ondemand-cut-database-diagnosis-by-78-with-amazon-bedrock/"
+---
+
+# Cornerstone Orion AI: 13 Agentes que Bajaron el Diagnóstico de Bases de Datos de 45 a 10 Minutos
+
+> **Serie: Arquitectura de Software Avanzada — Parte 23.** Las semanas pasadas vimos agentes
+> que escriben código y agentes anclados a ontologías. Esta semana bajamos a un terreno menos
+> glamoroso y mucho más honesto: **operaciones de bases de datos**. Cornerstone OnDemand
+> (140 millones de usuarios, 186 países) construyó Orion AI, un sistema multi-agente que
+> convirtió el *firefighting* de su equipo de DataOps en flujos auto-orquestados. Tres
+> personas, seis meses, y un diagnóstico que pasó de **45 a 10 minutos**.
+
+## El problema real: coordinación, no SQL
+
+Lo interesante del caso es que el cuello de botella no era técnico en el sentido clásico. Los
+ingenieros de DataOps de Cornerstone saben leer un *blocking chain* en SQL Server. El problema
+era todo lo que pasaba **alrededor** de esa lectura:
+
+- **~45 minutos por incidente** saltando entre herramientas y vistas de sistema.
+- **10+ pasos manuales** para flujos de ciclo de vida de bases de datos: abrir conexiones,
+  correr queries cruzadas, comunicar estado.
+- **15 minutos de lag** en el reporte entre SRE y el equipo de datos.
+- **Alertas redundantes** que enterraban las señales que importaban.
+
+Si has estado de guardia en una plataforma con decenas de instancias, reconoces el patrón: el
+tiempo no se va en pensar, se va en **recolectar evidencia y pasarla de mano en mano**. Ese es
+exactamente el tipo de trabajo donde un agente aporta, porque es multi-paso, repetitivo y
+verificable.
+
+## La topología: hub-and-spoke con un hub sin herramientas de dominio
+
+Orion AI usa un **meta-orquestador** (lo llaman *TaskExecutor*) y **13 agentes especialistas**
+en topología hub-and-spoke, construidos con Strands Agents sobre Amazon Bedrock y desplegados
+como contenedores en ECS.
+
+El detalle de diseño que más me gusta: **el hub no tiene herramientas de dominio**. Solo tiene
+dos tipos de tools:
+
+- **Ruteo**: `find_relevant_agents`, `call_agent`.
+- **Control de flujo**: `emit_plan_step`, `emit_confirmation_gate`.
+
+Es una decisión arquitectónica fuerte y correcta. Un orquestador que además sabe hacer
+queries a SQL Server termina siendo un *god object*: su contexto crece con cada integración y
+su selección de tools se degrada. Al quitarle el dominio, el hub solo razona sobre **a quién
+delegar y cuándo pedir confirmación**. Es el mismo principio que aplicamos en Clean
+Architecture: el caso de uso orquesta, los adaptadores ejecutan.
+
+Los spokes se cargan de forma *lazy* desde un registro basado en decoradores. Cada uno trae su
+propio modelo, sus tools y su system prompt localizado.
+
+## Principio 1: dividir por dominio, no por complejidad
+
+La tentación habitual es dividir agentes por "dificultad": uno rápido para cosas simples, uno
+con razonamiento para cosas difíciles. Cornerstone dividió por **dominio operativo**, y lo
+ilustra con tres agentes de SQL Server que responden preguntas distintas de una misma
+investigación:
+
+1. **Database diagnostics agent** — *"¿qué está pasando y qué significa?"*. Blocking chains,
+   wait types, queries largas, traducidas a impacto de negocio.
+2. **Session blocking analysis agent** — *"¿por qué pasa y cuál es la causa raíz?"*. Usa
+   modelos de razonamiento para mapear la cadena hasta el *root blocker*.
+3. **Real-time SQL diagnostics agent** — *"¿qué es verdad ahora mismo?"*. Consulta las
+   instancias en vivo vía su DATAOPS API.
+
+Los otros diez siguen la misma regla de *ownership* estrecho: monitoreo de infraestructura,
+analítica operativa, ciclo de vida, analítica de clientes, runbooks, ruteo de notificaciones,
+descomposición de queries compuestas, resolución de listeners de Availability Groups y hasta
+un agente de *warm-up* de conexiones al modelo.
+
+El beneficio se nota en la calidad de la **selección de herramientas**: un agente con cuatro
+tools de un solo dominio elige mejor que uno con cuarenta tools de cinco dominios. Es el mismo
+hallazgo que vimos con Postman y el *tool sprawl*, ahora desde la óptica de topología.
+
+## Principio 2: keyword primero, semántica como fallback
+
+Aquí está la decisión más pragmática del caso. Antes de invocar embeddings, Orion AI intenta
+rutear con un **fast-path de keywords en memoria**. Resultado: **~80% de las consultas se
+resuelven en menos de un milisegundo**. Solo cuando las keywords no alcanzan, cae a búsqueda
+semántica con Titan Text Embeddings V2. Y si tampoco aplica una tool directa, la cadena de
+fallback termina en una Knowledge Base (RAG) con los procedimientos aprobados.
+
+En Go, el patrón se ve así: un puerto de ruteo con adaptadores encadenados.
+
+```go
+package routing
+
+import (
+	"context"
+	"strings"
+)
+
+// Route es el resultado de decidir a qué especialista delegar.
+type Route struct {
+	Agent      string
+	Confidence float64
+	Strategy   string // "keyword" | "semantic" | "rag"
+}
+
+// Router es el puerto que consume el orquestador.
+type Router interface {
+	Route(ctx context.Context, query string) (Route, bool, error)
+}
+
+// KeywordRouter: búsqueda en un índice en memoria, sin I/O.
+type KeywordRouter struct {
+	index map[string]string // keyword -> agente
+}
+
+func (k KeywordRouter) Route(_ context.Context, q string) (Route, bool, error) {
+	hits := map[string]int{}
+	for _, tok := range strings.Fields(strings.ToLower(q)) {
+		if agent, ok := k.index[tok]; ok {
+			hits[agent]++
+		}
+	}
+	// Solo aceptamos si hay un ganador inequívoco.
+	var best string
+	var bestN, total int
+	for a, n := range hits {
+		total += n
+		if n > bestN {
+			best, bestN = a, n
+		}
+	}
+	if bestN == 0 || float64(bestN)/float64(total) < 0.75 {
+		return Route{}, false, nil
+	}
+	conf := float64(bestN) / float64(total)
+	return Route{Agent: best, Confidence: conf, Strategy: "keyword"}, true, nil
+}
+
+// Chain prueba routers en orden y se detiene en el primero que decide.
+type Chain []Router
+
+func (c Chain) Route(ctx context.Context, q string) (Route, bool, error) {
+	for _, r := range c {
+		route, ok, err := r.Route(ctx, q)
+		if err != nil {
+			return Route{}, false, err
+		}
+		if ok {
+			return route, true, nil
+		}
+	}
+	return Route{}, false, nil
+}
+```
+
+El orquestador solo conoce `Router`. Que detrás haya keywords, embeddings o un RAG es un
+detalle de infraestructura. Y lo más importante para operar: **emite `Strategy` y
+`Confidence` como métricas**. Cornerstone publica la *routing confidence* en CloudWatch; si
+el porcentaje que cae a semántica empieza a subir, es señal de que tus usuarios están
+cambiando de vocabulario antes de que la calidad se degrade.
+
+## Principio 3: memoria por sesión, y bypass para métricas en vivo
+
+Orion AI maneja tres niveles de memoria:
+
+- **Corto plazo**: contexto de la sesión en DynamoDB, más un resumen rodante generado de forma
+  asíncrona por un modelo pequeño (Nova 2 Lite).
+- **Largo plazo**: recuerdo entre sesiones con AgentCore Memory, con namespace por usuario.
+- **Inter-agente**: un *scratchpad* efímero en memoria para pasar hallazgos entre sub-agentes
+  dentro de una misma tarea.
+
+El gestor de memoria lee de los tres en paralelo con un **timeout duro de 500 ms** y un
+**presupuesto de 4,000 tokens**, con caché LRU. Esa disciplina de presupuesto es lo que
+separa un sistema de producción de una demo: la memoria no puede convertirse en la fuente de
+latencia del agente.
+
+Pero la regla clave es otra: **cuando la pregunta es sobre el estado actual del sistema, los
+agentes ignoran la memoria y leen datos en vivo**. Y no lo dejan a criterio del modelo: está
+implementado como protección a nivel de ruteo. Un agente que responde "la instancia X tiene
+bloqueos" desde un recuerdo de hace 20 minutos es peor que no tener agente.
+
+```go
+// La decisión de bypass vive en código, no en el prompt.
+func (m *MemoryManager) Context(ctx context.Context, q Query) (Snapshot, error) {
+	if q.Intent == IntentLiveState {
+		return Snapshot{}, nil // forzar ejecución de tools en vivo
+	}
+	ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+	defer cancel()
+	return m.gatherParallel(ctx, q, 4000) // presupuesto de tokens
+}
+```
+
+## Guardrails de dominio, no filtros genéricos
+
+En DataOps, "seguro" no significa "sin lenguaje ofensivo". Significa **no matar el proceso
+equivocado en producción**. Por eso Cornerstone construyó guardrails propios en cuatro capas:
+
+1. **Restricciones en el system prompt** de cada agente que bloquean recomendaciones
+   peligrosas (por ejemplo, terminar procesos críticos) y fuerzan métodos no disruptivos.
+2. **Confirmation gate humano**: las operaciones destructivas se pausan hasta que el usuario
+   confirma dentro de una ventana de **cinco minutos**, con **deny por defecto** si expira.
+3. **Módulos de validación**: límites de longitud, bloqueo de prompt injection *y de SQL
+   injection*, sanitización de salida (secretos, PII), rate limiting, RBAC y tracking de
+   costo por request.
+4. **Protección en el ruteo**: prohibido responder preguntas operativas desde memoria.
+
+El *deny on timeout* merece un subrayado. Es la diferencia entre un gate que protege y uno que
+solo decora. Si la aprobación expira y la operación procede, el gate no existe.
+
+## Integración: MCP donde se comparte, SDK donde no
+
+Un detalle que suele pasarse por alto: no todo tiene que ser MCP. Orion AI usa **dos patrones
+de conectividad**:
+
+- **MCP** (HTTP streamable) para tools que comparten varios agentes, como el diagnóstico SQL
+  en vivo o Jira vía las tools de Atlassian. Un servidor *Portal-Tools* centraliza el acceso.
+- **SDK o REST directo** para fuentes que solo usa un agente: métricas, calendarios de guardia,
+  Knowledge Bases vía Boto3.
+
+Las credenciales (token MCP, autorización REST) se pasan **por request**, nunca embebidas en el
+código del agente. Ese es el criterio correcto: MCP como contrato cuando hay múltiples
+consumidores, llamada directa cuando el acoplamiento es uno a uno.
+
+## Resultados
+
+| Métrica | Antes | Después |
+| --- | --- | --- |
+| Diagnóstico de base de datos | 45 min | 10 min (−78%) |
+| Pasos manuales de ciclo de vida | 10+ | 1 interacción (−70%) |
+| Lag de reporte SRE → datos | 15 min | Tiempo real |
+| Alertas redundantes | Línea base alta | −65% (mediana) |
+
+Lo de las alertas tiene una lectura concreta: de cada 10 alertas que antes llegaban, ahora
+llegan **3 o 4**, gracias a deduplicación, filtros de umbral y correlación entre señales.
+
+## Lo que no te dicen
+
+**Eligieron ECS porque AgentCore Runtime no estaba disponible cuando empezaron.** Lo dicen
+explícitamente y ahora evalúan migrar. Es la lección más útil del caso para quien arranca hoy:
+construye sobre lo estable y disponible, y diseña para poder migrar el runtime. Si tu
+orquestador depende de puertos (`Router`, `MemoryStore`, `ToolGateway`) y no de un SDK
+concreto, esa migración es un cambio de adaptador, no una reescritura.
+
+**Trece agentes es mucho para tres personas.** Funciona porque el *ownership* de cada agente
+es estrecho y la observabilidad (CloudWatch para confianza de ruteo y latencia, X-Ray para el
+camino completo) está desde el inicio. Sin eso, depurar una respuesta incorrecta en un sistema
+de 13 nodos se vuelve arqueología.
+
+## Qué te llevas
+
+- **El hub no hace trabajo de dominio.** Solo rutea y controla el flujo.
+- **Divide por dominio**, no por complejidad. Mejora la selección de tools más que cualquier
+  prompt.
+- **Ruteo barato primero.** Si el 80% de tus consultas se resuelve con keywords, no pagues
+  embeddings en cada request.
+- **La memoria tiene presupuesto** (tiempo y tokens) y **nunca responde por el estado
+  actual**.
+- **Deny por defecto** en cualquier confirmación humana con timeout.
+
+El siguiente post de la semana cambia de ángulo: qué pasa cuando un agente interno se convierte
+en una feature para clientes, y cómo Snyk lo hizo sin reescribir el runtime.

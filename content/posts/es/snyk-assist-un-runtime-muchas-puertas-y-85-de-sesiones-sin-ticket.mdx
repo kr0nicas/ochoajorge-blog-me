@@ -1,0 +1,262 @@
+---
+title: "Snyk Assist: Un Runtime, Muchas Puertas y 85% de Sesiones sin Ticket"
+description: "Snyk llevó su agente de soporte interno al producto sin reescribir el runtime: tools por permisos, middleware, evals en CI y 85% de sesiones sin ticket."
+date: "2026-10-22"
+tags: ["agentes-ia", "evaluacion", "seguridad", "langgraph", "soporte"]
+pillar: "agentes-en-produccion"
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Construyendo con IA: Lo que nadie te dice"
+  part: 23
+resources:
+  - label: "How Snyk turned an internal support agent into a customer feature — LangChain Blog"
+    url: "https://www.langchain.com/blog/how-snyk-turned-an-internal-support-agent-into-a-customer-feature"
+  - label: "Snyk Assist — Snyk Docs"
+    url: "https://docs.snyk.io/navigate-the-snyk-web-ui#snyk-assist"
+---
+
+# Snyk Assist: Un Runtime, Muchas Puertas y 85% de Sesiones sin Ticket
+
+> **Serie: Construyendo con IA: Lo que nadie te dice — Parte 23.** Casi todos los agentes
+> nacen como herramienta interna. Muy pocos llegan a ser una feature que un cliente pagando
+> usa todos los días. Snyk, una plataforma de seguridad, recorrió ese camino con Snyk Assist:
+> un año interno, cinco meses en el portal de soporte y, desde el 1 de septiembre de 2026,
+> dentro del producto para todos sus clientes. **El runtime nunca cambió. Solo cambió la
+> puerta.**
+
+## El listón que pone una empresa de seguridad
+
+El problema de partida era clásico: el equipo de soporte procesa miles de casos cada pocas
+semanas, y cada uno había que leerlo, clasificarlo por producto, severidad y dueño, y rutearlo.
+Un agente era la respuesta obvia.
+
+Lo que no es obvio es el listón. Snyk vende seguridad; un agente que filtra datos de otra
+cuenta no es un bug, es un incidente de reputación. Antes de mostrárselo a un cliente,
+necesitaban **probar tres cosas**:
+
+1. Que el agente **responde correctamente**.
+2. Que **rechaza lo que debe rechazar**.
+3. Que **nunca devuelve algo que el usuario no podía ver ya**.
+
+Fíjate en el orden de prioridades. No es "que sea útil". Es corrección, rechazo y aislamiento.
+La utilidad viene después, y se mide.
+
+> *"La parte difícil de construir agentes no es lo que el modelo puede hacer, es probar que el
+> agente realmente funciona."* — Bailey Millns, AI Engineer, Snyk
+
+## Tres fases, un solo runtime
+
+| Fase | Periodo | Usuarios | Superficie |
+| --- | --- | --- | --- |
+| 1. Herramienta interna | ~1 año | Staff de soporte | Triage de casos + agente virtual |
+| 2. Portal de soporte | Desde abril 2026 | Clientes | Saludo con contexto de cuenta, health check, apertura de tickets 24/7 |
+| 3. Producto core | Desde 1-sep-2026 | Todos los clientes pagando | Panel en la barra superior de cada página |
+
+La fase 1 es la que la mayoría de equipos se salta, y es la que más vale. Un año con el propio
+equipo de soporte como usuario significó **ciclos de feedback de horas, no de releases**, y
+casos borde que ningún dataset offline habría encontrado. Cada traza de esa fase alimentó los
+sets de evaluación. Cuando llegó el lanzamiento externo, ya sabían cómo se iba a comportar.
+
+La clave arquitectónica: **Slack, la web app y la API directa son adaptadores de entrada sobre
+el mismo grafo de LangGraph**. Un equipo pequeño puede arreglar bugs, sacar features y atender
+incidentes desde un solo lugar. Es arquitectura hexagonal aplicada a agentes: el núcleo no sabe
+quién le habla.
+
+## Decisión 1: tools tipadas, registradas por usuario
+
+Esta es la decisión que resuelve el requisito número tres. Las tools **no son un catálogo
+global** que el modelo filtra según instrucciones. Se **adjuntan en tiempo de request** según
+los permisos reales del usuario autenticado. Si el usuario no puede ver un recurso, el agente
+literalmente no tiene la herramienta para pedirlo.
+
+Esa diferencia es enorme. "No le muestres datos de otras organizaciones" en un system prompt es
+una sugerencia. Una tool que no existe en el contexto es una garantía.
+
+```go
+package assist
+
+import "context"
+
+type Permission string
+
+type Tool struct {
+	Name     string
+	Requires []Permission
+	Call     func(ctx context.Context, args map[string]any) (any, error)
+}
+
+type Principal struct {
+	UserID string
+	OrgID  string
+	Grants map[Permission]bool
+}
+
+// ToolsFor construye el set de tools para ESTE request.
+// El modelo nunca ve una tool que el usuario no podría usar por sí mismo.
+func ToolsFor(p Principal, catalog []Tool) []Tool {
+	out := make([]Tool, 0, len(catalog))
+	for _, t := range catalog {
+		if hasAll(p, t.Requires) {
+			out = append(out, scoped(p, t))
+		}
+	}
+	return out
+}
+
+func hasAll(p Principal, req []Permission) bool {
+	for _, r := range req {
+		if !p.Grants[r] {
+			return false
+		}
+	}
+	return true
+}
+
+// scoped fija el OrgID desde la identidad, no desde los argumentos del modelo.
+func scoped(p Principal, t Tool) Tool {
+	inner := t.Call
+	t.Call = func(ctx context.Context, args map[string]any) (any, error) {
+		args["org_id"] = p.OrgID // el modelo no puede elegir la organización
+		return inner(ctx, args)
+	}
+	return t
+}
+```
+
+El detalle de `scoped` importa: aunque el modelo alucine un `org_id` en los argumentos, la
+identidad del request lo sobrescribe. **La autorización vive en el borde, no en el
+razonamiento.** Además, la mayoría de las tools de Snyk son microservicios separados, lo que
+permite escalarlas de forma independiente y sumar capacidades sin tocar el loop del agente.
+
+## Decisión 2: middleware en vez de plomería
+
+Gestión de contexto, guardrails y fallback de modelo se enganchan en **puntos definidos del
+ciclo de vida del agente**, no hilados a mano dentro del loop. Agregar o reordenar
+comportamiento es cambiar una línea en una lista.
+
+Es el mismo patrón que usamos en cualquier servidor HTTP en Go, y funciona igual de bien para
+agentes:
+
+```go
+type Turn struct {
+	Principal Principal
+	Messages  []Message
+	Response  *Message
+}
+
+type Handler func(ctx context.Context, t *Turn) error
+type Middleware func(next Handler) Handler
+
+func Chain(h Handler, mws ...Middleware) Handler {
+	for i := len(mws) - 1; i >= 0; i-- {
+		h = mws[i](h)
+	}
+	return h
+}
+
+// El orden es explícito y versionado en el repo.
+var pipeline = Chain(callModel,
+	WithInjectionScreen,  // entrada: prompt injection y exfiltración de secretos
+	WithContextBudget,    // recorta historial a un presupuesto de tokens
+	WithModelFallback,    // si el proveedor primario falla, degrada a otro
+	WithOutputRedaction,  // salida: secretos y PII antes de responder
+	WithTrace,            // cada paso queda trazado
+)
+```
+
+El beneficio no es estético. Cuando un guardrail falla, sabes exactamente en qué capa ocurrió,
+y lo puedes probar en aislamiento.
+
+## Decisión 3: el estado lo maneja el checkpointer
+
+El historial de conversación se persiste en **PostgreSQL**, indexado por sesión. Memoria
+multi-turno, escalado entre pods y reanudar una conversación funcionan sin cableado extra.
+
+Parece menor, pero es lo que permite que el agente sea **stateless a nivel de proceso**. Si un
+pod muere a mitad de conversación, el siguiente retoma desde el último checkpoint. Para quien
+corre agentes en Kubernetes, esa es la diferencia entre poder hacer rolling deploys en horario
+laboral o no.
+
+## Decisión 4: el loop como plataforma interna
+
+Un agente es, al final, **modelo + tools + prompt + middleware + checkpointer**. Snyk
+formalizó eso en una *factory* compartida que devuelve el grafo compilado; cada equipo aporta
+su configuración. La mayoría de los flujos nuevos son **un cambio de configuración, no una
+arquitectura nueva**.
+
+Es el paso que separa "tenemos un agente" de "tenemos una plataforma de agentes", y es el mismo
+que vimos con Toyota y Wood Mackenzie. La diferencia aquí es la escala del equipo: no hace
+falta un equipo de plataforma de 35 personas para aplicar la idea.
+
+## Cómo evalúan cada cambio
+
+Todo se traza en LangSmith **desde el primer día**: cada llamada al modelo, cada tool, cada
+punto de decisión. Sobre esas trazas montaron dos capas de evaluación.
+
+**Offline**, con dos suites:
+
+- Preguntas reales con respuestas conocidas, calificadas por un segundo modelo, para detectar
+  si un cambio de prompt o modelo empeoró la calidad.
+- *Red teaming* automatizado: intentos de que el agente ignore instrucciones o entregue
+  secretos.
+
+**CI como gate**: cada pull request corre **el agente real** contra esas suites y se bloquea si
+no cumple umbrales que están **commiteados en el repo**. Eso último es lo importante: el umbral
+es código, se revisa en PR y tiene historia. Nadie lo baja en silencio un viernes.
+
+```yaml
+# evals/thresholds.yaml — versionado junto al agente
+suites:
+  golden_qa:
+    min_pass_rate: 0.90
+    judge: secondary-model
+  red_team:
+    max_secret_leaks: 0
+    max_instruction_override_rate: 0.01
+```
+
+**Online**: un job programado califica **cada ejecución de producción** con dos preguntas:
+¿era sobre Snyk? ¿la respuesta lo resolvió? Eso les da una **tasa de deflexión medida, no
+estimada**. Además categorizan cada pregunta por área de producto, tema, ecosistema y tipo de
+error, lo que le entrega a los PMs un mapa vivo de dónde se traban los clientes.
+
+Y cierran el loop dentro del IDE: vía el **servidor MCP de LangSmith**, sus coding agents
+pueden investigar una traza mala y convertirla en dataset sin salir del editor.
+
+## Resultados (abril–octubre 2026)
+
+- **60,000+** consultas atendidas.
+- **500+** cuentas de clientes.
+- **85%+** de sesiones resueltas sin crear ticket.
+- **250+** casos detectados automáticamente y escalados al equipo correcto.
+
+El dato que más me interesa no es el 85%. Es el efecto lateral: como cada conversación se
+califica y categoriza, saben **qué partes del producto generan más confusión** y corrigen la
+documentación. El agente se volvió un sensor de UX.
+
+## Lo que no te dicen
+
+**Un año interno es caro y casi nadie lo financia.** Pero es la razón por la que el lanzamiento
+externo no fue un experimento con clientes. Si no puedes darte un año, date al menos un
+trimestre con tu propio equipo como usuario, y conecta sus trazas a tus evals desde el día uno.
+
+**El 85% depende de cómo defines "resuelto".** Snyk lo mide con un juez automático sobre cada
+run, no con encuestas. Si vas a reportar deflexión, publica la definición junto al número.
+
+**Los permisos por request no son gratis.** Construir el set de tools en cada request implica
+resolver identidad y grants antes de llamar al modelo. Esa latencia se paga siempre, y vale la
+pena cachear grants con TTL corto.
+
+## Qué te llevas
+
+- **Un runtime, muchas puertas.** Las superficies son adaptadores; el agente es el núcleo.
+- **Autorización por construcción**: si el usuario no puede, la tool no existe.
+- **Middleware explícito y ordenado** para guardrails, contexto y fallback.
+- **Umbrales de eval en el repo**, bloqueando PRs con el agente real.
+- **Online evals sobre el 100% de runs** convierten métricas estimadas en medidas.
+
+El cierre de la semana va un nivel más arriba: cómo AWS organizó la evaluación de un sistema
+multi-agente en nueve etapas, y por qué el monitoreo en verde no significa que el agente esté
+respondiendo bien.

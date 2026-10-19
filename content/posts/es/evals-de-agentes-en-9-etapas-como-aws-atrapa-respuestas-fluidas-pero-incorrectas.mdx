@@ -1,0 +1,288 @@
+---
+title: "Evals de Agentes en 9 Etapas: Cómo AWS Atrapa Respuestas Fluidas pero Incorrectas"
+description: "El equipo de ventas de AWS evalúa su sistema multi-agente en nueve etapas, de CI a drift, y bajó el tiempo de detección de semanas a menos de cuatro horas."
+date: "2026-10-24"
+tags: ["agentes-ia", "evaluacion", "observabilidad", "llm-como-juez", "multi-agente"]
+pillar: "agentes-en-produccion"
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Construyendo con IA: Lo que nadie te dice"
+  part: 24
+resources:
+  - label: "Building trust in AI agents: A production-ready evaluation framework with Amazon Bedrock AgentCore — AWS ML Blog"
+    url: "https://aws.amazon.com/blogs/machine-learning/building-trust-in-ai-agents-a-production-ready-evaluation-framework-with-amazon-bedrock-agentcore/"
+---
+
+# Evals de Agentes en 9 Etapas: Cómo AWS Atrapa Respuestas Fluidas pero Incorrectas
+
+> **Serie: Construyendo con IA: Lo que nadie te dice — Parte 24.** El software tradicional
+> falla ruidosamente. Los agentes fallan en silencio: devuelven una respuesta segura, bien
+> redactada e incorrecta, mientras la latencia está baja y la tasa de errores en cero. El
+> equipo de Sales, Marketing and Global Services (SMGS) de AWS opera un sistema multi-agente
+> para su fuerza de ventas global y documentó cómo lo evalúa: **nueve etapas, tres niveles,
+> un solo loop**. Es el marco más completo que he visto publicado este año.
+
+## El dashboard estaba en verde
+
+Antes del lanzamiento, evaluando el *Customer Insights Agent*, encontraron esto:
+
+- Reportó **$410.08** de ingreso trimestral de un cliente como **"$410.08 millones"**.
+- Etiquetó *Sales Revenue* como *Sales Revenue excluding Adjustments*.
+- Ofreció un estimado de ARR que **no aparecía en ningún dato**.
+- Presentó sus propios cálculos como hechos con fuente.
+
+Durante todas esas corridas, el monitoreo estuvo en verde. Les decía que el sistema había
+**respondido**, no que la respuesta fuera **correcta**.
+
+Hay un segundo hallazgo igual de incómodo: cuando un cambio de datos, uno de tool y uno de
+prompt que debían salir juntos llegaron desfasados, **la tasa de aprobación cayó de 78% a 38%**
+solo por la ventana de inconsistencia. Ningún cambio individual estaba mal.
+
+## Cinco dimensiones, tres niveles
+
+El marco evalúa cinco dimensiones: **seguridad, calidad, desempeño, costo y control
+operativo**. La seguridad va primero (ningún agente sale ni sigue corriendo si no cumple su
+umbral), pero la calidad ocupa más espacio porque es la más difícil.
+
+La idea que más vale la pena robar es la de los **tres niveles**:
+
+1. **Tool**: cada capacidad (resolver un cliente, recuperar del grafo) tiene su propio
+   contrato de evaluación.
+2. **Agente**: cada sub-agente se evalúa de punta a punta.
+3. **Multi-agente**: se evalúan los caminos de orquestación (ruteo correcto, síntesis fiel,
+   propagación de contexto entre agentes).
+
+La mayoría de equipos evalúa solo a nivel agente. Pero la calidad del agente es tan buena como
+sus tools, y el sistema multi-agente introduce una superficie de falla que ninguno de los dos
+niveles ve por separado. Cada nivel tiene su **golden set, sus evaluadores y sus criterios de
+promoción**.
+
+## Las nueve etapas
+
+| # | Etapa | Pregunta que responde |
+| --- | --- | --- |
+| 1 | Foundation | ¿Cómo se ve "bien"? |
+| 2 | Experiment | ¿Qué versión es mejor? |
+| 3 | Merge (CI) | ¿Rompí algo? |
+| 4 | Gate (CD) | ¿Es seguro para producción? |
+| 5 | Canary | ¿Algo se rompió en silencio? |
+| 6 | Adversary | ¿Y si alguien intenta romperlo? |
+| 7 | Drift | ¿La calidad se está desviando en vivo? |
+| 8 | Pulse | ¿Cómo sé que funciona ahora mismo? |
+| 9 | Feedback Loop | ¿Cómo mejora automáticamente? |
+
+No voy a recorrer las nueve con el mismo detalle. Me quedo con las decisiones que cambian cómo
+diseñas tu propio sistema.
+
+## Etapa 1: una taxonomía de fallas sacada de producción
+
+Antes de elegir herramientas, definieron qué significa "incorrecto" **con fallas reales**.
+Seis tipos, cualquiera marca la respuesta como inexacta:
+
+- **Metric swap**: cliente y periodo correctos, métrica equivocada.
+- **Wrong period**: dato de una ventana de tiempo etiquetado como otra (YoY presentado como MoM).
+- **Wrong entity**: cuentas o subsidiarias confundidas.
+- **Pure hallucination**: cifras sin fuente rastreable.
+- **Wrong symbols**: métrica correcta, moneda o unidad equivocada.
+- **Unauthorized calculation**: cifras derivadas no sancionadas.
+
+Cada tipo tiene su evaluador propio. Ninguno de los seis está cubierto por plantillas nativas;
+son señales de dominio. **Saber qué cubre una plantilla genérica y qué necesita un evaluador
+custom es parte del diseño**, no un detalle de implementación.
+
+El stack de evaluadores combina cuatro tipos: built-in (relevancia, fidelidad, utilidad),
+custom por tipo de falla, librerías de terceros (DeepEval, AutoEval) y **deterministas** para
+ground truth exacto (ingreso, fecha de renovación, estado de contrato). La regla es simple:
+**determinista para hechos, LLM-como-juez para razonamiento**.
+
+Un evaluador determinista para "wrong symbols" es trivial y no debería costar un solo token:
+
+```go
+package evals
+
+import (
+	"regexp"
+	"strconv"
+	"strings"
+)
+
+var moneyRe = regexp.MustCompile(`\$\s?([\d,]+(?:\.\d+)?)\s*(millones|million|M|K|mil)?`)
+
+var scale = map[string]float64{
+	"": 1, "k": 1e3, "mil": 1e3, "m": 1e6, "million": 1e6, "millones": 1e6,
+}
+
+// MagnitudeCheck falla si alguna cifra de la respuesta difiere en orden de
+// magnitud del valor de referencia (el caso "$410.08" -> "$410.08 millones").
+func MagnitudeCheck(answer string, truth float64) (pass bool, got float64) {
+	for _, m := range moneyRe.FindAllStringSubmatch(answer, -1) {
+		v, err := strconv.ParseFloat(strings.ReplaceAll(m[1], ",", ""), 64)
+		if err != nil {
+			continue
+		}
+		v *= scale[strings.ToLower(m[2])]
+		if ratio := v / truth; ratio > 0.999 && ratio < 1.001 {
+			return true, v
+		}
+		got = v
+	}
+	return false, got
+}
+```
+
+El golden set se alimenta de tres fuentes: **casos de producción** (incluyendo sesiones mal
+calificadas), **casos de falla** (cada regresión atrapada) y **casos sintéticos** para
+escenarios que no puedes esperar a encontrar. Está versionado y se revisa mensualmente.
+
+## Etapa 2: un scorecard, no un número
+
+Ante cada cambio, corren la misma evaluación contra el mismo golden set y comparan en las
+cinco dimensiones. **Un modelo que mejora la exactitud 5% pero duplica la latencia y triplica
+el costo no gana automáticamente.**
+
+Y el desglose por categoría es lo que vuelve accionable el número: en tres meses, el pass rate
+subió de **93% a 96%**, las alucinaciones puras bajaron de **138 a menos de 52 por cada 10,000
+respuestas** y los cálculos no autorizados de **59 a menos de 44**. Ese desglose les confirmó
+que el retrieval estaba bien y que las ganancias venían de arreglos en generación. Sin él,
+habrían iterado a ciegas.
+
+## Etapas 3 y 4: sentinel en CI, golden completo con mocks en CD
+
+**CI** corre solo un **sentinel set** de unos 15 casos de alto riesgo, en minutos, en cada
+deploy a staging. Hay un sentinel por nivel; un cambio que mejora al agente pero degrada una
+tool crítica igual se bloquea. Un ejemplo real: tras una normalización de datos, la tool de
+desambiguación empezó a devolver entidades sin resolver para ciertos formatos de nombre, y el
+agente respondía con un *best guess*: **datos reales del cliente equivocado**. El sentinel de
+tool lo atrapó y el deploy se bloqueó solo.
+
+**CD** corre el golden set completo, y aquí aparece la técnica más interesante: **tool
+mocking por replay**. Primero validan cada tool contra respuestas conocidas. Luego congelan
+esas respuestas validadas en un dataset versionado. Durante el gate, cada llamada a tool se
+intercepta y se responde desde ese replay. Resultado: **el agente se evalúa solo por su
+razonamiento**, sin varianza de tools ni latencia de sistemas reales.
+
+```go
+// ReplayTools intercepta tool calls durante el gate de CD.
+type ReplayTools struct {
+	fixtures map[string]json.RawMessage // hash(tool+args) -> respuesta validada
+	misses   []string
+}
+
+func (r *ReplayTools) Call(_ context.Context, tool string, args json.RawMessage) (json.RawMessage, error) {
+	key := fixtureKey(tool, args)
+	if out, ok := r.fixtures[key]; ok {
+		return out, nil
+	}
+	// Una llamada sin fixture es información: el agente tomó un camino nuevo.
+	r.misses = append(r.misses, key)
+	return nil, fmt.Errorf("replay: sin fixture para %s", tool)
+}
+```
+
+Además corren 200 preguntas de punta a punta con LLM-como-juez, y el gate se cierra si ocurre
+**cualquiera** de tres condiciones:
+
+1. El score agregado retrocede contra la corrida previa del candidato.
+2. No supera la línea base de producción.
+3. Más de un porcentaje definido de las 200 preguntas queda bajo el umbral individual.
+
+La tercera es la que atrapa lo que un promedio esconde: un modelo que **mejora la media
+mientras falla más preguntas individuales**.
+
+## Etapa 5: canary contra lo que nadie cambió
+
+CI protege contra lo que los ingenieros cambian. El canary protege contra **todo lo demás**:
+pipelines upstream que refrescan datos sin pasar por ningún gate, comportamiento del modelo
+que evoluciona, dependencias de terceros.
+
+La cadencia está calibrada con dolor:
+
+- **15 minutos**: demasiadas falsas alarmas.
+- **60 minutos**: dos horas antes de registrar una degradación real.
+- **30 minutos**: detecta una tendencia real en 90 minutos (tres ventanas consecutivas).
+
+Y la regla de paginación: **una ventana fallida es una señal, no un incidente**. Solo se pagina
+tras **tres ventanas consecutivas** bajo umbral. El primer mes usaron umbral de una sola
+ventana y on-call dejó de confiar en el sistema por completo.
+
+```go
+// Pager implementa "tres ventanas consecutivas" por métrica.
+type Pager struct {
+	threshold   float64
+	consecutive int
+	streak      map[string]int
+}
+
+func (p *Pager) Observe(metric string, score float64) (page bool) {
+	if score >= p.threshold {
+		p.streak[metric] = 0
+		return false
+	}
+	p.streak[metric]++
+	return p.streak[metric] == p.consecutive // dispara una vez, no en cada ventana
+}
+```
+
+Un caso real: tras un refresh de índice, una tool de retrieval empezó a devolver fragmentos
+apenas relevantes. Latencia nominal, errores en cero, respuestas fluidas con cifras
+equivocadas. El canary lo vio en la **primera ventana** por la caída de *grounding rate* y
+precisión de retrieval en el sentinel de tool.
+
+## Etapas 6 y 7: adversario y drift
+
+La seguridad corre en el **100% del tráfico**, de forma síncrona, en entrada y salida:
+filtros de contenido y una categoría de *prompt attack* que cubre jailbreak, prompt injection
+(incluida la que llega dentro de documentos recuperados) y fuga del system prompt.
+
+Para drift, muestrean **10% del tráfico vivo** con los mismos evaluadores. El ejemplo es
+perfecto: su golden set de identificación de clientes estaba lleno de variaciones de nombre y
+subsidiarias sintéticas. En producción, los vendedores preguntaban **"¿qué pasa con AMZN?"**.
+Tickers, abreviaturas y typos que nadie había anticipado. La exactitud cayó de **98% a 81% y
+80%** en tres ventanas; on-call recibió el page, y el arreglo fue doble: sumar esas sesiones
+al golden set y normalizar formatos de entrada antes de la resolución.
+
+Después del gate, hacen **A/B con tráfico real**: el candidato debe **ganar o empatar en todas
+las dimensiones** antes del rollout completo.
+
+## Etapas 8 y 9: del alarm al trace en un clic, y el loop que se cierra
+
+La observabilidad está instrumentada con **OpenTelemetry** en cada paso de razonamiento:
+tools llamadas, orden, entradas, salidas, latencia y tokens. On-call pasa de la alarma de
+CloudWatch a la traza completa en un clic. El **MTTD bajó de días o semanas a menos de cuatro
+horas**.
+
+La etapa 9 cierra el loop con recomendaciones de prompt y descripciones de tools derivadas de
+trazas. El ejemplo que publican vale oro por lo mundano: el modelo reproducía montos y nombres
+de clientes **copiados de los few-shot examples** en consultas que no tenían nada que ver. El
+arreglo fue reemplazar valores reales por placeholders (`$[AMOUNT]`, `[CUSTOMER_NAME]`) para
+que el modelo aprendiera la estructura sin memorizar datos. Esa sola corrección explica buena
+parte de la caída de alucinaciones de 138 a menos de 52 por cada 10,000.
+
+## Lo que no te dicen
+
+**Nueve etapas es mucho para empezar.** Si hoy no tienes nada, el orden de AWS es el correcto:
+Etapa 1 (taxonomía y golden set) antes que cualquier herramienta. Sin una definición de
+"incorrecto" derivada de fallas reales, cada gate posterior está adivinando.
+
+**El costo de los evaluadores es real.** LLM-como-juez sobre el 10% del tráfico, más batch
+cada 30 minutos, más 200 preguntas por candidato, suma. Por eso la regla de usar
+deterministas donde haya ground truth no es solo de precisión: es de presupuesto.
+
+**El marco está atado a AgentCore, el patrón no.** Sentinel por nivel, replay de tools, tres
+ventanas antes de paginar y taxonomía de fallas se implementan igual con OpenTelemetry,
+Postgres y un scheduler. La herramienta es intercambiable; la disciplina no.
+
+## Qué te llevas
+
+- **Monitoreo verde no es calidad.** Mide si la respuesta es correcta, no si existió.
+- **Evalúa en tres niveles**: tool, agente y orquestación.
+- **Taxonomía de fallas desde producción**, con un evaluador por tipo.
+- **Replay de tools en CD** para aislar el razonamiento del agente.
+- **Tres ventanas antes de paginar.** La confianza de on-call es un recurso finito.
+- **Cada falla en producción se vuelve un caso permanente** del golden set.
+
+Con esto cerramos una semana que empezó en la topología (Cornerstone), pasó por la superficie
+y los permisos (Snyk) y termina en lo que sostiene a ambos: saber, con números, si el agente
+sigue funcionando.
