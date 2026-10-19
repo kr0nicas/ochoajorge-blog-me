@@ -24,9 +24,9 @@
 
 | Post | Fecha | Job ID | Acción |
 |------|-------|--------|--------|
-| Cornerstone | 2026-10-20 09:00 CST | `CRON_1` | `draft: false` + commit + push + PR a develop |
-| Snyk Assist | 2026-10-22 09:00 CST | `CRON_2` | `draft: false` + commit + push + PR a develop |
-| Evals 9 etapas | 2026-10-24 09:00 CST | `CRON_3` | `draft: false` + commit + push + PR a develop |
+| Cornerstone | 2026-10-20 09:00 CST | `9bd8e962a0ed` | `draft: false` + build + commit + push + PR a develop |
+| Snyk Assist | 2026-10-22 09:00 CST | `09418bb36ccb` | `draft: false` + build + commit + push + PR a develop (reusa PR si existe) |
+| Evals 9 etapas | 2026-10-24 09:00 CST | `53d5fe904331` | `draft: false` + build + commit + push + PR a develop (reusa PR si existe) |
 
 ## Dependencias
 
