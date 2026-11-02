@@ -1,0 +1,316 @@
+---
+title: "Bayer ADE: 22 Agentes Especialistas y las 5 Decisiones que No Estaban en el Prompt"
+description: "Bayer Crop Science resuelve el 80% de preguntas sin ingenieros con 22 agentes. Lo que lo hizo posible fue estado durable, identidad por salto y tools acotadas."
+date: "2026-11-03"
+tags: ["agentes-ia", "multi-agente", "arquitectura", "observabilidad", "identidad"]
+pillar: "agentes-en-produccion"
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Arquitectura de Software Avanzada"
+  part: 24
+resources:
+  - label: "How Bayer Crop Science built an agentic decision engine on Amazon Bedrock AgentCore with AWS Unified Operations — AWS ML Blog"
+    url: "https://aws.amazon.com/blogs/machine-learning/how-bayer-crop-science-built-an-agentic-decision-engine-on-amazon-bedrock-agentcore-with-aws-unified-operations/"
+---
+
+# Bayer ADE: 22 Agentes Especialistas y las 5 Decisiones que No Estaban en el Prompt
+
+> **Serie: Arquitectura de Software Avanzada — Parte 24.** Bayer Crop Science no reemplazó su
+> plataforma de analítica con agentes. Le puso encima una capa de lenguaje natural con un
+> supervisor y **22 agentes especialistas** que hoy resuelven cerca del **80% de las preguntas
+> sin un ingeniero en el loop**. Lo interesante no es el número de agentes. Es que casi todo el
+> trabajo de producción ocurrió **fuera de los prompts**.
+
+## El cuello de botella se movió
+
+Bayer opera el **Connected Decision Engine (CDE)**: una plataforma para desplegar, orquestar y
+monitorear cientos de configuraciones de modelos de ML sobre genómica, ensayos de campo,
+imágenes y datos ambientales. Cada corrida tiene que ser repetible y gobernada.
+
+CDE funcionó. Tanto, que el problema dejó de ser *correr* workflows y pasó a ser *entenderlos*.
+Explicar por qué falló un workflow o de dónde salió un resultado obligaba a cruzar APIs,
+documentación, metadata stores, dashboards y logs. El usuario tenía que saber **qué sistema
+inspeccionar** antes de poder preguntar.
+
+Es un patrón que reconozco en cualquier plataforma interna madura: la complejidad operativa no
+desaparece, se traslada al usuario. La respuesta de Bayer fue el **Agentic Decision Engine
+(ADE)**: un supervisor que clasifica la pregunta, la rutea a un especialista y combina
+resultados cuando la pregunta cruza dominios.
+
+## La arquitectura en cuatro capas
+
+1. **Experiencia de usuario**: front end en React, detrás de un proxy de identidad con
+   Microsoft Entra ID.
+2. **Orquestación**: LangGraph sobre AgentCore Runtime, con un Supervisor Agent como punto de
+   entrada.
+3. **Especialistas**: 22 agentes, cada uno con un dominio, sus tools y sus fuentes. Domain
+   Expert (RAG), Operational (estado en vivo de CDE), Troubleshooting (telemetría),
+   Visualization (gráficas o dashboards existentes).
+4. **Tools y datos**: APIs de CDE expuestas como MCP vía gateway, OpenSearch Serverless para
+   RAG, DynamoDB para checkpoints, Aurora PostgreSQL para sesiones y feedback, ElastiCache con
+   TTL para respuestas.
+
+El ejemplo canónico: un breeder pregunta *"¿por qué falló ayer mi workflow de fenotipado?"*. El
+supervisor clasifica, el Troubleshooting Agent lee telemetría y estado del workflow, identifica
+el punto de falla y responde. **De más de una hora de cazar logs y esperar a un ingeniero, a
+menos de 10 minutos.**
+
+Hasta aquí, un hub-and-spoke conocido. Ya lo vimos con [Cornerstone y sus 13
+agentes](/es/blog/cornerstone-orion-ai-13-agentes-que-bajaron-el-diagnostico-de-bases-de-datos-de-45-a-10-minutos)
+y lo discutimos a nivel de patrón en [Orchestrator-Worker en
+producción](/es/blog/orchestrator-worker-multi-agente-produccion). Lo que vale la pena de Bayer
+son las cinco decisiones que tomaron en el camino.
+
+## Decisión 1: el runtime tiene sesión, pero no es tu base de datos
+
+AgentCore Runtime aísla cada sesión y preserva contexto entre invocaciones. Tentador tratarlo
+como estado. Bayer no lo hizo: **los checkpoints de LangGraph van a DynamoDB**, para que el
+grafo pueda reanudarse tras un scale-out, un reinicio o el fin de una sesión.
+
+> Usa la sesión del runtime para la ejecución activa. Persiste en un servicio durable el estado
+> necesario para reanudar o reconstruir el workflow.
+
+En términos hexagonales, el checkpointer es un **puerto**, no un detalle del runtime:
+
+```go
+package orchestration
+
+import "context"
+
+// Checkpoint es el estado mínimo para reanudar un grafo en otro nodo.
+type Checkpoint struct {
+	ThreadID  string
+	Step      int
+	NodeID    string
+	StateJSON []byte
+	Version   int64 // optimistic locking
+}
+
+// CheckpointStore es el puerto. DynamoDB, Postgres o Redis son adaptadores.
+type CheckpointStore interface {
+	Load(ctx context.Context, threadID string) (*Checkpoint, error)
+	// Save falla con ErrConflict si Version no coincide: dos réplicas no
+	// pueden avanzar el mismo hilo en paralelo.
+	Save(ctx context.Context, cp Checkpoint) error
+}
+
+type Engine struct {
+	store CheckpointStore
+	graph Graph
+}
+
+func (e *Engine) Resume(ctx context.Context, threadID string, input Input) (Output, error) {
+	cp, err := e.store.Load(ctx, threadID)
+	if err != nil {
+		return Output{}, err
+	}
+	next, out, err := e.graph.StepFrom(ctx, cp, input)
+	if err != nil {
+		return Output{}, err
+	}
+	return out, e.store.Save(ctx, next)
+}
+```
+
+El detalle que suele faltar es el `Version`. Si el runtime escala y dos réplicas reciben el
+mismo hilo, sin control de concurrencia optimista vas a tener checkpoints que se pisan.
+
+## Decisión 2: un token por frontera, no un token para todo
+
+Bayer usa Entra ID para identidad de usuario, IAM para servicio a servicio y la autorización
+saliente del gateway para llegar a CDE. Una Lambda interceptora valida y pasa los atributos que
+cada tool necesita.
+
+> Las fallas de identidad en sistemas de agentes se concentran en las transiciones entre
+> identidad de usuario, identidad de agente e identidad de tool.
+
+Es la decisión más subestimada del caso. El antipatrón es reenviar el JWT del usuario hasta la
+última API "porque funciona". Funciona hasta que el `audience` no coincide, el token expira a
+mitad de un workflow largo, o un agente termina operando con más alcance del que debería. La
+regla de Bayer: **definir emisor, audiencia, claims, scopes y vida del credencial en cada
+salto**.
+
+```go
+package identity
+
+import (
+	"context"
+	"time"
+)
+
+type Hop string
+
+const (
+	HopUserToGateway Hop = "user->gateway"
+	HopAgentToTool   Hop = "agent->tool"
+)
+
+// Contract documenta y valida lo que cada frontera exige.
+type Contract struct {
+	Issuer   string
+	Audience string
+	Scopes   []string
+	MaxTTL   time.Duration
+}
+
+// TokenExchanger cambia el credencial entrante por uno válido SOLO para el
+// siguiente salto. Nunca se reutiliza el token de la frontera anterior.
+type TokenExchanger interface {
+	Exchange(ctx context.Context, in Credential, hop Hop) (Credential, error)
+}
+```
+
+## Decisión 3: el modelo es un contrato de interfaz
+
+Evaluaron una versión más nueva de modelo con reasoning activado. La combinación de **tool use
++ structured output** que ADE necesita no era compatible con cómo estaban implementados los
+agentes. Se quedaron con el modelo anterior.
+
+Esto debería ser obvio y no lo es: para un agente que usa tools, el modelo no es "el más
+inteligente disponible". Es una dependencia con una interfaz que incluye tool calling, salida
+estructurada, streaming, features de razonamiento, latencia, cuota y semántica de request. **Un
+modelo más nuevo no es un drop-in replacement.** Trátalo como un upgrade de major version de
+una librería: con tests de contrato antes de promoverlo.
+
+## Decisión 4: controla la superficie de tools antes de que controle el prompt
+
+CDE maneja más de 500 configuraciones de modelos. Un servidor MCP por API habría significado
+despliegue, autenticación y versionado por cada uno. ADE registra **specs OpenAPI en el
+gateway**, que las expone como tools MCP. Agregar una API pasa a ser un cambio de schema y
+configuración, no un nuevo deploy.
+
+Y cada especialista ve **solo sus tools**. Cada definición de tool consume tokens de entrada y
+amplía el espacio de decisión del modelo. Para catálogos grandes, búsqueda semántica de tools en
+lugar de cargar todo en cada turno.
+
+El resultado medible: exponer las APIs vía gateway en lugar de un servidor por API **redujo el
+overhead de integración por API en más del 99%**.
+
+## Decisión 5: cuando una tool empieza a decidir, es un agente
+
+Visualización empezó como tool. Creció: necesitaba recuperar datos, elegir el tipo de gráfica,
+reintentar, manejar errores y decidir entre generar una gráfica o devolver un dashboard
+existente. La promovieron a **Visualization Agent**, con Code Interpreter en sandbox para
+matplotlib y Plotly.
+
+> Una tool ejecuta una operación acotada. Cuando una capacidad empieza a tener estado,
+> reintentos, planificación, política o decisiones de presentación, modélala como agente.
+
+Es el mejor criterio que he leído para una pregunta que todo equipo se hace. Lo traduzco a una
+prueba rápida: si la "tool" necesita su propio prompt para decidir *qué* hacer, ya no es una
+tool.
+
+## Lo que pasó al preparar producción
+
+### Éxito de transporte no es éxito de tarea
+
+Este es el hallazgo que más me interesa. Los exception handlers de la aplicación **atrapaban
+errores de agentes y devolvían respuestas que el monitoreo contaba como exitosas**. HTTP 200,
+dashboards en verde, usuario con una respuesta inútil.
+
+La corrección: métricas custom dentro de los paths de falla y alarmas por condición específica
+de agente: errores de tool call, throttling, timeouts de modelo y fallas de validación de
+salida estructurada.
+
+```go
+package observability
+
+import "context"
+
+type Outcome string
+
+const (
+	OutcomeCompleted     Outcome = "completed"
+	OutcomeToolError     Outcome = "tool_error"
+	OutcomeThrottled     Outcome = "throttled"
+	OutcomeModelTimeout  Outcome = "model_timeout"
+	OutcomeInvalidOutput Outcome = "invalid_structured_output"
+)
+
+type TaskMetrics interface {
+	Record(ctx context.Context, agent string, o Outcome)
+}
+
+// Wrap garantiza que ningún handler "trague" una falla de tarea sin
+// registrarla, aunque la respuesta HTTP termine siendo 200.
+func Wrap(m TaskMetrics, agent string, run func(context.Context) (Answer, error)) func(context.Context) (Answer, error) {
+	return func(ctx context.Context) (Answer, error) {
+		ans, err := run(ctx)
+		switch {
+		case err != nil:
+			m.Record(ctx, agent, classify(err))
+		case !ans.Valid():
+			m.Record(ctx, agent, OutcomeInvalidOutput)
+		default:
+			m.Record(ctx, agent, OutcomeCompleted)
+		}
+		return ans, err
+	}
+}
+```
+
+Si ya leíste [cómo AWS evalúa sus agentes en nueve
+etapas](/es/blog/evals-de-agentes-en-9-etapas-como-aws-atrapa-respuestas-fluidas-pero-incorrectas),
+esto es el mismo principio visto desde operaciones: el monitoreo en verde no te dice nada sobre
+la calidad de la tarea.
+
+### Costo por interacción, no por cuenta
+
+Una request puede invocar varios modelos y tools, así que el gasto agregado de Bedrock no
+explica la economía unitaria. Combinaron tres mecanismos: inference profiles por aplicación,
+metadata de request con logging de invocaciones (tokens por agente y feature) y atribución por
+principal IAM. Hallazgos:
+
+- Los agentes **Visualization y Operational**, los más intensivos en tools MCP, son los que más
+  tokens consumen.
+- Un workload tenía un **prefijo de input repetido grande sin prompt caching**. Mover
+  instrucciones estables y definiciones de tools a un prefijo cacheable **bajó el costo de input
+  entre 20% y 30%**.
+
+Ese segundo punto es dinero que casi todos los equipos están dejando en la mesa. Si tus
+definiciones de tools van antes del contenido variable y no estás cacheando, revísalo hoy.
+
+### Endurecimiento y lanzamiento
+
+IAM por agente (Troubleshooting lee, no modifica; Domain Expert consulta su índice, no APIs
+ajenas), tools de solo lectura, validación de salida estructurada y respuestas ancladas a datos
+recuperados. La revisión Well-Architected encontró **tags de imagen mutables, poca
+trazabilidad y falta de escaneo de vulnerabilidades**: imágenes inmutables versionadas, scan on
+push y políticas de ciclo de vida. Las pruebas de carga revelaron un modo de falla de red que
+devolvía **respuestas vacías**. En total, **35 bloqueantes resueltos antes del lanzamiento**.
+
+Lanzaron a un grupo cerrado, no a toda la organización. Más de 100 usuarios a la fecha.
+
+## Lo que no te dicen
+
+**Ese 80% es de "primera fase".** Resolver sin ingeniero no es lo mismo que resolver
+correctamente. El post no detalla cómo se mide la calidad de esas respuestas; con 22 agentes,
+esa es la pregunta que yo haría primero.
+
+**22 especialistas es mucha superficie.** Cada uno tiene prompt, tools, IAM y alarmas. El costo
+operativo crece linealmente con los agentes, y la clasificación del supervisor se vuelve más
+difícil con cada dominio que agregas. Empieza con 3-4 y promueve a agente solo con el criterio
+de la Decisión 5.
+
+**El caso está atado a AgentCore; las decisiones no.** Checkpointer durable, contrato de
+identidad por salto, tests de contrato de modelo, tools por agente vía OpenAPI y métricas de
+éxito de tarea se implementan igual en GKE con LangGraph, Postgres y OpenTelemetry. En GCP, el
+equivalente natural es Agent Engine o un runtime propio en Kubernetes.
+
+## Qué te llevas
+
+- **El estado del runtime es efímero**; los checkpoints van a un store durable con locking
+  optimista.
+- **Un credencial por frontera.** Emisor, audiencia, scopes y TTL definidos en cada salto.
+- **El modelo es un contrato**, no una preferencia. Tests de contrato antes de actualizar.
+- **Tools por agente**, generadas desde OpenAPI, no un servidor MCP por API.
+- **Promueve a agente** lo que empieza a tener estado, política o planificación.
+- **Mide éxito de tarea**, no éxito HTTP.
+- **Cachea el prefijo estable**: 20-30% de ahorro en input no es un detalle.
+
+La conclusión del propio equipo de Bayer resume la semana que empieza: la mayoría del trabajo de
+producción vive fuera de los prompts. En el próximo post vemos el otro extremo del problema:
+cómo Eon le dio a 100+ ingenieros y a su agente SRE acceso a cientos de tools con **una sola
+URL**.
