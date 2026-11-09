@@ -1,0 +1,269 @@
+---
+title: "AI-SDLC en Verisk: 5 Agentes sin Orquestador y un Humano en Cada Frontera"
+description: "Verisk llevó agentes a todo su ciclo de desarrollo sin orquestador central: 5 agentes por etapa, gates humanos y 90% de aceptación. Las decisiones detrás."
+date: "2026-11-12"
+tags: ["agentes-ia", "sdlc", "human-in-the-loop", "arquitectura", "mcp"]
+pillar: "agentes-en-produccion"
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Arquitectura de Software Avanzada"
+  part: 26
+resources:
+  - label: "Reinventing software delivery with AI-SDLC on Amazon Bedrock AgentCore — AWS for Industries"
+    url: "https://aws.amazon.com/blogs/industries/reinventing-software-delivery-with-ai-sdlc-on-amazon-bedrock-agentcore/"
+---
+
+# AI-SDLC en Verisk: 5 Agentes sin Orquestador y un Humano en Cada Frontera
+
+> **Serie: Arquitectura de Software Avanzada — Parte 26.** Cuando un equipo decide llevar
+> agentes más allá del editor de código, lo primero que dibuja es un orquestador que conduce
+> todo el ciclo, del ticket al deploy. Verisk, que provee analítica a la industria de seguros
+> desde hace más de 50 años, tomó la decisión contraria a propósito: **cinco agentes
+> independientes, ningún orquestador y un checkpoint humano obligatorio entre cada etapa**. La
+> aceptación de lo que generan los agentes superó el **90%**, cuando la meta original era 50-60%.
+
+## El problema: la IA se quedó en el editor
+
+Los asistentes de código cambiaron la etapa de desarrollo. Las otras cuatro (requerimientos,
+grooming, QA y code review) siguen corriendo con esfuerzo manual, handoffs y conocimiento
+tribal. Verisk midió lo que costaba ese resto:
+
+- Tickets escritos a mano con criterios de aceptación incompletos y varias rondas de aclaración.
+- Grooming que consumía horas del sprint planning, con calidad dispareja entre equipos.
+- **3-4 horas** escribiendo cada plan de pruebas y **1-2 días** montando la automatización.
+- Code review cuya profundidad dependía de quién estaba disponible y cuánto conocía el código.
+
+La pregunta de su liderazgo de ingeniería fue concreta: ¿pueden los agentes hacer el trabajo de
+*generación* en cada etapa mientras los ingenieros gobiernan las *decisiones*? Para lograrlo no
+agregaron más herramientas de IA al proceso de siempre. **Rediseñaron el flujo.**
+
+## Cinco agentes, cinco contratos
+
+| Agente | Trigger | Produce | Checkpoint humano |
+| --- | --- | --- | --- |
+| Requirements | Ticket creado o actualizado en Jira | Criterios de aceptación, ambigüedades, edge cases | Product owner aprueba |
+| Grooming | Requerimiento aprobado | Subtareas, estimación, dependencias, `spec.md` | Equipo valida el enfoque |
+| Developer | Desarrollador toma el ticket | Código full stack (Claude Code en Bedrock) | Desarrollador revisa y hace commit |
+| Code Review | PR abierto | Hallazgos Critical/Major/Minor + herramienta de calidad | Desarrollador decide y aprueba |
+| QA | Plan aprobado + PR mergeado | Plan de pruebas y luego colecciones Bruno y JMeter | QA aprueba el plan antes de automatizar |
+
+Todos corren en AgentCore Runtime, con LangGraph o Strands para el flujo interno de cada uno. El
+acceso a Jira, el repositorio, Confluence y la herramienta de calidad pasa por un **MCP
+Gateway**. Una tool nueva se registra una vez y queda disponible para los cinco agentes.
+
+## Decisión 1: sin orquestador
+
+Esta es la decisión que más vale la pena discutir, porque contradice el diagrama que casi todos
+dibujamos. Verisk lo justifica así: **las etapas del ciclo de vida están separadas por tiempo,
+por personas distintas y por decisiones humanas que no se pueden predecir**.
+
+Un orquestador central tiene sentido cuando el grafo de ejecución es conocido y corto: una
+petición entra, se reparte entre especialistas y vuelve en segundos o minutos. Un ciclo de
+desarrollo dura días o semanas, se pausa esperando a un product owner y retrocede cuando QA
+encuentra un hueco en los requerimientos. Un orquestador que modele eso termina siendo un motor
+de workflow con estado durable, reintentos y timeouts de días. Y además tiene un LLM en el
+camino crítico.
+
+Verisk usó algo que ya tenía: **las transiciones de estado de Jira son el bus de eventos**. Cada
+agente tiene un contrato explícito (trigger, entradas, formato de salida) y nada más. El
+beneficio práctico es el que menciona el caso: cuando hay que refinar el prompt de un agente, el
+cambio queda aislado.
+
+En términos de arquitectura, es **coreografía en lugar de orquestación**. Ya conocíamos el
+trade-off en microservicios: ganas desacoplamiento y despliegue independiente, pierdes una vista
+central del flujo. Verisk lo compensa con algo que ya existía, el ticket como fuente de verdad
+del estado.
+
+### Cómo se ve en código
+
+Un agente por etapa es un consumidor de eventos con un contrato. En Go, el puerto es mínimo:
+
+```go
+package sdlc
+
+import "context"
+
+type Stage string
+
+const (
+	StageRequirements Stage = "requirements"
+	StageGrooming     Stage = "grooming"
+	StageQA           Stage = "qa"
+)
+
+// Event es la transición de estado del sistema de registro (Jira, PR, etc.).
+type Event struct {
+	TicketID   string
+	From, To   string // estados del workflow
+	Actor      string // quién movió el ticket
+	ApprovedBy string // vacío si la transición no fue una aprobación humana
+}
+
+// Artifact es lo que un agente escribe de vuelta. Nunca avanza solo.
+type Artifact struct {
+	TicketID string
+	Stage    Stage
+	Kind     string // "acceptance-criteria", "spec.md", "test-plan"
+	Body     []byte
+	Status   ArtifactStatus
+}
+
+type ArtifactStatus string
+
+const (
+	StatusProposed ArtifactStatus = "proposed" // esperando checkpoint humano
+	StatusApproved ArtifactStatus = "approved"
+	StatusRejected ArtifactStatus = "rejected"
+)
+
+// StageAgent es el contrato completo de un agente: cuándo se dispara y qué produce.
+type StageAgent interface {
+	Stage() Stage
+	Triggers(e Event) bool
+	Run(ctx context.Context, e Event, in Context) (Artifact, error)
+}
+
+// Context es lo que la etapa hereda: artefactos aprobados aguas arriba, nunca propuestos.
+type Context struct {
+	Upstream []Artifact
+}
+```
+
+La regla más importante del diseño queda en el comentario de `Context`: **un agente solo
+consume artefactos aprobados**. El dispatcher la hace cumplir mecánicamente:
+
+```go
+type Dispatcher struct {
+	agents    []StageAgent
+	artifacts ArtifactStore
+	tracker   TicketTracker // adaptador de Jira, vía MCP
+}
+
+func (d *Dispatcher) Handle(ctx context.Context, e Event) error {
+	for _, a := range d.agents {
+		if !a.Triggers(e) {
+			continue
+		}
+		upstream, err := d.artifacts.Approved(ctx, e.TicketID)
+		if err != nil {
+			return err
+		}
+		art, err := a.Run(ctx, e, Context{Upstream: upstream})
+		if err != nil {
+			return d.tracker.Comment(ctx, e.TicketID, "agent "+string(a.Stage())+" failed: "+err.Error())
+		}
+		art.Status = StatusProposed // siempre: ningún agente aprueba su propia salida
+		if err := d.artifacts.Save(ctx, art); err != nil {
+			return err
+		}
+		return d.tracker.RequestReview(ctx, e.TicketID, art)
+	}
+	return nil
+}
+```
+
+No hay un LLM decidiendo qué etapa sigue. Lo deciden el workflow de Jira y los humanos que
+mueven el ticket.
+
+## Decisión 2: el humano como parte de la arquitectura
+
+El caso lo dice así: *"Los agentes proponen. Los humanos deciden."* Cada etapa tiene un
+checkpoint obligatorio, y Verisk le da dos funciones que conviene separar.
+
+**Cortar la cascada de errores.** Una ambigüedad en requerimientos que nadie corrige termina en
+un spec defectuoso, código incorrecto y pruebas inadecuadas. En una cadena de cinco agentes sin
+gates, la confiabilidad se multiplica: cinco etapas al 90% dan un 59% de extremo a extremo. Con
+un gate humano en cada frontera, cada etapa empieza desde un artefacto validado y el error deja
+de acumularse.
+
+**Generar el rastro de auditoría.** En seguros, los cambios de software que afectan precios de
+pólizas, ajuste de reclamos o modelos de riesgo caen bajo SOX y la supervisión estatal. Los
+checkpoints producen el registro de decisiones que esos marcos exigen. **La gobernanza sale como
+subproducto del flujo**, no como un ejercicio de compliance aparte.
+
+Para quienes trabajamos en servicios financieros, este segundo punto es el argumento que
+convence a un comité de riesgo. No vas a vender "agentes autónomos en el SDLC". Vas a vender un
+flujo donde cada decisión tiene un nombre, una fecha y un artefacto aprobado.
+
+## Decisión 3: enriquecimiento progresivo del contexto
+
+La calidad de cada agente depende de su entrada, y ese efecto se acumula. El Requirements Agent
+deja criterios de aceptación completos. El Grooming Agent los convierte en un `spec.md` junto
+con el contexto del repositorio. El QA Agent cruza ambos y genera casos trazables a
+requerimientos específicos, incluidos valores límite y validaciones faltantes.
+
+Hay un detalle de diseño que me parece acertado: **el contexto vive en los sistemas de
+registro**, Jira y archivos markdown versionados, no en un vector store aparte. El Grooming Agent
+detecta huecos, los convierte en preguntas abiertas y las resuelve conversando con el
+responsable. La respuesta se escribe de vuelta en el ticket, así que la fuente de verdad sigue
+al día para la siguiente etapa y para el siguiente humano.
+
+Si estás construyendo RAG para tu ciclo de desarrollo, pregúntate primero si no te basta con
+leer bien Jira y el repositorio.
+
+## Decisión 4: QA en dos pasos
+
+El QA Agent no genera automatización a partir de los requerimientos. Primero genera un **plan**
+(happy path, casos negativos, límites, integraciones), QA lo aprueba y **solo después del merge**
+genera las colecciones de Bruno y los planes de JMeter.
+
+El gate intermedio garantiza que la automatización se construya sobre lógica validada. Generar
+mil líneas de pruebas sobre un plan equivocado es peor que no tener pruebas, porque da una
+falsa sensación de cobertura.
+
+## Los números
+
+| Actividad | Antes | Después |
+| --- | --- | --- |
+| Plan de pruebas | 3-4 horas | Menos de 10 minutos |
+| Setup de automatización | 1-2 días | Menos de 30 minutos |
+| Grooming del sprint | Horas | ~10 minutos |
+| Tiempo por story point | 4-6 horas | 2-4 horas |
+| Costo por story point | Solo mano de obra | 20-30% menor (mano de obra + cómputo AWS) |
+
+Fíjate en la última fila. **El costo incluye el cómputo de AWS.** Es raro ver un caso que
+reporte el ahorro neto después de pagar inferencia. Eso es exactamente lo que discutimos al
+hablar de [cómo medir el ROI de la IA en el
+SDLC](/es/blog/gitlab-duo-y-el-roi-de-la-ia-como-medir-lo-que-los-agentes-aportan-al-sdlc). La
+métrica de aceptación (más de 90% de salidas aceptadas con modificaciones mínimas) también es la
+correcta: mide si el humano usó lo que el agente propuso, no cuántos tokens se generaron.
+
+## Lo que el caso no resuelve
+
+**El gate humano también es un cuello de botella.** Si el product owner tarda tres días en
+aprobar, el agente que genera en segundos no acelera nada. Verisk apunta a ciclos de release de
+una semana y reconoce que eso obliga a revisar la cadencia de Scrum. El trabajo pendiente es
+organizacional, no técnico.
+
+**La aprobación por cansancio.** Con 90% de aceptación existe el riesgo de que el revisor deje
+de leer y apruebe por inercia. El gate se vuelve un sello de goma y la cascada de errores
+vuelve. Conviene medir el tiempo de revisión por artefacto y muestrear aprobaciones para
+auditarlas.
+
+**Sin orquestador, sin vista global.** La coreografía pierde la pregunta "¿dónde está atascado
+este feature?". Jira la responde a medias. En un sistema así agregaría trazas que correlacionen
+las cinco etapas por `ticket_id`, al estilo de lo que vimos en [observabilidad para sistemas de
+IA](/es/blog/observabilidad-sistemas-ia-trazas-opentelemetry).
+
+## Cuándo copiar el patrón
+
+- Tu proceso tiene **etapas con dueños humanos distintos** y tiempos largos entre ellas.
+- Ya tienes un sistema de registro con workflow (Jira, Linear, GitHub Projects) que puede emitir
+  eventos.
+- Operas en un dominio regulado donde el rastro de decisiones vale tanto como la velocidad.
+
+Si tu flujo es una petición síncrona de segundos, este no es tu patrón: vuelve al [ruteo en
+cascada de U Mobile](/es/blog/ruteo-en-cascada-para-agentes-el-70-por-ciento-de-u-mobile-que-nunca-toca-un-llm)
+o a un [Orchestrator-Worker](/es/blog/orchestrator-worker-multi-agente-produccion) clásico.
+
+## Qué te llevas
+
+La pregunta útil no es "¿orquestador o no?". Es **¿quién es dueño de la transición entre
+pasos?** Si la transición la decide una persona, como en el SDLC, el orquestador es un
+intermediario caro que va a modelar mal la realidad. Deja que los agentes generen, que los
+humanos decidan y que el sistema de registro cargue el estado.
+
+Cerramos la semana el sábado con una pregunta que todo SaaS que agrega agentes tiene que
+responder: ¿un agente por cliente o uno para todos?
