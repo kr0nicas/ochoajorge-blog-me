@@ -1,0 +1,250 @@
+---
+title: "Agentes Multi-Tenant: Silo, Pool o Bridge y Por Qué Axonius Eligió Silo"
+description: "Un agente por cliente o uno compartido: los 3 modelos multi-tenant para agentes IA, sus trade-offs reales y por qué Axonius eligió silo con un tope de tokens."
+date: "2026-11-14"
+tags: ["agentes-ia", "multi-tenant", "saas", "seguridad", "costos-llm"]
+pillar: "seguridad"
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Arquitectura de Software Avanzada"
+  part: 27
+resources:
+  - label: "How Axonius built secure multi-tenant AI agents on Bedrock AgentCore — AWS ML Blog"
+    url: "https://aws.amazon.com/blogs/machine-learning/how-axonius-built-secure-multi-tenant-ai-agents-on-bedrock-agentcore/"
+  - label: "Cedar Policy Language"
+    url: "https://www.cedarpolicy.com/"
+---
+
+# Agentes Multi-Tenant: Silo, Pool o Bridge y Por Qué Axonius Eligió Silo
+
+> **Serie: Arquitectura de Software Avanzada — Parte 27.** Cuando un SaaS agrega agentes, hereda
+> todos los problemas de multi-tenancy que ya tenía y suma uno nuevo: **un componente que decide
+> en tiempo de ejecución qué datos leer**. Axonius, la plataforma de inteligencia de activos que
+> reconcilia datos de más de 1,400 sistemas para equipos de seguridad, opera cientos de entornos
+> aislados de clientes. Evaluó los tres modelos clásicos y eligió el más caro de operar. Este
+> post explica por qué esa elección tiene sentido.
+
+## El problema: el agente es un nuevo plano de acceso a datos
+
+En un SaaS tradicional, el aislamiento entre tenants vive en lugares conocidos: el esquema de
+base de datos, el filtro `WHERE tenant_id = ?` del repositorio y el middleware que valida el
+token. El código que decide qué datos leer lo escribiste tú y pasa por code review.
+
+Un agente rompe esa garantía. El que decide qué tool llamar y con qué argumentos es un modelo.
+Si el aislamiento depende de que el modelo pase el `tenant_id` correcto, **tu frontera de
+seguridad es un prompt**. Ningún equipo de seguridad debería aceptar eso.
+
+Axonius tenía seis requisitos: aislamiento estricto por tenant, integrarse con su módulo de
+identidad existente, costo por tenant, acceso seguro a las APIs del tenant, encajar en su CD por
+tenant y observabilidad para una flota grande de agentes.
+
+## Los tres modelos
+
+### Pool: un runtime compartido, ruteo por JWT
+
+Un solo runtime atiende a todos. Cada sesión corre en su propia microVM, el JWT trae un claim
+`tenant_id` y el código del agente lo lee para rutear tools y datos.
+
+- **A favor**: un solo despliegue y onboarding instantáneo.
+- **En contra**: **el aislamiento depende por completo del código de la aplicación**. Un bug de
+  ruteo filtra datos entre clientes.
+
+### Bridge: runtime compartido, aislamiento en el gateway
+
+El runtime sigue siendo compartido, pero toda llamada a tools pasa por un gateway con dos
+controles independientes:
+
+1. **Políticas Cedar**: una decisión determinística de permitir o denegar según los atributos
+   de identidad del llamante.
+2. **Interceptor de request**: extrae el JWT, busca el contexto del tenant y lo **cambia por
+   credenciales IAM de corta vida con alcance de tenant** vía STS AssumeRole. La tool recibe esas
+   credenciales mínimas, no el JWT original.
+
+El interceptor corre antes que la política, así que puede enriquecer el contexto que la política
+evalúa. Un interceptor de respuesta puede además filtrar qué tools *ve* cada tenant.
+
+- **A favor**: aunque el agente tenga un bug de ruteo, **el gateway bloquea la llamada cruzada**.
+  Es defensa en profundidad fuera del código del agente.
+- **En contra**: muchas piezas móviles (gateway, dos Lambdas, mapeos, políticas, relaciones de
+  confianza STS) y conectividad VPC más compleja.
+
+Es el mismo patrón de gateway con Cedar que vimos con [Eon y su MCP
+Gateway](/es/blog/eon-y-el-mcp-gateway-de-2-dias-a-2-minutos-para-humanos-y-agentes), aplicado
+al eje tenant en lugar del eje persona.
+
+### Silo: un runtime por tenant
+
+Cada cliente tiene su propio runtime, provisionado con CloudFormation o CDK durante el
+onboarding. El control de acceso es solo IAM: políticas basadas en recursos sobre el runtime y su
+endpoint.
+
+- **A favor**: aislamiento máximo, autorización simple y la posibilidad de correr versiones o
+  modelos distintos por cliente.
+- **En contra**: un límite por defecto de 1,000 agentes por cuenta, latencia de provisión en el
+  onboarding y la carga de operar cientos de runtimes.
+
+## Por qué silo
+
+Axonius ya operaba en silo: cada cliente tiene su VPC dedicada con balanceadores, bases de datos
+y cómputo. **Eligió que el agente heredara el modelo de tenancy que ya tenía**, en lugar de
+introducir uno nuevo.
+
+Creo que esa es la decisión correcta y la más subestimada del caso. Mezclar modelos de tenancy
+(app en silo y agente en pool) crea una frontera nueva que hay que razonar, auditar y explicar a
+cada cliente en su revisión de seguridad. Si tu SaaS ya es silo, el agente en silo no agrega
+conceptos nuevos. Solo agrega automatización.
+
+El resultado: de unas **ocho semanas estimadas** de infraestructura propia a **10 días** hasta
+producción.
+
+## El flujo de una pregunta
+
+Un usuario pregunta *"¿hay cambios grandes en mi conteo de activos respecto a la semana
+pasada?"*:
+
+1. La app de Axonius, donde el usuario ya inició sesión, **genera un JWT de impersonación de
+   corta vida** con identidad, tenant, sesión y actor.
+2. El control plane invoca el runtime *dedicado* del cliente. El payload solo lleva configuración
+   del tenant (IDs de memoria y knowledge base, versión, callback). **El JWT va en un header**, no
+   en el cuerpo, para que el material de autenticación no termine en el estado guardado del
+   agente.
+3. El runtime tiene una **ENI dentro de la VPC del cliente**. El JWT se valida contra la app del
+   cliente (firma, expiración, revocación y permisos) y un token inválido se rechaza antes de que
+   corra el modelo.
+4. Un supervisor LangGraph rutea a un especialista.
+5. Para preguntas sobre el producto, el especialista consulta una Knowledge Base con la
+   documentación de la versión que corre el cliente.
+6. Para datos en vivo, traduce la pregunta a AQL y llama a la API del cliente **con el mismo JWT**.
+   El agente solo puede ver lo que el usuario ya podía ver.
+7. Guardrails en cada respuesta, streaming al chat y memoria de sesión.
+
+El punto clave es que **el agente no tiene credenciales de larga vida**. Toma prestado el JWT del
+usuario mientras dura la petición. Es el mismo principio de identidad por salto que discutimos
+con [Bayer ADE](/es/blog/bayer-ade-22-agentes-especialistas-y-las-5-decisiones-que-no-estaban-en-el-prompt).
+
+## Gobierno de tokens: el control que nadie implementa
+
+La sección de costos es la más útil para quien opera agentes. Axonius:
+
+- Mide tokens de entrada y salida por agente en CloudWatch, más OpenTelemetry para uso en tiempo
+  real.
+- Etiqueta roles IAM para atribuir el costo de Bedrock por tenant.
+- Usa inference profiles por modelo para etiquetar y alertar con más detalle.
+- Y el más interesante: **si un cliente excede su presupuesto de tokens, una alarma dispara una
+  política IAM que deniega nuevas invocaciones**.
+
+Ese último punto convierte el costo en un **control de seguridad**. Un agente en loop, un prompt
+injection que dispara llamadas encadenadas o un cliente que automatiza abuso quedan cortados por
+infraestructura, no por un `if` que alguien olvidó.
+
+Fuera de AWS, el patrón se implementa con un middleware de presupuesto en el gateway de modelos.
+En Go, con Redis como contador:
+
+```go
+package budget
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/redis/go-redis/v9"
+)
+
+var ErrBudgetExceeded = errors.New("budget: tenant token budget exceeded")
+
+// Limits es la política por tenant. Vive en configuración, no en código.
+type Limits interface {
+	MonthlyTokens(ctx context.Context, tenantID string) (int64, error)
+}
+
+type Guard struct {
+	rdb    *redis.Client
+	limits Limits
+	now    func() time.Time
+}
+
+func (g *Guard) key(tenantID string) string {
+	return fmt.Sprintf("tokens:%s:%s", tenantID, g.now().UTC().Format("2006-01"))
+}
+
+// Admit se llama ANTES de invocar el modelo. Falla cerrado si no puede verificar.
+func (g *Guard) Admit(ctx context.Context, tenantID string) error {
+	limit, err := g.limits.MonthlyTokens(ctx, tenantID)
+	if err != nil {
+		return fmt.Errorf("budget: cannot resolve limit: %w", err) // fail-closed
+	}
+	used, err := g.rdb.Get(ctx, g.key(tenantID)).Int64()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return fmt.Errorf("budget: cannot read usage: %w", err) // fail-closed
+	}
+	if used >= limit {
+		return ErrBudgetExceeded
+	}
+	return nil
+}
+
+// Record se llama DESPUÉS, con el uso real reportado por el proveedor.
+func (g *Guard) Record(ctx context.Context, tenantID string, in, out int64) error {
+	k := g.key(tenantID)
+	pipe := g.rdb.TxPipeline()
+	pipe.IncrBy(ctx, k, in+out)
+	pipe.Expire(ctx, k, 40*24*time.Hour)
+	_, err := pipe.Exec(ctx)
+	return err
+}
+```
+
+Dos decisiones deliberadas en este código:
+
+1. **Falla cerrado.** Si Redis no responde, la invocación se rechaza. Un control de costo que
+   falla abierto no controla nada en el momento en que más se necesita.
+2. **Admisión antes y registro después.** Una petición en vuelo puede pasarse un poco del límite.
+   Es un trade-off aceptable frente a reservar tokens por adelantado, que exige estimar la salida.
+   Si tu contrato no tolera ese desborde, reserva un máximo por petición en `Admit` y ajusta en
+   `Record`.
+
+El modelo de Axonius tiene una diferencia importante: su enforcement vive en **IAM**, fuera del
+proceso que se está protegiendo. Si tu gateway es el único punto de enforcement, tiene que ser
+el único camino hacia el modelo. Ninguna credencial de proveedor debería vivir en otro lado.
+
+## Cómo elegir
+
+| Pregunta | Si la respuesta es sí |
+| --- | --- |
+| ¿Tu SaaS ya está en silo (VPC o cuenta por cliente)? | Silo. No inventes una frontera nueva. |
+| ¿Tienes miles de tenants pequeños y onboarding self-service? | Pool, con aislamiento en gateway. Es decir, bridge. |
+| ¿Tus clientes exigen en contrato aislamiento de cómputo o versión dedicada? | Silo. |
+| ¿Tu equipo de plataforma es pequeño y no tiene IaC por tenant? | Bridge, no silo. Cientos de runtimes sin automatización son un incidente esperando. |
+| ¿Tu aislamiento actual depende solo de `WHERE tenant_id`? | Arregla eso antes de agregar agentes. |
+
+Mi regla práctica: **pool puro casi nunca es aceptable para agentes con acceso a datos de
+clientes**. La diferencia entre pool y bridge es exactamente la diferencia entre "confío en el
+modelo" y "no necesito confiar en el modelo".
+
+## Lo que el caso deja abierto
+
+- **El límite de 1,000 runtimes por cuenta** es ajustable, pero en silo te obliga a planear
+  sharding por cuentas desde el día uno si tu base de clientes crece.
+- **La actualización de flota.** Un cambio de prompt o modelo se despliega a cientos de runtimes.
+  Necesitas canary por cohortes de tenants y evals por cohorte, no un despliegue en bloque.
+- **La Knowledge Base es compartida** y se aísla por filtrado de metadata. Es un componente
+  bridge dentro de una arquitectura silo. Para documentación del producto, que es pública para
+  todos los clientes, es razonable. Para datos del cliente no lo sería.
+
+## Qué te llevas
+
+Multi-tenancy en agentes no es un problema nuevo. Es el mismo problema de siempre con un actor
+nuevo que no sigue instrucciones al 100%. La respuesta tampoco es nueva: **saca el aislamiento
+del código que decide y ponlo en la infraestructura que ejecuta**. Puede ser un runtime por
+tenant, un gateway con políticas o un IAM que corta el acceso cuando se acaba el presupuesto. Lo
+que no puede ser es un prompt.
+
+Con esto cerramos la semana. Vimos tres decisiones sobre **dónde vive el control** en un sistema
+de agentes. En [U Mobile](/es/blog/ruteo-en-cascada-para-agentes-el-70-por-ciento-de-u-mobile-que-nunca-toca-un-llm)
+vive en un router que decide cuándo no usar el modelo. En
+[Verisk](/es/blog/ai-sdlc-en-verisk-5-agentes-sin-orquestador-y-un-humano-en-cada-frontera),
+en un humano en cada frontera. En Axonius, en la infraestructura de tenancy.

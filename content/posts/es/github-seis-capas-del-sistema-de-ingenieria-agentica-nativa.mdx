@@ -1,0 +1,322 @@
+---
+title: "GitHub: Seis Capas del Sistema de Ingeniería Agéntica Nativa"
+description: "GitHub construyó un sistema de ingeniería agéntica nativa en seis capas: sandboxes aislados, Agent Merge, multi-model review, Chronicle y Rubber Duck crítico."
+date: "2026-09-05"
+tags: ["agentes-ia", "ingenieria-agentic", "copilot", "code-review", "sandbox"]
+pillar: "construir-con-ia"
+lang: "es"
+draft: true
+featured: false
+series:
+  name: "Construyendo con IA: Lo que nadie te dice"
+  part: 12
+resources:
+  - label: "Evaluating performance of the GitHub Copilot agentic harness — GitHub Blog"
+    url: "https://github.blog/ai-and-ml/github-copilot/evaluating-performance-and-efficiency-of-the-github-copilot-agentic-harness-across-models-and-tasks/"
+  - label: "How to maximize GitHub Copilot's agentic capabilities — GitHub Blog"
+    url: "https://github.blog/ai-and-ml/github-copilot/how-to-maximize-github-copilots-agentic-capabilities/"
+  - label: "How canvases make agentic workflows visible — GitHub Blog"
+    url: "https://github.blog/ai-and-ml/github-copilot/how-canvases-make-agentic-workflows-visible-steerable-and-cost-efficient/"
+  - label: "Build Production-Ready Agents with GitHub Copilot — Microsoft Agent Framework"
+    url: "https://devblogs.microsoft.com/agent-framework/build-production-ready-agents-with-the-github-copilot-harness-and-agent-framework/"
+---
+
+# GitHub: Seis Capas del Sistema de Ingenieria Agentica Nativa
+
+> **Serie: Construyendo con IA — Parte 12.** Los agentes de coding son buenos
+> produciendo código. Que ese código sea revisado, verificado y mergeado a
+> producción es donde la mayoría de los equipos sigue perdiendo tiempo. GitHub
+> construyó un sistema completo para cerrar ese gap — y publicó la arquitectura
+> en seis capas: Surfaces, Runtime, Automation, Quality, Memory y Trust.
+
+## El problema: producir código no es shippear código
+
+Un agente de coding puede generar un PR en minutos. Pero entre el PR y el merge
+hay un mundo: CI verde, conflictos resueltos, review feedback incorporado,
+security checks pasados. Ese mundo consume horas humanas — y la mayoría de las
+herramientas de desarrollo no fueron diseñadas para colaboración humano-agente.
+
+<Callout type="warning" title="El gap que nadie cubre">
+  Los agentes pueden producir cambios más rápido de lo que cualquier humano
+  puede revisarlos. Y la mayoría de las herramientas de developer no fueron
+  diseñadas para orquestación multi-agente. Se pierde el rastro de qué corrió,
+  qué cambió, qué se validó y qué todavía necesita juicio humano.
+</Callout>
+
+La respuesta de GitHub es un sistema, no un feature. La premisa: las
+herramientas que construimos para colaboración humano-a-humano no son suficientes
+para colaboración humano-a-agente. Hace falta un sistema nuevo, construido
+API-first y UX-first, donde todo lo que un developer puede hacer por la
+interfaz, un agente puede hacerlo con las mismas primitivas.
+
+## Las seis capas
+
+GitHub organiza su sistema agent-native en seis pilares. Cada uno resuelve un
+problema distinto, y juntos cierran el loop de prompt a producción.
+
+<ComparisonTable
+  headers={["Capa", "Propósito", "Componentes"]}
+  highlight={1}
+  rows={[
+    ["Surfaces", "Donde trabajas con agentes", "Copilot app, CLI, IDE, web, Canvases"],
+    ["Runtime", "Donde los agentes actúan seguros", "Sandbox local + cloud, micro-VMs"],
+    ["Automation", "Mantener el trabajo en movimiento", "/every, Morning Briefs, Agent Merge"],
+    ["Quality", "Verificar antes de que llegue a ti", "Multi-model review, Rubber Duck, security"],
+    ["Memory", "Contexto entre sesiones", "Chronicle, Copilot Memory"],
+    ["Trust", "Seguridad y gobernanza a escala", "Sandbox isolation, scoped credentials, agent apps"],
+  ]}
+/>
+
+### Capa 1 — Surfaces: donde humanos y agentes coinciden
+
+El GitHub Copilot app es una aplicación desktop standalone, distinta de la
+extensión de VS Code. No es un session manager para spawnear más trabajo paralelo
+— está diseñado para **terminar trabajo**. La home screen es un inbox "My Work"
+que muestra sesiones activas, issues, pull requests y automatizaciones en
+segundo plano, todo en un lugar.
+
+El surface más interesante son los **Canvases**: paneles bidireccionales que
+tanto el humano como el agente pueden manejar. En lugar de tratar el chat como
+el único lugar donde pasa el trabajo, los Canvases hacen el trabajo **visible,
+steerable y approvable** mientras se desarrolla.
+
+```text
+┌─────────────────────────────────────────────────┐
+│                   CANVAS                          │
+│  ┌─────────────────────────────────────────────┐ │
+│  │  Estado del workflow (persistente)          │ │
+│  │  • Fase 1: Assessment ✓                    │ │
+│  │  • Fase 2: Planning ✓                      │ │
+│  │  • Fase 3: Migration tasks ⟳ (en progreso)  │ │
+│  │  • Fase 4: Validation ⬜                    │ │
+│  └─────────────────────────────────────────────┘ │
+│                                                   │
+│  Humano: puede inspeccionar, guiar, aprobar      │
+│  Agente: puede actualizar, progresar             │
+│  Ambos: alineados sin replay constante de ctx    │
+└─────────────────────────────────────────────────┘
+```
+
+Un Canvas hace el estado explícito y persistente. El humano puede inspeccionar
+y guiar; el agente puede actualizar y progresar; ambos se mantienen alineados
+sin replay constante de contexto.
+
+<Callout type="tip" title="El blueprint repetible de un Canvas">
+  1. Definir estados del workflow claramente. 2. Superficiar las decisiones que
+  importan. 3. Persistir progreso y drafts inmediatamente. 4. Mantener puntos de
+  aprobación humana explícitos. Esto cambia de interacción prompt-por-prompt a
+  workflows colaborativos durables con memoria y estructura.
+</Callout>
+
+### Capa 2 — Runtime: sandboxes y la libertad de cerrar el laptop
+
+Los agentes necesitan un lugar seguro para ejecutar código. GitHub Sandboxes son
+**micro-VMs rápidas** que arrancan en segundos. Puedes flipar una sesión a
+autopilot, entregarla a ejecución en cloud, y correr tareas toda la noche con
+el laptop cerrado.
+
+Dos propiedades lo hacen seguro en lugar de imprudente:
+
+- **Aislamiento:** los sandboxes son isolated y stateful. Un PR riesgoso se
+  puede testear en un entorno completamente separado de tu máquina.
+- **Credenciales scoped:** un agente que se desboque no puede alcanzar lo que
+  nunca se le concedió.
+
+Hay sandbox local y cloud. El patrón: **entornos aislados en ambos lados del
+dividido local-cloud.**
+
+### Capa 3 — Automation: de Morning Briefs a Agent Merge
+
+El centerpiece de esta capa es **Agent Merge**. Con un botón en un PR, Agent
+Merge periódicamente revisa el PR, busca conflictos de merge, observa si CI está
+verde, y resuelve feedback de review de humanos y otros agentes — iterando
+hasta que el PR está listo para merge.
+
+```python
+# Lo que Agent Merge automatiza
+async def agent_merge(pr):
+    while not pr.is_ready_to_merge():
+        if pr.has_conflicts():
+            await resolve_conflicts(pr)
+        
+        if not pr.ci_green():
+            await wait_for_ci(pr)
+        
+        for comment in pr.review_comments:
+            if comment.unresolved:
+                await address_feedback(pr, comment)
+                await push_changes(pr)
+        
+        # Revisar estado completo
+        pr = await refresh(pr)
+    
+    # Cuando todo está verde y sin conflictos → listo
+    return pr
+```
+
+Esto convierte el seguimiento de PR de una tarea humana repetitiva a un
+proceso automatizado que respeta los mismos gates que un humano verificaría.
+
+### Capa 4 — Quality: el Rubber Duck y multi-model review
+
+La primera herramienta es el **Rubber Duck**: un crítico built-in que le da al
+agente una segunda opinión constructiva sobre sus propios planes, código y
+tests. Deliberadamente usa un **modelo distinto** del que maneja tu sesión. Dos
+modos: advisor y critic. Critic mode es el que querrías antes de commit nada
+importante.
+
+El patrón más poderoso es **multi-model review orchestration**: desde una sesión
+parent, spawn dos sub-sesiones:
+
+```text
+                    PARENT SESSION
+                   /              \
+                  /                \
+    ┌────────────┐    ┌────────────────────────┐
+    │ CODE REVIEW│    │    SECURITY REVIEW      │
+    │ (multi)    │    │    (multi-model)        │
+    │            │    │                        │
+    │ Gemini +   │    │ Sub-agents con GitHub   │
+    │ GPT +      │    │ Advanced Security       │
+    │ Claude     │    │                        │
+    └──────┬─────┘    └───────────┬────────────┘
+           |                      |
+           └──────────┬───────────┘
+                      ▼
+            ┌──────────────────┐
+            │  RUBBER DUCK     │
+            │  (final critique)│
+            └────────┬─────────┘
+                     ▼
+              ¿Modelos acuerdan?
+              ¿Critic acuerda?
+              ¿Security pass? ──→ Revisar antes de
+                                  pedir tu atención
+```
+
+La primera sub-sesión corre code review con múltiples modelos en paralelo —
+Gemini, un GPT, Claude — porque tienen distribuciones de entrenamiento distintas
+y no siempre concuerdan. Ese desacuerdo surfacea issues que un solo modelo
+no vería. La segunda corre security review con sub-agents de GitHub Advanced
+Security.
+
+Cuando ambas reportan, el parent corre el Rubber Duck sobre el output combinado
+para una última ronda de crítica antes de pedir tu atención. El resultado: una
+review de alta confianza donde los modelos acuerdan, el critic acuerda, y el
+security pass ya corrió — todo antes de que gastes un minuto en ello.
+
+### Capa 5 — Memory: Chronicle y continuidad
+
+Los agentes son stateless por naturaleza. Tu trabajo se reparte entre CLI, cloud
+agent, IDE y web. Memory resuelve el problema de continuidad, y el comando es
+`/chronicle`.
+
+**Chronicle** es un registro privado, scoped por usuario, de cada sesión, cada
+línea de código y cada prompt — across todas tus surfaces y máquinas. Si no
+recuerdas los detalles de un bug tricky que arreglaste hace días, le pides a
+Chronicle que lo encuentre. Under the hood, el agente corre una combinación de
+full-text search y structured SQL queries contra un **data lake de tus propias
+sesiones**.
+
+El segundo uso es más afilado: `/chronicle standup` revisa todo lo que hiciste
+en las últimas 24 horas y genera un standup report estructurado automáticamente.
+
+<Callout type="note" title="Memoria que es auditable">
+  Memory aquí no es una claim vaga de que el modelo recuerda. Es un store
+  privado y queryable con una interfaz SQL directa expuesta al agente. Eso es
+  lo que lo hace poderoso Y auditable. Puedes ver las queries que ejecuta.
+</Callout>
+
+### Capa 6 — Trust: aislamiento, credenciales y ecosistema
+
+Trust es la razón por la que una organización puede dejar que los agentes actúen
+en absoluto. Es la diferencia entre un proof of concept y un sistema que puedes
+correr contra tu codebase.
+
+**Garantías técnicas:**
+- Un worktree por sesión
+- Sandboxes sellados
+- Credenciales scoped — el agente solo alcanza lo que se le concedió
+
+**Ecosistema abierto:** Agent Apps son AI agents de partners, instalados desde
+GitHub Marketplace como cualquier otra GitHub App. Sonar para code quality,
+Endor para security, Miro para design canvases, LaunchDarkly para deploys detrás
+de feature flags.
+
+## El harness vs el modelo
+
+La distinción clave del sistema de GitHub: **el harness es el componente
+compartido.** El modelo provee la inteligencia bruta, pero el harness — tools,
+context, workflow, orquestación — moldea cómo esa inteligencia se aplica
+efectivamente. Mejora el harness, y cada surface se beneficia.
+
+```text
+MODELO vs HARNESS
+
+┌────────────────────────────────────────────┐
+│  MODELO: inteligencia bruta                 │
+│  • Cambia con cada release del provider    │
+│  • No controlable por ti                    │
+│  • Token efficiency depende del provider   │
+├────────────────────────────────────────────┤
+│  HARNESS: cómo se aplica la inteligencia    │
+│  • Tú lo controlas                          │
+│  • Mejora con cada iteración               │
+│  • Token efficiency, tools, context        │
+│  • Mejóralo → todos los surfaces mejoran   │
+└────────────────────────────────────────────┘
+```
+
+El agentic harness de GitHub Copilot es un componente compartido del SDK que
+powera el CLI, la app, code review, y una variedad amplia de experiencias.
+Soporta 20+ modelos frontier — GPT, Claude, Gemini — con bring-your-own-key
+para open-source y local. Puedes elegir el modelo por task, o dejar que Auto
+model selection decida.
+
+En benchmarks como TerminalBench 2.0, el harness de GitHub Copilot logra
+task completion rates a la par con los harnesses de los model-vendors, mientras
+consume **menos tokens** en la mayoría de las configuraciones.
+
+## Lecciones aprendidas
+
+- **El harness es el multiplier, no el modelo.** DoorDash lo dijo, Shopify lo
+  demostró, y GitHub lo convirtió en producto: el modelo es commodity; el
+  harness — tools, context, orquestación — es donde vives el advantage
+  durable. Mejora el harness y cada surface mejora.
+
+- **Canvases > chat para workflows repetitivos.** Tratar cada turno como un
+  fresh start es caro. Tratar cada workflow como un sistema con memoria,
+  estructura y control es más eficiente. Los Canvases hacen el trabajo visible
+  y steerable en lugar de enterrado en un thread de chat.
+
+- **Multi-model review surfacea lo que un solo modelo no ve.** Diferentes
+  modelos tienen distribuciones de entrenamiento distintas. Ese desacuerdo es
+  un feature, no un bug — surfacea issues que un solo modelo no detectaría.
+  El Rubber Duck como capa final es el pattern correcto.
+
+- **Agent Merge elimina el toil de PR management.** Resolver conflictos,
+  esperar CI, incorporar feedback de review — todo automatizable. Si tu
+  equipo pierde tiempo en seguimiento de PRs, esto es la solución.
+
+- **Memory auditable, no memoria vaga.** Chronicle no es "el modelo recuerda."
+  Es un store queryable con interfaz SQL. Eso es lo que lo hace de producción:
+  auditable, debuggable, y confiable.
+
+## Conclusión
+
+El sistema agent-native de GitHub es lo más cercano a un blueprint completo
+para operar agentes de coding en producción que he visto. No es un feature — es
+seis capas que se refuerzan mutuamente: surfaces dan un lugar compartido para
+trabajar, runtime da seguridad, automation mantiene el trabajo en movimiento,
+quality verifica antes de que llegue a ti, memory lleva el contexto, y trust
+hace que todo sea seguro a escala.
+
+El insight de fondo: las herramientas que construimos para colaboración
+humano-a-humano no son suficientes. Hace falta un sistema nuevo, construido
+API-first y UX-first, donde el agente es un ciudadano de primera clase con los
+mismos primitivos que el humano. Cuando lo logras, el agente no acelera tu
+trabajo — lo transforma.
+
+¿Quién vigila al agente? En el sistema de GitHub, todos: sandboxes, credenciales,
+multi-model review, Rubber Duck, Chronicle. La vigilancia no es un overhead —
+es la arquitectura.

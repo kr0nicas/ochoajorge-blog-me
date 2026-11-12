@@ -1,0 +1,303 @@
+---
+title: "Ruteo en Cascada para Agentes: El 70 por Ciento de U Mobile que Nunca Toca un LLM"
+description: "U Mobile resuelve 70% de las peticiones de su helpdesk agéntico sin invocar un modelo. Así funciona el ruteo en tres niveles y cómo implementarlo en Go."
+date: "2026-11-10"
+tags: ["agentes-ia", "ruteo", "costos-llm", "arquitectura", "go"]
+pillar: "agentes-en-produccion"
+lang: "es"
+draft: false
+featured: false
+series:
+  name: "Construyendo con IA: Lo que nadie te dice"
+  part: 26
+resources:
+  - label: "How U Mobile built agentic telco operations with Amazon Bedrock AgentCore — AWS ML Blog"
+    url: "https://aws.amazon.com/blogs/machine-learning/how-u-mobile-built-agentic-telco-operations-with-amazon-bedrock-agentcore/"
+  - label: "Agent2Agent (A2A) Protocol"
+    url: "https://a2a-protocol.org/"
+---
+
+# Ruteo en Cascada para Agentes: El 70 por Ciento de U Mobile que Nunca Toca un LLM
+
+> **Serie: Construyendo con IA: Lo que nadie te dice — Parte 26.** Lo que nadie te dice de un
+> sistema multi-agente en producción es que **la mayoría de las peticiones no necesitan un
+> agente**. U Mobile, el operador 5G más nuevo de Malasia, lo midió: cerca del **70% de las
+> peticiones a su helpdesk agéntico se resuelven con coincidencia determinística de palabras
+> clave**, sin invocar ningún modelo. Solo el 10% llega al orquestador completo.
+
+## El problema: un orquestador LLM para todo es caro y lento
+
+El diseño por defecto de un sistema multi-agente es un supervisor LLM que recibe cada pregunta,
+decide qué especialista la atiende y combina resultados. Funciona en el demo y escala mal en
+producción, por tres motivos:
+
+- **Costo por petición**: cada consulta paga como mínimo una llamada de clasificación al
+  modelo más capaz del sistema, aunque la pregunta sea *"estado del port-in del número X"*.
+- **Latencia**: el supervisor suma uno o dos segundos antes de que el especialista empiece a
+  trabajar.
+- **No determinismo donde no hace falta**: la misma pregunta frecuente puede rutearse distinto
+  en dos invocaciones. Eso complica la auditoría y los evals.
+
+U Mobile construyó **AiDaH** (AI-Driven Agentic Helpdesk) sobre Amazon Bedrock AgentCore para
+sus equipos de soporte L2. Hoy cubre **más de 150 escenarios operativos documentados** en seis
+divisiones, con **8 agentes especialistas**. Según las mediciones internas de U Mobile, entre
+enero y septiembre de 2026 los tickets de aprovisionamiento y red bajaron **84.5%**, las
+consultas generales **81.6%** y los de facturación **48.7%**.
+
+Lo que más me interesa del caso no son esos números. Es la decisión de arquitectura que los
+hace sostenibles: **el camino más barato que puede resolver la petición con confianza es el que
+corre**.
+
+## La arquitectura de seis capas
+
+Para ubicar el ruteo, el mapa completo de AiDaH:
+
+1. **Interfaz**: Microsoft Teams y un portal web (CloudFront + WAF + Lambda). No hay una app
+   nueva que aprender.
+2. **Orquestación**: el "cerebro de ruteo" sobre AgentCore. Primero un chequeo de seguridad
+   (RBAC, identidad, guardrails) y después el ruteo en cascada.
+3. **Especialistas**: 8 agentes (CRM, gestión de problemas, portabilidad, órdenes y SIM,
+   monitoreo, analítica, costos cloud, finanzas) que se delegan subtareas vía **A2A**.
+4. **Gateways**: AgentCore Gateway expone los backends como tools **MCP** tipadas.
+5. **Datos y conocimiento**: Knowledge Bases con OpenSearch Serverless, memoria de sesión y
+   DynamoDB con un modelo RBAC de seis niveles.
+6. **Sistemas operativos**: on-premises y nube, alcanzados por Transit Gateway y VPN IPsec.
+   Nada pasa por internet público.
+
+La capa 2 es la que nos importa hoy.
+
+## Los tres niveles
+
+| Nivel | Mecanismo | % de peticiones | Costo de modelo |
+| --- | --- | --- | --- |
+| 1 | Coincidencia determinística de keywords | ~70% | Cero |
+| 2 | Clasificador con modelo ligero | ~20% | Bajo |
+| 3 | Orquestador completo | ~10% | Alto |
+
+Un *"port-in status"* reconocido salta directo al especialista de portabilidad. Una redacción
+ambigua va al clasificador ligero. Una pregunta nueva o con varias partes va al orquestador, que
+puede encadenar especialistas vía A2A. Por ejemplo, un port-in que en realidad es un bloqueo de
+facturación.
+
+Hay un detalle que se pasa por alto con facilidad: **el chequeo de seguridad ocurre antes del
+ruteo, no dentro de él**. Una petición que falla RBAC, validación de token o guardrails se
+detiene ahí. El nivel 1 no es un atajo que salte controles. Solo se salta el modelo.
+
+## Por qué el 70% es posible: prompts dirigidos
+
+El nivel 1 no funciona por magia léxica. Funciona porque U Mobile **cambió cómo pregunta la
+gente**. El equipo de sistemas no esperó exploración abierta y repartió **plantillas de prompt
+estructuradas** para los escenarios comunes. Pasaron de "pregúntale lo que quieras a AiDaH" a
+"así se pide un chequeo de facturación o el estado de un port-in".
+
+Esa decisión de adopción, que el caso presenta como gestión del cambio, es también una decisión
+de arquitectura. **Las plantillas son el contrato de entrada que vuelve determinístico el
+ruteo.** La encuesta interna de facilidad de uso dio 4.6 de 5, así que el contrato no espantó a
+los usuarios.
+
+Es la misma lección que vimos en [MCP como contrato entre
+agentes](/es/blog/mcp-como-contrato-entre-agentes), aplicada en el borde humano. Si controlas la
+forma de la entrada, controlas el costo de procesarla.
+
+## Implementación en Go
+
+El esqueleto que yo usaría, con arquitectura hexagonal: el router es un caso de uso y cada nivel
+es un puerto. Esto **no es código de U Mobile**, que no publicó su implementación. Es el patrón
+traducido a algo desplegable.
+
+```go
+package routing
+
+import (
+	"context"
+	"errors"
+	"time"
+)
+
+// Route es el resultado de cualquier nivel: a qué especialista va y con qué confianza.
+type Route struct {
+	Specialist string
+	Confidence float64
+	Tier       Tier
+	Params     map[string]string // entidades extraídas (msisdn, order_id...)
+}
+
+type Tier int
+
+const (
+	TierRules Tier = iota + 1
+	TierClassifier
+	TierOrchestrator
+)
+
+// Puertos. El dominio no sabe si detrás hay regex, un modelo pequeño o un supervisor LLM.
+type RuleMatcher interface {
+	Match(ctx context.Context, q string) (Route, bool)
+}
+
+type Classifier interface {
+	Classify(ctx context.Context, q string) (Route, error)
+}
+
+type Orchestrator interface {
+	Plan(ctx context.Context, q string) (Route, error)
+}
+
+type Metrics interface {
+	RouteDecided(tier Tier, specialist string, latency time.Duration)
+}
+
+type CascadeRouter struct {
+	rules         RuleMatcher
+	classifier    Classifier
+	orchestrator  Orchestrator
+	metrics       Metrics
+	minConfidence float64       // umbral para aceptar al clasificador, p. ej. 0.85
+	classifierTTL time.Duration // presupuesto de latencia del nivel 2
+}
+
+var ErrUnroutable = errors.New("routing: no tier could handle the request")
+
+func (r *CascadeRouter) Route(ctx context.Context, q string) (Route, error) {
+	start := time.Now()
+
+	// Nivel 1: determinístico, sin modelo.
+	if rt, ok := r.rules.Match(ctx, q); ok {
+		rt.Tier = TierRules
+		r.metrics.RouteDecided(rt.Tier, rt.Specialist, time.Since(start))
+		return rt, nil
+	}
+
+	// Nivel 2: modelo ligero con deadline propio. Si tarda o duda, escala.
+	cctx, cancel := context.WithTimeout(ctx, r.classifierTTL)
+	rt, err := r.classifier.Classify(cctx, q)
+	cancel()
+	if err == nil && rt.Confidence >= r.minConfidence {
+		rt.Tier = TierClassifier
+		r.metrics.RouteDecided(rt.Tier, rt.Specialist, time.Since(start))
+		return rt, nil
+	}
+
+	// Nivel 3: orquestador completo. Es el único que puede planear multi-especialista.
+	rt, err = r.orchestrator.Plan(ctx, q)
+	if err != nil {
+		return Route{}, errors.Join(ErrUnroutable, err)
+	}
+	rt.Tier = TierOrchestrator
+	r.metrics.RouteDecided(rt.Tier, rt.Specialist, time.Since(start))
+	return rt, nil
+}
+```
+
+Tres decisiones del código que importan más que el código:
+
+1. **El nivel 2 tiene su propio deadline.** Si el clasificador ligero tarda más que su
+   presupuesto, la petición escala. Un nivel barato que se vuelve lento deja de ser barato.
+2. **Un error del clasificador no es un error de la petición.** Se trata como "no sé" y se
+   escala. Solo el nivel 3 puede fallar hacia el usuario.
+3. **Cada decisión emite una métrica con el nivel.** Sin eso no sabes si tu 70% sigue siendo
+   70% o si se degradó a 40% después de que alguien cambió la plantilla.
+
+### El nivel 1 como datos, no como código
+
+Las reglas deben ser versionables y revisables por gente de operaciones, no un `switch` en Go:
+
+```go
+type Rule struct {
+	ID         string         `yaml:"id"`
+	Pattern    *regexp.Regexp `yaml:"-"`
+	RawPattern string         `yaml:"pattern"`
+	Specialist string         `yaml:"specialist"`
+	Extract    []string       `yaml:"extract"` // grupos nombrados a Params
+}
+
+type RegexMatcher struct{ rules []Rule }
+
+func (m *RegexMatcher) Match(_ context.Context, q string) (Route, bool) {
+	norm := strings.ToLower(strings.TrimSpace(q))
+	for _, r := range m.rules {
+		sub := r.Pattern.FindStringSubmatch(norm)
+		if sub == nil {
+			continue
+		}
+		params := make(map[string]string, len(r.Extract))
+		for _, name := range r.Extract {
+			if i := r.Pattern.SubexpIndex(name); i > 0 {
+				params[name] = sub[i]
+			}
+		}
+		return Route{Specialist: r.Specialist, Confidence: 1, Params: params}, true
+	}
+	return Route{}, false
+}
+```
+
+```yaml
+# rules/portabilidad.yaml
+- id: portin-status
+  pattern: '^(port-?in|portabilidad)\s+(status|estado)\s+(?P<msisdn>\+?\d{8,15})$'
+  specialist: number-portability
+  extract: [msisdn]
+```
+
+Cada regla tiene un `id`, así que las métricas del nivel 1 se agregan por regla. Una regla que
+deja de coincidir después de un cambio en la plantilla aparece como una caída en su contador. No
+tienes que esperar a ver subir la factura del modelo para enterarte.
+
+## Los trade-offs que el caso no cuenta
+
+**Falsos positivos del nivel 1.** Un regex que coincide de más manda la petición al especialista
+equivocado *sin que ningún modelo lo cuestione*. La mitigación es que el especialista valide sus
+precondiciones (¿el `msisdn` existe?, ¿hay un port-in activo?) y, si no se cumplen, devuelva un
+error tipado que reinyecte la petición al nivel 2. Y las reglas deben anclarse (`^...$`), no
+buscar subcadenas.
+
+**El umbral de confianza es un parámetro de negocio.** Bajarlo de 0.85 a 0.7 manda más tráfico
+al nivel 2, que es más barato, pero sube los errores de ruteo. Esa curva se calibra con evals
+offline sobre tráfico real etiquetado. No se adivina.
+
+**Deriva del vocabulario.** Los usuarios inventan atajos nuevos y las plantillas envejecen. Si
+el porcentaje del nivel 3 sube semana a semana, no es que el modelo empeoró: tus reglas dejaron
+de cubrir cómo habla la gente. Revisar las peticiones del nivel 3 es la mejor fuente para
+escribir reglas nuevas.
+
+**Multi-dominio.** El nivel 1 solo puede rutear a un especialista. Las preguntas que cruzan
+dominios tienen que llegar al nivel 3 o a un especialista que delegue vía A2A. Si fuerzas una
+regla para un caso multi-dominio, obtienes respuestas incompletas que *parecen* correctas.
+
+## Lo que hace barato agregar el dominio 151
+
+El caso tiene una observación que vale más que el ruteo. Al seguir el flujo de una petición,
+**incorporar un dominio nuevo solo agrega un gateway y sus definiciones de tools MCP**. La
+interfaz, el chequeo previo, el ruteo, la colaboración A2A, la respuesta y la auditoría no
+cambian.
+
+Esa es la definición operativa de un núcleo estable: el costo marginal de cada dominio nuevo es
+bajo porque el núcleo no se toca. U Mobile pasó de 2 casos de uso a más de 150 con sprints de 12
+semanas y un equipo pequeño, usando desarrollo dirigido por specs (Kiro). Cada dominio nuevo
+empieza como un spec con el gateway, las tools MCP y las entradas RBAC que deciden quién puede
+llamarlas.
+
+Si ya leíste cómo [DoorDash centralizó modelos detrás de un LLM
+Gateway](/es/blog/plataforma-de-agentes-en-doordash-llm-gateway-mcp-y-evals-a-2000-diarios), el
+patrón es el mismo, aplicado a las tools en lugar de los modelos.
+
+## Checklist para tu propio router
+
+- Chequeo de seguridad **antes** del ruteo, idéntico para los tres niveles.
+- Reglas del nivel 1 en archivos versionados, ancladas y con `id`.
+- Deadline y umbral de confianza explícitos para el nivel 2.
+- Errores del nivel 2 tratados como "escalar", no como fallo.
+- Métrica `route_decided{tier, specialist, rule_id}` y alarma sobre la proporción del nivel 3.
+- Especialistas que validan precondiciones y devuelven el control si el ruteo fue incorrecto.
+- Plantillas de prompt publicadas para los usuarios: son tu contrato de entrada.
+
+## Qué te llevas
+
+El orquestador LLM es la herramienta más cara de tu sistema multi-agente. Úsala para el 10% de
+peticiones que la necesitan de verdad. El otro 90% es ingeniería de software convencional:
+reglas, umbrales, deadlines y métricas. U Mobile no ganó por tener agentes más inteligentes.
+Ganó porque decidió **cuándo no usarlos**.
+
+En el próximo post de la semana vamos a ver la decisión opuesta. Verisk eliminó el orquestador
+por completo y puso un humano en cada frontera de su ciclo de desarrollo.
