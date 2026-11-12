@@ -1,31 +1,39 @@
-# Calendario Semanal de Contenido — Semana del 2 de Noviembre, 2026
+# Calendario Semanal de Contenido — Semana del 9 de Noviembre, 2026
 
-## Serie: Agentes en Producción y Casos de Uso Reales
+## Tema de la semana: dónde vive el control en un sistema de agentes
 
 | # | Fecha | Slug | Título | Serie | Parte | Pillar |
 |---|-------|------|--------|-------|-------|--------|
-| 1 | 2026-11-03 | `bayer-ade-22-agentes-especialistas-y-las-5-decisiones-que-no-estaban-en-el-prompt` | Bayer ADE: 22 Agentes Especialistas y las 5 Decisiones que No Estaban en el Prompt | Arquitectura de Software Avanzada | 24 | agentes-en-produccion |
-| 2 | 2026-11-05 | `eon-y-el-mcp-gateway-de-2-dias-a-2-minutos-para-humanos-y-agentes` | Eon y el MCP Gateway: De 2 Días a 2 Minutos para Darle Herramientas a Humanos y Agentes | Construyendo con IA: Lo que nadie te dice | 25 | agentes-en-produccion |
-| 3 | 2026-11-07 | `agentes-tolerantes-a-fallas-7-patrones-de-sistemas-distribuidos-que-ningun-prompt-reemplaza` | Agentes Tolerantes a Fallas: 7 Patrones de Sistemas Distribuidos que Ningún Prompt Reemplaza | Arquitectura de Software Avanzada | 25 | agentes-en-produccion |
+| 1 | 2026-11-10 | `ruteo-en-cascada-para-agentes-el-70-por-ciento-de-u-mobile-que-nunca-toca-un-llm` | Ruteo en Cascada para Agentes: El 70 por Ciento de U Mobile que Nunca Toca un LLM | Construyendo con IA: Lo que nadie te dice | 26 | agentes-en-produccion |
+| 2 | 2026-11-12 | `ai-sdlc-en-verisk-5-agentes-sin-orquestador-y-un-humano-en-cada-frontera` | AI-SDLC en Verisk: 5 Agentes sin Orquestador y un Humano en Cada Frontera | Arquitectura de Software Avanzada | 26 | agentes-en-produccion |
+| 3 | 2026-11-14 | `agentes-multi-tenant-silo-pool-o-bridge-y-por-que-axonius-eligio-silo` | Agentes Multi-Tenant: Silo, Pool o Bridge y Por Qué Axonius Eligió Silo | Arquitectura de Software Avanzada | 27 | seguridad |
 
 ## Foco de cada post
 
-1. **Bayer ADE**: Bayer Crop Science resuelve el 80% de las preguntas sin ingenieros usando 22 agentes sobre Bedrock AgentCore. El post cubre las decisiones que lo hicieron posible y que no están en ningún prompt: checkpoints durables con locking optimista, una credencial por cada salto, el modelo tratado como contrato, tools generadas desde OpenAPI y la medición del éxito de la tarea en lugar del éxito HTTP.
+1. **U Mobile (ruteo en cascada)**: el helpdesk agéntico AiDaH resuelve ~70% de las peticiones con reglas determinísticas, ~20% con un clasificador ligero y solo ~10% con el orquestador completo. El post cubre el chequeo de seguridad previo al ruteo, las plantillas de prompt como contrato de entrada y un router hexagonal en Go con deadlines, umbrales y métricas por nivel. Resultado: tickets −84.5% en aprovisionamiento.
 
-2. **Eon MCP Gateway**: Eon reemplazó los servidores MCP locales y los tokens por tool con un gateway remoto único. La autorización se define con políticas Cedar, lo usan 100+ devs y un agente SRE sobre 3 nubes, y el onboarding bajó de 2 días a 2 minutos. Temas: fail-closed, identidad como conectividad y manifiesto de tools filtrado por principal.
+2. **Verisk (AI-SDLC)**: cinco agentes por etapa (Requirements, Grooming, Developer, Code Review, QA) sin orquestador central. Las transiciones de Jira funcionan como bus de eventos y hay un gate humano obligatorio en cada frontera. Temas: coreografía vs orquestación, cascada de errores, auditoría SOX como subproducto y QA en dos pasos. Aceptación >90% y costo por story point 20-30% menor, incluyendo cómputo.
 
-3. **Agentes tolerantes a fallas**: Un agente es un sistema distribuido que escribe su propio grafo de llamadas. El post recorre 7 patrones: retries con presupuesto, idempotencia, circuit breakers, sagas, pasos irreversibles al final, conteo de huérfanos y pass^k con fallas inyectadas. Con ellos la tasa de éxito sube de 33% a 89.6%. Código en Go.
+3. **Axonius (multi-tenant)**: pool vs bridge (Cedar + interceptor STS) vs silo. Axonius eligió silo para heredar su modelo de tenancy existente: runtime y ENI por cliente, JWT de impersonación de corta vida y tope de tokens aplicado vía IAM-deny. Incluye un guard de presupuesto de tokens en Go que falla cerrado y una matriz de decisión.
+
+## Fuentes
+
+- https://aws.amazon.com/blogs/machine-learning/how-u-mobile-built-agentic-telco-operations-with-amazon-bedrock-agentcore/ (04-nov-2026)
+- https://aws.amazon.com/blogs/industries/reinventing-software-delivery-with-ai-sdlc-on-amazon-bedrock-agentcore/ (05-nov-2026)
+- https://aws.amazon.com/blogs/machine-learning/how-axonius-built-secure-multi-tenant-ai-agents-on-bedrock-agentcore/ (18-ago-2026)
 
 ## Cron Jobs de Publicación
 
 | Post | Fecha | Acción |
 |------|-------|--------|
-| Bayer ADE | 2026-11-03 09:00 CST | `draft: false` + commit + push + PR a develop |
-| Eon MCP Gateway | 2026-11-05 09:00 CST | `draft: false` + commit + push + PR a develop |
-| Agentes tolerantes a fallas | 2026-11-07 09:00 CST | `draft: false` + commit + push + PR a develop |
+| U Mobile | 2026-11-10 09:00 CST | `draft: false` + build + commit + push + PR a develop |
+| Verisk | 2026-11-12 09:00 CST | `draft: false` + build + commit + push + PR a develop |
+| Axonius | 2026-11-14 09:00 CST | `draft: false` + build + commit + push + PR a develop |
 
-Rama: `content/semana-nov02-agentes-produccion`
+Rama: `content/semana-nov09-agentes-produccion` (desde `origin/develop`)
+
+**Dependencia:** el post 3 enlaza a Bayer ADE y Eon (rama `content/semana-nov02-agentes-produccion`, aún sin merge a develop). Mergear nov02 antes que nov09 para evitar enlaces 404.
 
 ---
 
-*Contenido redactado el 2026-10-26 (esa corrida se interrumpió antes del commit). Reprogramado por Hermes Agent el 2026-11-02.*
+*Generado por Hermes Agent el 2026-11-09.*
