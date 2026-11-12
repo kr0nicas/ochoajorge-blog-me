@@ -1,0 +1,369 @@
+---
+title: "Agentes Tolerantes a Fallas: 7 Patrones de Sistemas Distribuidos que Ningún Prompt Reemplaza"
+description: "Un agente es un sistema distribuido que escribe su propio grafo de llamadas. Retries, idempotencia, breakers y sagas suben el éxito de 33% a 89.6% sin duplicar."
+date: "2026-11-07"
+tags: ["agentes-ia", "confiabilidad", "sistemas-distribuidos", "go", "arquitectura"]
+pillar: "agentes-en-produccion"
+lang: "es"
+draft: false
+featured: false
+series:
+  name: "Arquitectura de Software Avanzada"
+  part: 25
+resources:
+  - label: "Failure Is a Feature: Engineering Fault-Tolerant AI Agents — ACM Queue (Tommy Tran, oct-2026)"
+    url: "https://queue.acm.org/doi/10.1145/3841558"
+  - label: "agent-fault-harness — harness reproducible del artículo"
+    url: "https://github.com/TommyTranX/agent-fault-harness"
+---
+
+# Agentes Tolerantes a Fallas: 7 Patrones de Sistemas Distribuidos que Ningún Prompt Reemplaza
+
+> **Serie: Arquitectura de Software Avanzada — Parte 25.** La mayoría de fallas de agentes se
+> diagnostican como fallas del modelo ("alucinó", "perdió el hilo") y se atacan con prompt
+> engineering. Un artículo de ACM Queue de este mes argumenta lo contrario, y lo demuestra con
+> un experimento reproducible: **un agente es un sistema distribuido que escribe su propio grafo
+> de llamadas**, y falla como fallan los sistemas distribuidos. La solución tiene 40 años.
+
+## El loop es un sistema distribuido
+
+Reducido a su esqueleto, un agente es un loop: el modelo propone una acción, el harness la
+ejecuta contra una tool, el resultado vuelve al modelo. Ahora mira lo que realmente es ese
+loop: un coordinador haciendo llamadas remotas a servicios que no controla, sobre redes que
+pierden paquetes, a dependencias que limitan tasa, se cuelgan y devuelven basura, mientras
+acumula estado que eventualmente tiene que reconciliarse con el mundo exterior.
+
+Eso es un sistema distribuido. El no determinismo del modelo es un ingrediente nuevo en un plato
+muy viejo.
+
+Ejemplos que todos hemos visto y casi nadie clasifica bien:
+
+- La tool de búsqueda hizo timeout **y el modelo improvisó**.
+- La API devolvió JSON truncado y **el modelo parseó "vibras" en lugar de estructura**.
+- Una escritura se aplicó, se perdió el ack, se reintentó **y ahora el cliente tiene dos
+  reembolsos**.
+
+Ninguno es un problema de prompt.
+
+## Una taxonomía por punto de entrada de la falla
+
+No puedes diseñar contra "el agente falló". Puedes diseñar contra una taxonomía. La del
+artículo se organiza por **dónde entra la falla al loop**, porque eso determina qué patrón
+aplica:
+
+1. **Infraestructura (frontera de tool)**: timeouts, 429/503, conexiones reseteadas. Lo
+   clásico, con la diferencia de que el llamador narra una respuesta segura alrededor del hueco.
+2. **Interfaz (payload)**: JSON truncado, HTML de error donde iba JSON, schema que derivó. Son
+   las más peligrosas porque **el modelo es un parser omnívoro**: si `"balance": 1000` llega
+   truncado como `"balance": 1`, razona felizmente sobre un saldo de 1.
+3. **Semánticas (modelo)**: tool equivocada, argumento inventado, éxito declarado sin verificar.
+   La única categoría realmente nueva.
+4. **Estado (efectos secundarios)**: la más cara y la menos discutida. Escrituras duplicadas y
+   registros huérfanos que sobreviven a la tarea.
+5. **Emergentes (el loop)**: oscilación entre tools, reintentos infinitos, agotamiento de
+   contexto, dos agentes esperándose. Livelock y deadlock con otro nombre.
+
+La observación clave: **todas las categorías excepto la semántica se resuelven con maquinaria
+pre-LLM**. La mayor parte del presupuesto de confiabilidad de un agente pertenece a código
+aburrido, no a prompts.
+
+## Los 7 patrones, traducidos al loop
+
+Uso Go para los ejemplos; el artículo original está en Python. La traducción importa menos que
+**dónde vive cada pieza**: en el harness, nunca en el modelo.
+
+### 1. Retries con backoff: baratos, potentes e inseguros por defecto
+
+Reintentar solo errores reintentables, con tope, backoff exponencial y full jitter. Tres
+traducciones específicas para agentes:
+
+- **Reintenta el paso, no el transcript.** El retry vive en el harness, invisible al modelo. El
+  modelo solo ve el resultado final de la llamada lógica.
+- **Las fallas de validación sí son reintentables.** En sistemas clásicos un payload malformado
+  es un bug determinista; aquí suele ser estocástico (stream truncado, serializador flaky).
+- **Los retries multiplican costo.** Cada reintento de un paso LLM son dólares. El conteo de
+  retries debe ser una métrica de primera clase.
+
+```go
+func CallWithRetry(ctx context.Context, p RetryPolicy, call func(context.Context) (Result, error)) (Result, error) {
+	var last error
+	for attempt := 0; attempt < p.Attempts; attempt++ {
+		if attempt > 0 {
+			ceil := min(p.Cap, p.Base*time.Duration(1<<(attempt-1)))
+			sleep := time.Duration(rand.Int64N(int64(ceil) + 1)) // full jitter
+			select {
+			case <-time.After(sleep):
+			case <-ctx.Done():
+				return Result{}, ctx.Err()
+			}
+		}
+		res, err := call(ctx)
+		if err == nil {
+			if verr := res.Validate(); verr == nil {
+				return res, nil
+			} else {
+				last = verr // payload malformado: reintentable en agentes
+				continue
+			}
+		}
+		if !IsRetryable(err) {
+			return Result{}, err // 4xx: reintentar es inútil
+		}
+		last = err
+	}
+	return Result{}, last
+}
+```
+
+### 2. Timeouts y deadlines: el presupuesto de tokens es un reloj
+
+Cada llamada remota necesita deadline. Los agentes agregan una segunda moneda: **tokens**. Una
+tarea tiene presupuesto de tiempo, tokens y pasos, que se decrementa en cada paso y se valida
+antes de admitir trabajo nuevo.
+
+```go
+type TaskBudget struct {
+	deadline   time.Time
+	tokensLeft int
+	stepsLeft  int
+}
+
+var (
+	ErrDeadline    = errors.New("budget: task deadline exceeded")
+	ErrTokenBudget = errors.New("budget: token budget exhausted")
+	ErrStepBudget  = errors.New("budget: step budget exhausted")
+)
+
+func (b *TaskBudget) Admit(estimatedTokens int) error {
+	switch {
+	case time.Now().After(b.deadline):
+		return ErrDeadline
+	case b.tokensLeft < estimatedTokens:
+		return ErrTokenBudget
+	case b.stepsLeft <= 0:
+		return ErrStepBudget
+	}
+	b.stepsLeft--
+	b.tokensLeft -= estimatedTokens // ajustar con valores reales tras la llamada
+	return nil
+}
+```
+
+El tope de pasos es **el seguro más barato del artículo**: cinco líneas convierten "el agente
+estuvo en loop toda la noche contra una API muerta" en "la tarea falló en el paso 20 con una
+etiqueta limpia". Y por la cola de latencia (Dean y Barroso): una tarea de 15 pasos hace
+decenas de llamadas; sin deadlines por llamada, hereda **la peor cola de todas sus
+dependencias**.
+
+### 3. Idempotencia: el harness es dueño de las llaves
+
+La regla más importante del artículo, y la que más equipos violan: **el modelo nunca genera la
+idempotency key**. Si pones `idempotency_key` en el schema de la tool, en un reintento el modelo
+puede regenerar la llamada con otra llave (o con argumentos sutilmente distintos) y la
+deduplicación se evapora.
+
+```go
+// La llave deriva de la identidad estable del paso lógico, asignada por el
+// harness cuando el modelo propone la acción y constante entre reintentos.
+func (h *Harness) ExecuteSideEffect(ctx context.Context, taskID, stepID string, tool Tool, args Args) (Result, error) {
+	key := fmt.Sprintf("%s:%s:%s", taskID, stepID, tool.Name())
+	return CallWithRetry(ctx, h.retry, func(ctx context.Context) (Result, error) {
+		return tool.Call(ctx, args.With("idempotency_key", key))
+	})
+}
+```
+
+Si el modelo replanea y propone la operación otra vez como paso nuevo, es una llave nueva, y
+está bien: **el modelo decidiendo actuar de nuevo es un evento distinto del harness reenviando
+una request cuyo ack se perdió**. Prefiere contratos naturalmente idempotentes ("poner el ticket
+en estado cerrado") sobre maquinaria de deduplicación.
+
+### 4. Circuit breakers: falla rápido y díselo al modelo
+
+Tras N fallas consecutivas, el circuito abre y las llamadas fallan sin marcar. Dos traducciones:
+
+- **El error es para un planificador.** Devuelve algo planificable:
+  `{"error": "circuit_open", "tool": "search_docs", "retry_after_s": 30, "hint": "usa grep_docs o responde desde contexto"}`.
+- **Breakers por dependencia, no por nombre de tool.** Si no, el modelo "planifica alrededor"
+  del breaker martillando otra tool que pega al mismo backend.
+
+Y una advertencia honesta del experimento: **con fallas independientes, el breaker empeora el
+éxito** (de 33.3% a 18.8%). Su valor aparece con fallas correlacionadas, es decir, caídas reales.
+
+### 5. Bulkheads: aislamiento de presupuestos, incluido el contexto
+
+Presupuesto por tool dentro de una tarea, control de admisión por dependencia entre tareas (20
+agentes reintentando contra una API con rate limit es una tormenta autoinfligida) y el bulkhead
+específico de agentes: **la ventana de contexto**. Un stack trace de 40 KB contamina todos los
+pasos siguientes.
+
+```go
+const maxResultChars = 4000 // bulkhead de contexto
+
+func AdmitToContext(result string) string {
+	if len(result) <= maxResultChars {
+		return result
+	}
+	return result[:maxResultChars] + "\n[truncado: resultado completo en la traza]"
+}
+```
+
+### 6. Degradación elegante: respuestas parciales sobre fallas pulidas
+
+Tools de fallback **estrictamente más simples** que la primaria (un grep local cuando cae la
+búsqueda, un snapshot cacheado cuando la API no responde). Respuestas parciales **etiquetadas
+honestamente**: el harness inyecta qué pasos fallaron para que el modelo lo diga. Y modo solo
+lectura: "preparé el reembolso pero no pude enviarlo; esto es lo que debes hacer manualmente".
+Perder una escritura es mucho menor que duplicarla.
+
+### 7. Compensación tipo saga: el plan es una transacción de larga duración
+
+Un agente que escribe en varios sistemas es exactamente la *long-lived transaction* de
+Garcia-Molina y Salem (1987). La regla: **los compensadores se registran en diseño, por tool,
+escritos por humanos**. Nunca le pidas al modelo que genere el "undo" en el momento de la falla:
+es el peor momento posible para darle una tarea destructiva y novedosa a un componente no
+determinista.
+
+```go
+type Compensator func(ctx context.Context, r Result) error
+
+type Journal struct {
+	entries []journalEntry
+}
+
+type journalEntry struct {
+	compensate Compensator
+	result     Result
+}
+
+func (h *Harness) DoSideEffect(ctx context.Context, j *Journal, taskID, stepID string, tool Tool, args Args) (Result, error) {
+	if tool.Irreversible() && j.hasPendingReversible() {
+		// Lo irreversible va al final, siempre. 10 líneas de scheduler
+		// garantizan lo que ningún prompt puede.
+		return Result{}, ErrIrreversibleOutOfOrder
+	}
+	res, err := h.ExecuteSideEffect(ctx, taskID, stepID, tool, args)
+	if err != nil {
+		return Result{}, err
+	}
+	j.entries = append(j.entries, journalEntry{h.compensators[tool.Name()], res})
+	return res, nil
+}
+
+func (j *Journal) Abort(ctx context.Context) error {
+	var errs []error
+	for i := len(j.entries) - 1; i >= 0; i-- {
+		e := j.entries[i]
+		if e.compensate == nil {
+			continue // irreversible: ya pasó por el gate más estricto
+		}
+		if err := e.compensate(ctx, e.result); err != nil {
+			errs = append(errs, err) // compensador idempotente: se reintenta luego
+		}
+	}
+	return errors.Join(errs...)
+}
+```
+
+## Lo que midió el experimento
+
+El autor publicó un harness en Python puro, sin API keys, con reloj simulado: cualquiera puede
+reproducir cada número. Un agente responde 12 preguntas sobre READMEs públicos con dos tools de
+lectura y dos de escritura (borrador y publicación). Fallas inyectadas por llamada (perfil
+medio: 10% transitorias, 7% cuelgues, 8% malformadas) y, en escrituras, **50% de probabilidad
+de aplicar el efecto antes de fallar**: la ventana ambigua.
+
+Lo importante es la métrica: **éxito estricto** = respuesta correcta **y** exactamente un
+registro publicado, sin duplicados ni huérfanos.
+
+Resultados con perfil medio (48 tareas por configuración):
+
+- **Baseline**: 33.3% de éxito estricto, 9 huérfanos.
+- **Solo retries**: 83.3% estricto, 91.7% respuesta correcta, **5 duplicados**.
+- **Retries + idempotencia**: **91.7%** en ambas columnas, **0 duplicados**.
+- **Solo timeouts**: éxito igual, p95 de 0.52 s a **0.08 s**.
+- **Solo circuit breaker**: **18.8%** (empeora con fallas independientes).
+- **Solo degradación**: 72.9% respuesta correcta pero 47.9% estricto y **23 huérfanos**.
+- **Solo compensación**: huérfanos de 9 a **0**, sin mover el éxito.
+- **Todos los patrones**: **89.6%**, 0 duplicados, 0 huérfanos, p95 0.17 s.
+
+Tres lecturas que valen el post completo:
+
+1. **Retries sin idempotencia convierten un timeout transitorio en una escritura duplicada
+   permanente.** Los patrones se adoptan como sistema, no sueltos.
+2. **Todos los patrones juntos no son la suma.** 89.6% queda una tarea por debajo de retries +
+   idempotencia, porque breakers y deadlines achican la ventana de reintento. A cambio: la mejor
+   cola de latencia y cero basura en el sistema de registro.
+3. **Con el perfil alto**, todos los patrones responden el 97.9% de preguntas pero solo el 12.5%
+   termina limpio: la mayoría llega por fallbacks que saltan el ledger. **Respuesta correcta y
+   tarea correcta son métricas distintas.**
+
+### La prueba con un modelo real complica la historia, y está bien
+
+Con `claude-haiku-4-5` en el loop (12 tareas por configuración), la higiene de estado se
+sostuvo exacta: baseline con 1 duplicado y 2 huérfanos; todos los patrones con 0 y 0. Pero la
+brecha de éxito casi desapareció: **un modelo real, al ver un error, improvisa su propia
+recuperación**, reintenta y busca el fallback por su cuenta. Y el run con patrones perdió una
+tarea por un deadline de 8 segundos dimensionado para latencias de milisegundos. Lección
+directa: **los deadlines se dimensionan con la distribución de latencia real del modelo**, no
+con la del harness de pruebas.
+
+## Cuándo no vale la pena
+
+Esta es la sección que más respeto del artículo, porque casi nadie la escribe:
+
+- **Agentes de solo lectura necesitan la mitad de la lista.** Idempotencia y compensación llegan
+  con la primera tool con efectos secundarios, no el día del lanzamiento.
+- **Human-in-the-loop es un sustituto**, no solo un complemento. Para agentes de bajo volumen y
+  alto riesgo, un gate de aprobación es más simple y confiable que un journal de saga.
+- **Presupuestos interactivos cambian la matemática.** Con 2 segundos de presupuesto no hay
+  tiempo para tres reintentos; falla rápido a una respuesta degradada.
+- **No construyas para caídas que no vas a tener.** Un breaker frente a una tool llamada 40
+  veces al día nunca tendrá señal para abrir.
+- **La complejidad es un modo de falla.** Cada patrón agrega estados que alguien de guardia
+  tiene que entender a las 3 a. m.
+
+Lo que sí es piso para cualquier agente, a cualquier escala: **tope de pasos, deadlines por
+llamada y validación de output**. Cuestan casi nada.
+
+## Lo que no te dicen
+
+**No construyas esto a mano si no tienes que hacerlo.** El propio autor lo dice: Temporal,
+Durable Task Framework o un runtime de agentes con retries y fallbacks ya implementan esto con
+estándares que un loop artesanal no va a igualar pronto. El valor del artículo es el **mapa
+conceptual y la medición**, no el código. En Go, Temporal te da retries, timeouts y sagas como
+primitivas; lo que tú aportas es la taxonomía y los compensadores.
+
+**El harness es un instrumento, no una prueba de producción.** Fallas independientes
+subestiman breakers y bulkheads. Lo que generaliza es la mecánica, no las magnitudes. Corre el
+harness con tu perfil de fallas.
+
+**El problema real es organizacional.** Los equipos de IA vienen de ML, no de SRE. El
+conocimiento para resolver el 80% de estas fallas ya existe en tu empresa, en el equipo de
+plataforma. Siéntalos en la misma mesa.
+
+## El checklist mínimo
+
+- Deadline por llamada derivado de la latencia observada de cada tool.
+- Presupuesto de pasos, tokens y tiempo por tarea.
+- Validación de schema antes de que algo entre al contexto.
+- Fallas clasificadas por taxonomía y contadas: sabes qué categoría dominó la semana pasada.
+- Retries en el harness, acotados, con backoff y jitter. El modelo solo ve resultados finales.
+- Cada tool con efectos inventariada como idempotente, deduplicable o peligrosa.
+- Idempotency keys generadas por el harness, nunca por el modelo.
+- Compensador escrito por humanos para cada tool con efectos, o flag explícito de irreversible.
+- Pasos irreversibles ordenados al final, mecánicamente.
+- Huérfanos contados y con alarma.
+- Confiabilidad medida como distribución (pass^k, no pass@1), con fallas inyectadas.
+
+## Qué te llevas
+
+La confiabilidad de los agentes **no es un problema abierto de investigación**. Es un cuerpo de
+ingeniería conocida esperando a que alguien reconozca el sistema que tiene enfrente. El modelo
+va a mejorar a su propio ritmo. La maquinaria alrededor es tuya.
+
+Con esto cerramos una semana que fue de adentro hacia afuera: las decisiones de arquitectura de
+[Bayer](/es/blog/bayer-ade-22-agentes-especialistas-y-las-5-decisiones-que-no-estaban-en-el-prompt),
+el plano de acceso a tools de [Eon](/es/blog/eon-y-el-mcp-gateway-de-2-dias-a-2-minutos-para-humanos-y-agentes)
+y, hoy, lo que pasa cuando esas tools fallan. Los tres casos dicen lo mismo: **el trabajo de
+producción vive fuera del prompt**.

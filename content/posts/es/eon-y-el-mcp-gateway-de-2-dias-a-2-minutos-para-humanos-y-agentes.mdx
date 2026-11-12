@@ -1,0 +1,302 @@
+---
+title: "Eon y el MCP Gateway: De 2 Días a 2 Minutos para Darle Herramientas a Humanos y Agentes"
+description: "Eon reemplazó tokens por tool y servidores MCP locales con un gateway único y políticas Cedar: 100+ devs, un agente SRE, 3 nubes y onboarding de 2 minutos."
+date: "2026-11-05"
+tags: ["mcp", "agentes-ia", "seguridad", "multi-cloud", "platform-engineering"]
+pillar: "agentes-en-produccion"
+lang: "es"
+draft: false
+featured: false
+series:
+  name: "Construyendo con IA: Lo que nadie te dice"
+  part: 25
+resources:
+  - label: "How Eon built multi-cloud investigation with an MCP Gateway on Amazon Bedrock AgentCore — AWS ML Blog"
+    url: "https://aws.amazon.com/blogs/machine-learning/how-eon-built-multi-cloud-investigation-with-an-mcp-gateway-on-amazon-bedrock-agentcore/"
+  - label: "Cedar Policy Language"
+    url: "https://www.cedarpolicy.com/"
+---
+
+# Eon y el MCP Gateway: De 2 Días a 2 Minutos para Darle Herramientas a Humanos y Agentes
+
+> **Serie: Construyendo con IA: Lo que nadie te dice — Parte 25.** Nadie habla del costo real
+> de MCP en un equipo: cada desarrollador corriendo diez servidores locales, cada uno con su
+> token, cada token con su rotación, y un agente SRE que no puede usar nada de eso porque las
+> credenciales viven en laptops. Eon, una plataforma de backup y datos multi-cloud, lo resolvió
+> con **una sola URL**. Onboarding de **2 días a 2 minutos**.
+
+## El problema que MCP crea cuando funciona
+
+MCP resolvió el problema de *conectar* modelos a herramientas. No resolvió el de *operar* esas
+conexiones a escala de equipo. Eon investiga incidentes en AWS, GCP y Azure: un pod caído
+implica revisar logs del contenedor, métricas en Grafana, el PR que lo desplegó y el estado del
+proveedor de nube, en la misma sesión.
+
+Su situación antes del gateway, que seguramente reconoces:
+
+- **Un set de credenciales por sistema** y por desarrollador. Configurar, asegurar, rotar.
+- **~10 procesos MCP locales por máquina**, difíciles de estandarizar y mantener actualizados.
+- **Sin punto único de decisión** sobre qué tools puede llamar cada persona o agente.
+- **VPC peering o PrivateLink por cuenta** para alcanzar servidores MCP en cuentas distintas.
+- **2 días de onboarding** antes de investigar el primer incidente.
+- Un **agente SRE autónomo** (Claude en Bedrock) que necesitaba las mismas tools que los
+  humanos, **con permisos distintos**.
+
+Ese último punto es el que convierte un problema de DevEx en un problema de arquitectura. Si tu
+agente no puede alcanzar las mismas herramientas que tus ingenieros, va a investigar con menos
+contexto. Si las alcanza con las mismas credenciales, tienes un problema de seguridad.
+
+## Dos opciones sobre la mesa
+
+**Opción 1: proxy reverso propio con auth custom.** Agrega todas las tools detrás de un proxy.
+Resuelve la consolidación de credenciales, pero solo soporta MCP remoto y obliga a construir
+traducción de protocolo, manejo de sesiones y lógica de autorización desde cero.
+
+**Opción 2: gateway administrado** (AgentCore Gateway) con federación de identidad, políticas
+Cedar y un runtime que convierte servidores MCP stdio en endpoints HTTP remotos.
+
+Eligieron la segunda. No por la marca, sino porque **identidad separada, conectividad entre
+cuentas y enforcement de políticas** pasaban de ser código propio a ser capacidades
+administradas. Si estás en GCP, el razonamiento aplica igual: la pregunta no es qué gateway,
+es si quieres mantener tú el plano de autorización.
+
+## La arquitectura en cinco capas
+
+1. **Clientes**: Claude Code, Cursor o Codex apuntan a **una URL MCP**. El agente SRE usa la
+   misma URL con otra identidad.
+2. **Plano de identidad**: SSO corporativo federado vía Cognito, que emite el JWT. API Gateway
+   como punto de entrada OAuth para humanos. Los agentes usan `client_credentials`.
+3. **Un gateway, mínimo privilegio**: puerta única para toda la compañía.
+4. **Políticas Cedar en modo ENFORCE**: cada `tools/call` se evalúa antes de reenviarse.
+5. **Targets**: decenas de servidores MCP con **cientos de tools**, alojados en runtimes
+   distribuidos en varias cuentas AWS.
+
+El flujo de un desarrollador: abre su IDE, configura una URL, se autentica por SSO y el gateway
+agrega todos los `tools/list` en un solo manifiesto. Sin setup local, sin tokens por tool.
+
+Si te suena a lo que discutimos en [MCP en producción: patrones de integración
+real](/es/blog/mcp-en-produccin-patrones-de-integracin-real), es porque lo es: el gateway es la
+evolución natural cuando pasas de un equipo a una organización.
+
+## La decisión central: autorización como código, evaluada en el borde
+
+La pieza que hace funcionar todo son las políticas Cedar. Humanos y agentes entran por la misma
+puerta; Cedar decide qué puede hacer cada uno:
+
+```plaintext
+// El agente "sre-bot" puede comentar PRs en GitHub
+permit(
+    principal == Agent::"sre-bot",
+    action == Action::"tools/call",
+    resource == Tool::"github_add_pr_comment"
+);
+
+// Ningún humano puede invocar tools de mutación
+forbid(
+    principal in Group::"humans",
+    action == Action::"tools/call",
+    resource in ResourceGroup::"write-tools"
+);
+```
+
+Tres cosas que me parecen correctas:
+
+- **Producción es solo lectura**, con acceso just-in-time aprobado y auditado.
+- **Las escrituras son de bajo impacto** (comentar un PR o un ticket) y requieren un `permit`
+  explícito para una identidad de agente específica.
+- **Las políticas viven en GitHub con PRs y review.** Cada cambio de permisos tiene autor,
+  revisor y diff. Esto es lo que separa gobernanza real de una hoja de cálculo de permisos.
+
+Fíjate en la inversión: los humanos **no pueden** invocar tools de escritura vía gateway, el
+agente sí, pero solo las que tiene explícitamente permitidas. Lo contrario de lo que haría la
+mayoría por instinto. Tiene sentido: el agente tiene un set de tools acotado y auditable; el
+humano tiene su consola y su flujo de aprobación normal para cambios.
+
+### El mismo patrón, como puerto en Go
+
+Si construyes tu propio gateway (o un middleware MCP frente a servidores internos), el diseño
+hexagonal es directo: la autorización es un puerto evaluado antes de despachar.
+
+```go
+package gateway
+
+import (
+	"context"
+	"errors"
+)
+
+type PrincipalKind string
+
+const (
+	Human PrincipalKind = "human"
+	Agent PrincipalKind = "agent"
+)
+
+type Principal struct {
+	ID     string
+	Kind   PrincipalKind
+	Groups []string
+}
+
+type ToolCall struct {
+	Tool string
+	Args map[string]any
+}
+
+var ErrForbidden = errors.New("gateway: tool call forbidden by policy")
+
+// Authorizer es el puerto. Cedar, OPA o una tabla en Postgres son adaptadores.
+type Authorizer interface {
+	Authorize(ctx context.Context, p Principal, call ToolCall) (bool, error)
+}
+
+// Target es cualquier servidor MCP detrás del gateway.
+type Target interface {
+	Call(ctx context.Context, call ToolCall) (Result, error)
+}
+
+type Gateway struct {
+	authz   Authorizer
+	routes  map[string]Target // tool -> target
+	auditor Auditor
+}
+
+func (g *Gateway) Dispatch(ctx context.Context, p Principal, call ToolCall) (Result, error) {
+	ok, err := g.authz.Authorize(ctx, p, call)
+	if err != nil {
+		// Fallo del motor de políticas = deny. Nunca fail-open.
+		g.auditor.Denied(ctx, p, call, err)
+		return Result{}, ErrForbidden
+	}
+	if !ok {
+		g.auditor.Denied(ctx, p, call, nil)
+		return Result{}, ErrForbidden
+	}
+	target, found := g.routes[call.Tool]
+	if !found {
+		return Result{}, ErrForbidden // tool no registrada: no existe para nadie
+	}
+	g.auditor.Allowed(ctx, p, call)
+	return target.Call(ctx, call)
+}
+```
+
+Dos detalles que no son opcionales: **fail-closed** si el motor de políticas falla, y
+**auditoría de las denegaciones**, no solo de lo permitido. Las denegaciones son tu señal de
+que un agente está intentando algo fuera de su alcance.
+
+## Conectividad entre cuentas sin redes
+
+Eon corre runtimes en varias cuentas AWS separadas por entorno o servicio. El gateway las
+alcanza con **asunción de rol IAM entre cuentas**: el runtime en la cuenta B confía en el rol de
+ejecución del gateway en la cuenta A. Una trust policy.
+
+Lo que eliminó: VPC peering y tablas de rutas, costos de endpoints PrivateLink por cuenta,
+coordinación de security groups y **días de setup por cuenta nueva**, reemplazados por minutos.
+
+Dos patrones para adjuntar targets:
+
+- **Runtime + IAM**: la tool necesita un salto a la nube con credenciales IAM (Grafana, API de
+  Kubernetes). Es el caso mayoritario.
+- **Runtime envolviendo un MCP remoto**: cuando hay que filtrar la superficie de tools o
+  traducir credenciales (Linear).
+
+Esto es identidad como plano de conectividad. En GCP, la analogía es Workload Identity
+Federation más IAM a nivel de servicio en lugar de VPC peering entre proyectos.
+
+## Lecciones a 100+ devs y ~10,000 sesiones
+
+### El tamaño de la política es un límite real
+
+Cada schema de tool que el gateway pre-indexa suma al tamaño de la política Cedar. Con decenas
+de targets y manifiestos extensos, se acercaron a la cuota. La solución: **modo DYNAMIC** para
+targets con muchas tools, donde el gateway reenvía `tools/list` en tiempo de request en lugar
+de pre-indexar. Cero bytes a la política.
+
+El trade-off: **sin búsqueda semántica de tools** en esos targets. Configuración híbrida:
+DEFAULT para targets con OAuth por usuario (pocas tools, necesitan schemas pre-indexados para
+el consentimiento) y DYNAMIC para catálogos grandes.
+
+### Los clientes MCP estándar no hablan el mismo OAuth
+
+Claude Code, Cursor y Codex esperan el parámetro `state` de OAuth para protección CSRF. El
+gateway usa binding por URI de sesión. Construyeron un **shim en API Gateway** que traduce entre
+ambos. Esto es exactamente el tipo de fricción que no aparece en la demo y te come una semana.
+
+### Filtrar la superficie de tools
+
+Algunos servidores MCP exponen cientos de tools; un desarrollador necesita un subconjunto. Un
+wrapper en el runtime **filtra el manifiesto**, reduce ruido en `tools/list`, evita invocaciones
+accidentales y mantiene esos targets en modo DEFAULT (con búsqueda semántica).
+
+```go
+// ManifestFilter reduce la superficie que ve cada principal.
+// Menos tools = menos tokens de contexto y menos decisiones erróneas.
+type ManifestFilter interface {
+	Visible(ctx context.Context, p Principal, all []ToolSpec) []ToolSpec
+}
+
+func (g *Gateway) ListTools(ctx context.Context, p Principal) []ToolSpec {
+	all := g.catalog.All(ctx)
+	visible := g.filter.Visible(ctx, p, all)
+	out := visible[:0]
+	for _, t := range visible {
+		// Solo listar lo que el principal puede efectivamente invocar.
+		if ok, _ := g.authz.Authorize(ctx, p, ToolCall{Tool: t.Name}); ok {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+```
+
+Es la misma idea que vimos en [Snyk
+Assist](/es/blog/snyk-assist-un-runtime-muchas-puertas-y-85-de-sesiones-sin-ticket): **la tool
+que el principal no puede usar no debería existir en su contexto**. Autorización por
+construcción, no por instrucción.
+
+## Resultados
+
+- **Credenciales por desarrollador**: de una por sistema a **cero** (un login SSO).
+- **Procesos MCP locales**: de 10 a **0**.
+- **Onboarding**: de **2 días a 2 minutos**.
+- **Configuración de red entre cuentas**: de peering por cuenta a **solo IAM**.
+- **Autorización**: una política Cedar para humanos y agentes.
+- **Escala**: 100+ desarrolladores, cientos de tools, ~10,000 sesiones.
+
+El dato que más me interesa no es el onboarding. Es este: **el agente interno explica la mayor
+parte del tiempo ahorrado**, porque con el gateway accede a más contexto y mejora la precisión
+de sus investigaciones. El gateway no solo simplificó la vida de los humanos; le dio al agente
+los ojos que le faltaban.
+
+## Lo que no te dicen
+
+**Un gateway único es un punto único de falla.** El post no habla de disponibilidad. Si el
+gateway cae durante un incidente, tus ingenieros y tu agente SRE pierden todas sus herramientas
+al mismo tiempo. Necesitas un plan de break-glass con acceso directo documentado.
+
+**Cedar no es gratis cognitivamente.** Políticas como código son mejores que permisos ad hoc,
+pero alguien tiene que entender `permit`/`forbid` con precedencia de forbid. Invierte en tests
+de políticas en CI: dado este principal y esta tool, ¿se permite? Si no lo pruebas, no lo
+sabes.
+
+**Pre-indexar vs dinámico es una decisión de producto.** Perder la búsqueda semántica de tools
+en catálogos grandes puede degradar la selección de tools del agente. Mide la precisión de
+selección antes y después de pasar un target a DYNAMIC.
+
+**El caso es interno.** 100+ desarrolladores y un agente propio. Exponer este patrón a clientes
+externos (Eon lo está explorando) agrega multi-tenancy, aislamiento por tenant y límites de
+tasa que no están en este diseño.
+
+## Qué te llevas
+
+- **MCP local no escala a un equipo.** El paso natural es un gateway remoto con identidad.
+- **Humanos y agentes por la misma puerta, con identidades distintas.**
+- **Autorización como código** (Cedar, OPA), revisada por PR, evaluada en cada `tools/call`.
+- **Fail-closed y auditoría de denegaciones**, siempre.
+- **Identidad como conectividad**: trust policies en lugar de peering de redes.
+- **Filtra el manifiesto por principal**: menos tools, menos tokens, menos errores.
+
+El martes vimos con Bayer cómo acotar tools por agente dentro de un sistema. Hoy, cómo hacerlo
+para toda una organización. El sábado cerramos con lo que pasa cuando esas tools fallan: los
+siete patrones de sistemas distribuidos que ningún prompt reemplaza.
