@@ -1,36 +1,37 @@
-# Calendario Semanal de Contenido — Semana del 12 de Octubre, 2026
+# Calendario Semanal de Contenido — Semana del 19 de Octubre, 2026
 
-> **Consolidación 2026-10-14.** Del 8-sep al 13-oct ningún post llegó a producción: el PAT de
-> `gh` no tenía `pull_requests: write` (corregido el 14-oct) y los jobs del 8 al 12-sep se
-> saltaron por `drift_skip`. La rama `content/consolidacion-pendientes-oct14` publica de una vez
-> los 13 posts atrasados: Meta, Duolingo, Spotify, IBM, State Farm, Toyota, monday.com, Google,
-> Wood Mackenzie, Trane, Fortune 500, OpenAI Medicare y Postman. SPS Commerce y MUFG siguen
-> programados abajo. Shopify, Notion y GitHub (semana del 1-sep) quedan en `draft: true` sin fecha.
-
-## Serie: Agentes en Producción y Casos de Uso Reales
+## Tema: Topología, Superficie y Evaluación de Agentes en Producción
 
 | # | Fecha | Slug | Título | Serie | Parte | Pillar |
 |---|-------|------|--------|-------|-------|--------|
-| 1 | 2026-10-13 | `postman-agent-mode-para-40-millones-de-desarrolladores-con-amazon-bedrock` | Postman: Agent Mode para 40 Millones de Desarrolladores con Amazon Bedrock | Arquitectura de Software Avanzada | 22 | arquitectura |
-| 2 | 2026-10-15 | `sps-commerce-la-fabrica-de-software-que-proceso-500-tickets-con-cero-incidentes` | SPS Commerce: La Fábrica de Software que Procesó 500 Tickets con Cero Incidentes | Construyendo con IA: Lo que nadie te dice | 21 | agentes-en-produccion |
-| 3 | 2026-10-17 | `mufg-ontologia-y-grafos-de-conocimiento-para-cortar-90-del-trabajo-de-flujogramas` | MUFG: Ontología y Grafos de Conocimiento para Cortar 90% del Trabajo de Flujogramas | Construyendo con IA: Lo que nadie te dice | 22 | agentes-en-produccion |
+| 1 | 2026-10-20 | `cornerstone-orion-ai-13-agentes-que-bajaron-el-diagnostico-de-bases-de-datos-de-45-a-10-minutos` | Cornerstone Orion AI: 13 Agentes que Bajaron el Diagnóstico de Bases de Datos de 45 a 10 Minutos | Arquitectura de Software Avanzada | 23 | agentes-en-produccion |
+| 2 | 2026-10-22 | `snyk-assist-un-runtime-muchas-puertas-y-85-de-sesiones-sin-ticket` | Snyk Assist: Un Runtime, Muchas Puertas y 85% de Sesiones sin Ticket | Construyendo con IA: Lo que nadie te dice | 23 | agentes-en-produccion |
+| 3 | 2026-10-24 | `evals-de-agentes-en-9-etapas-como-aws-atrapa-respuestas-fluidas-pero-incorrectas` | Evals de Agentes en 9 Etapas: Cómo AWS Atrapa Respuestas Fluidas pero Incorrectas | Construyendo con IA: Lo que nadie te dice | 24 | agentes-en-produccion |
 
 ## Foco de cada post
 
-1. **Postman — Agent Mode (40M de desarrolladores sobre Amazon Bedrock)** — El problema no era el modelo: era hacer legible un producto maduro para un agente. Tres patrones emergen a escala: contener el tool sprawl (selección dinámica de tools, no catálogo entero), lecturas por esquema, y tratar el contexto —no la capacidad— como cuello de botella. Debajo, el runtime administrado: flexibilidad de modelo sin reconstruir integración, inferencia cross-Region, retención dependiente del modelo, y prompt caching en dos niveles (1h para el núcleo estable, 5min para el contexto variable). Supervisión humana como diseño: aprobación antes de acciones con estado y redacción de PII con Bedrock Guardrails.
+1. **Cornerstone Orion AI (13 agentes, 45→10 min)** — Hub-and-spoke donde el meta-orquestador no tiene tools de dominio, solo de ruteo y control de flujo. División por dominio y no por complejidad, ruteo keyword-first (80% en <1 ms) con fallback semántico y RAG, memoria en tres niveles con presupuesto de 500 ms / 4,000 tokens y bypass forzado para estado en vivo, confirmation gate con deny por defecto, MCP solo para tools compartidas. Código Go: puerto `Router` con cadena de adaptadores.
+2. **Snyk Assist (60k consultas, 85% sin ticket)** — De herramienta interna (1 año) a portal (abr-2026) a producto core (sep-2026) sin cambiar el runtime. Superficies como adaptadores hexagonales, tools registradas por permisos en cada request (autorización por construcción), middleware ordenado para guardrails/contexto/fallback, checkpointer en PostgreSQL, umbrales de eval commiteados en el repo como gate de CI y online evals sobre el 100% de runs. Código Go: `ToolsFor(principal)` y cadena de middleware.
+3. **Evals en 9 etapas (AWS SMGS)** — Monitoreo en verde no es calidad. Evaluación en tres niveles (tool, agente, multi-agente), taxonomía de 6 fallas derivada de producción, sentinel en CI, replay de tools en CD, gate con tres condiciones, canary de 30 min con paginación tras 3 ventanas, drift en 10% del tráfico (caso tickers "AMZN"), few-shot con placeholders. Pass rate 93→96%, alucinaciones 138→<52 por 10k, MTTD de semanas a <4 h. Código Go: evaluador determinista de magnitud, replay de tools y pager de ventanas consecutivas.
 
-2. **SPS Commerce — fábrica de software (500+ tickets, 0 incidentes)** — Conectar agentes que ya existían, dispersos por equipos, en una línea de ensamblaje con gobernanza. Flujo: planning agent redacta plan → humano aprueba → coding agent abre PR → humano mergea. El agente se trata como "ingeniero junior": aprobación humana donde los ingenieros ya revisan. Requisitos del andamiaje: contexto compartido (context lake), gobernanza, orquestación de handoffs, y visibilidad del ROI. Resultado en 4 meses: 500+ tickets, ~400 story points, 0 incidentes, >50% utilidad reportada.
+## Fuentes
 
-3. **MUFG — ontología + grafo de conocimiento (11→1 días-persona, 90%)** — Por qué la IA generativa sola fallaba en banca regulada: el modelo no sabía qué es un procedimiento válido, así que inventaba. La solución añade dos capas debajo del LLM: una ontología (RDF/OWL, el plano del dominio) y un grafo de instancias en Amazon Neptune. El agente consulta el subgrafo antes de generar, restringe lo que el LLM puede emitir y cita nodos/aristas. La ontología no estandariza (eso es decisión humana); acelera el trabajo de sistema que precede cada decisión. Patrón replicable a cualquier empresa regulada que creció por adquisición.
+- [How Cornerstone OnDemand cut database diagnosis by 78% with Amazon Bedrock](https://aws.amazon.com/blogs/machine-learning/how-cornerstone-ondemand-cut-database-diagnosis-by-78-with-amazon-bedrock/) — AWS ML Blog, 07-oct-2026
+- [How Snyk turned an internal support agent into a customer feature](https://www.langchain.com/blog/how-snyk-turned-an-internal-support-agent-into-a-customer-feature) — LangChain Blog, 08-oct-2026
+- [Building trust in AI agents: A production-ready evaluation framework with Amazon Bedrock AgentCore](https://aws.amazon.com/blogs/machine-learning/building-trust-in-ai-agents-a-production-ready-evaluation-framework-with-amazon-bedrock-agentcore/) — AWS ML Blog, 16-oct-2026
 
 ## Cron Jobs de Publicación
 
 | Post | Fecha | Job ID | Acción |
 |------|-------|--------|--------|
-| Postman | 2026-10-13 09:00 CST | `8b4ee5f4f3da` | `draft: false` + commit + push + PR a develop |
-| SPS Commerce | 2026-10-15 09:00 CST | `b158de7219e3` | `draft: false` + commit + push + PR a develop |
-| MUFG | 2026-10-17 09:00 CST | `545275884054` | `draft: false` + commit + push + PR a develop |
+| Cornerstone | 2026-10-20 09:00 CST | `9bd8e962a0ed` | `draft: false` + build + commit + push + PR a develop |
+| Snyk Assist | 2026-10-22 09:00 CST | `09418bb36ccb` | `draft: false` + build + commit + push + PR a develop (reusa PR si existe) |
+| Evals 9 etapas | 2026-10-24 09:00 CST | `53d5fe904331` | `draft: false` + build + commit + push + PR a develop (reusa PR si existe) |
+
+## Dependencias
+
+- La rama base es `origin/develop`, que **no** incluye todavía el PR #102 (13 posts atrasados) ni SPS Commerce / MUFG. La numeración de series (Arquitectura 23, Construyendo con IA 23-24) asume que esos posts se mergean antes.
 
 ---
 
-*Generado automáticamente por Hermes Agent — 2026-10-12*
+*Generado automáticamente por Hermes Agent — 2026-10-19*
