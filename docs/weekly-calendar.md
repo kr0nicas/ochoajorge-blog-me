@@ -1,5 +1,10 @@
 # Calendario Semanal de Contenido — Semana del 9 de Noviembre, 2026
 
+> **Consolidación 2026-11-12.** Del 8-sep al 12-nov ningún post llegó a producción: el token
+> de `gh` usado por los crons no tenía `pull_requests: write` (corregido el 12-nov en
+> `hosts.yml`). Este release publica de una vez los 23 posts atrasados (8-sep a 12-nov).
+> Shopify, Notion y GitHub (semana del 1-sep) siguen en `draft: true` sin fecha.
+
 ## Tema de la semana: dónde vive el control en un sistema de agentes
 
 | # | Fecha | Slug | Título | Serie | Parte | Pillar |
